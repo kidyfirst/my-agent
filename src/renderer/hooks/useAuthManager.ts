@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react"
+import { DEFAULT_FALLBACK_MODEL_ID } from "../../constants/models.js"
 
 interface LoginState {
 	providerId: string
@@ -37,11 +38,11 @@ export function useAuthManager() {
 	const handleSkipLogin = useCallback(async () => {
 		await window.api.invoke({
 			type: "switchModel",
-			modelId: "google/gemini-3.8-flash",
+			modelId: DEFAULT_FALLBACK_MODEL_ID,
 			scope: "global",
 		})
 		setIsAuthenticated(true)
-		return "google/gemini-3.8-flash"
+		return DEFAULT_FALLBACK_MODEL_ID
 	}, [])
 
 	const handleLoginSubmitCode = useCallback((code: string) => {

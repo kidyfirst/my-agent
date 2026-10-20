@@ -7,8 +7,10 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> =
 		"anthropic/claude-haiku-4-5": { input: 0.8, output: 4 },
 		"openai/gpt-5.2-codex": { input: 2, output: 8 },
 		"openai/o3": { input: 10, output: 40 },
+		"google/gemini-3-flash-preview": { input: 0.15, output: 0.6 },
+		"google/gemini-3.5-flash": { input: 0.15, output: 0.6 },
 		"google/gemini-3.8-flash": { input: 0.15, output: 0.6 },
-		"google/gemini-2.5-pro": { input: 1.25, output: 10 },
+		"google/gemini-3.1-pro-preview": { input: 1.25, output: 10 },
 	}
 
 export function estimateTokenCost(

@@ -82,6 +82,25 @@ describe("messageParser", () => {
 			const res = normalizeMessageContent([], "fallback text")
 			expect(res).toEqual([{ type: "text", text: "fallback text" }])
 		})
+
+		it("normalizes JSON string containing format 2 parts array", () => {
+			const jsonStr = JSON.stringify({
+				format: 2,
+				parts: [{ type: "text", text: "test" }],
+				metadata: { signal: { type: "user" } },
+			})
+			const res = normalizeMessageContent(jsonStr)
+			expect(res).toEqual([{ type: "text", text: "test" }])
+		})
+
+		it("normalizes data-user-message signal object", () => {
+			const part = {
+				type: "data-user-message",
+				data: { contents: "hello from signal" },
+			}
+			const res = normalizeMessageContent([part])
+			expect(res).toEqual([{ type: "text", text: "hello from signal" }])
+		})
 	})
 
 	describe("extractMessageDetails", () => {

@@ -116,9 +116,23 @@ export function ChatView({
 	}> = []
 
 	for (const msg of messages) {
-		if (msg.role === "user") {
+		const rawContent = msg.content as unknown
+		const isUser =
+			msg.role === "user" ||
+			((msg.role as string) === "signal" &&
+				((msg as any).type === "user" ||
+					(typeof rawContent === "object" &&
+						(rawContent as any)?.metadata?.signal?.type === "user") ||
+					(typeof rawContent === "string" &&
+						(rawContent.includes('"type":"user"') ||
+							rawContent.includes('"data-user-message"')))))
+		const isSystem =
+			msg.role === "system" ||
+			((msg.role as string) === "signal" && (msg as any).type === "system")
+
+		if (isUser) {
 			items.push({ type: "user", key: `msg-${msg.id}`, data: msg })
-		} else if (msg.role === "system") {
+		} else if (isSystem) {
 			items.push({ type: "system", key: `msg-${msg.id}`, data: msg })
 		} else if (msg.role === "assistant") {
 			// Walk content blocks in order and group consecutive text/thinking

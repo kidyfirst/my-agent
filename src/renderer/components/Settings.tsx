@@ -54,9 +54,9 @@ export function Settings({ onClose, loggedInProviders, onLogin, onApiKey, onLogo
 				smartEditing: (st?.smartEditing as boolean) ?? true,
 				thinkingLevel: (st?.thinkingLevel as ThinkingLevel) ?? "off",
 				observerModelId:
-					(st?.observerModelId as string) ?? "google/gemini-3.8-flash",
+					(st?.observerModelId as string) || (st?.currentModelId as string) || "",
 				reflectorModelId:
-					(st?.reflectorModelId as string) ?? "google/gemini-3.8-flash",
+					(st?.reflectorModelId as string) || (st?.currentModelId as string) || "",
 				observationThreshold: (st?.observationThreshold as number) ?? 30000,
 				reflectionThreshold: (st?.reflectionThreshold as number) ?? 40000,
 				prInstructions: (st?.prInstructions as string) ?? "",

@@ -85,7 +85,7 @@ export function openaiCodexProvider(
 			apiKey: process.env.OPENAI_API_KEY || "test-api-key",
 		})
 		return wrapLanguageModel({
-			model: openai.responses(modelId),
+			model: openai.responses(modelId) as any,
 			middleware: [openaiCodexMiddleware],
 		})
 	}
@@ -183,7 +183,7 @@ export function openaiCodexProvider(
 	// Use the responses API for Codex models
 	// Wrap with middleware
 	return wrapLanguageModel({
-		model: openai.responses(modelId),
+		model: openai.responses(modelId) as any,
 		middleware: [openaiCodexMiddleware],
 	})
 }

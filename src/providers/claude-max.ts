@@ -143,7 +143,7 @@ export function opencodeClaudeMaxProvider(
 			apiKey: process.env.ANTHROPIC_API_KEY || "test-api-key",
 		})
 		return wrapLanguageModel({
-			model: anthropic(modelId),
+			model: anthropic(modelId) as any,
 			middleware: [claudeCodeMiddleware, promptCacheMiddleware],
 		})
 	}
@@ -204,7 +204,7 @@ export function opencodeClaudeMaxProvider(
 
 	// Wrap with middleware to inject Claude Code identity and enable prompt caching
 	return wrapLanguageModel({
-		model: anthropic(modelId),
+		model: anthropic(modelId) as any,
 		middleware: [claudeCodeMiddleware, promptCacheMiddleware],
 	})
 }

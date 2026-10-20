@@ -1,7 +1,12 @@
 import { createRoot } from "react-dom/client"
 import { App } from "./App"
+import { ErrorBoundary } from "./components/ErrorBoundary"
 import "./styles/global.css"
 import "@xterm/xterm/css/xterm.css"
 
 const root = createRoot(document.getElementById("root")!)
-root.render(<App />)
+root.render(
+	<ErrorBoundary>
+		<App />
+	</ErrorBoundary>,
+)

@@ -26,9 +26,9 @@ export const requestSandboxAccessTool = createTool({
 	}),
 	execute: async ({ path: requestedPath, reason }, context) => {
 		try {
-			const harnessCtx = context?.requestContext?.get("harness") as
-				| HarnessRequestContext
-				| undefined
+			const harnessCtx = ((context as any)?.requestContext?.get?.(
+				"controller",
+			) || (context as any)?.requestContext?.get?.("harness")) as any
 
 			// Resolve to absolute path
 			const absolutePath = path.isAbsolute(requestedPath)
@@ -61,7 +61,7 @@ export const requestSandboxAccessTool = createTool({
 
 				// Emit event — UI will show the dialog
 				harnessCtx.emitEvent!({
-					type: "ask_question",
+					type: "ask_question" as any,
 					questionId,
 					question: `Grant access to "${absolutePath}"? Reason: ${reason}`,
 				})

@@ -40,7 +40,7 @@ async function takeScreenshot(browserManager: PlaywrightBrowserManager) {
  */
 export function createComputerUseTool(
 	browserManager: PlaywrightBrowserManager,
-) {
+): any {
 	const anthropic = createAnthropic({})
 
 	return anthropic.tools.computer_20251124({

@@ -1,6 +1,6 @@
 import type { BrowserWindow } from "electron"
 import type * as pty from "node-pty"
-import type { Harness } from "@mastra/core/harness"
+import type { MastraCodeHarness as Harness } from "../../harness/index.js"
 import type { ElectronStateManager } from "../electron-state.js"
 import type { PlaywrightBrowserManager } from "../../browser/playwright-manager.js"
 

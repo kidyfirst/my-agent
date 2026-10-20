@@ -164,7 +164,7 @@ function saveLastSyncTime(date: Date): void {
 /**
  * Sync gateways and update the global cache
  */
-async function syncGateways(force = false): Promise<void> {
+export async function syncGateways(force = false): Promise<void> {
 	if (isSyncing && !force) {
 		return
 	}

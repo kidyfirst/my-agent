@@ -201,7 +201,11 @@ export function getDatabasePath(): string {
 	if (process.env.MASTRA_DB_PATH) {
 		return process.env.MASTRA_DB_PATH
 	}
-	return path.join(getAppDataDir(), "mastra.db")
+	const dir = getAppDataDir()
+	try {
+		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+	} catch {}
+	return path.join(dir, "mastra.db")
 }
 
 /**
@@ -223,7 +227,7 @@ interface StorageConfig {
  *   3. Global config: ~/.myagent/database.json
  *   4. Local file database (default)
  */
-function getStorageConfig(projectDir?: string): StorageConfig {
+export function getStorageConfig(projectDir?: string): StorageConfig {
 	// 1. Environment variables
 	if (process.env.MASTRA_DB_URL) {
 		return {
@@ -316,7 +320,7 @@ type OmScope = "thread" | "resource"
  *   3. Global config: ~/.myagent/database.json → omScope
  *   4. Default: "thread"
  */
-function getOmScope(projectDir?: string): OmScope {
+export function getOmScope(projectDir?: string): OmScope {
 	// 1. Environment variable
 	const envScope = process.env.MASTRA_OM_SCOPE
 	if (envScope === "thread" || envScope === "resource") {
@@ -367,7 +371,7 @@ function loadOmScopeFromConfig(filePath: string): OmScope | null {
  *   3. Global config: ~/.myagent/database.json → resourceId
  *   4. null (use auto-detected value)
  */
-function getResourceIdOverride(projectDir?: string): string | null {
+export function getResourceIdOverride(projectDir?: string): string | null {
 	// 1. Environment variable
 	if (process.env.MASTRA_RESOURCE_ID) {
 		return process.env.MASTRA_RESOURCE_ID

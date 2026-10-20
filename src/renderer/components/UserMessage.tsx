@@ -34,47 +34,64 @@ export function UserMessage({ message }: UserMessageProps) {
 	return (
 		<div
 			style={{
-				padding: "10px 14px",
+				display: "flex",
+				justifyContent: "flex-end",
 				margin: "8px 0",
-				background: "var(--user-message-bg)",
-				border: "1px solid var(--border-muted)",
-				borderRadius: 8,
-				color: "var(--user-message-text)",
-				fontSize: 13,
-				whiteSpace: "pre-wrap",
-				wordBreak: "break-word",
 			}}
 		>
-			{text}
-			{images && images.length > 0 && (
-				<div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-					{images.map((img: MessageContent, i: number) => {
-						const imgData = img as unknown as {
-							mimeType?: string
-							data?: string
-							url?: string
-						}
-						const src = imgData.url
-							? imgData.url
-							: imgData.data
-							? `data:${imgData.mimeType || "image/png"};base64,${imgData.data}`
-							: ""
-						if (!src) return null
-						return (
-							<img
-								key={i}
-								src={src}
-								style={{
-									maxWidth: 300,
-									maxHeight: 200,
-									borderRadius: 6,
-									border: "1px solid var(--border-muted)",
-								}}
-							/>
-						)
-					})}
-				</div>
-			)}
+			<div
+				style={{
+					padding: "10px 14px",
+					background: "var(--user-message-bg)",
+					border: "1px solid var(--border-muted)",
+					borderRadius: 8,
+					color: "var(--user-message-text)",
+					fontSize: 13,
+					whiteSpace: "pre-wrap",
+					wordBreak: "break-word",
+					maxWidth: "70%",
+					textAlign: "left",
+				}}
+			>
+				{text}
+				{images && images.length > 0 && (
+					<div
+						style={{
+							marginTop: 8,
+							display: "flex",
+							gap: 8,
+							flexWrap: "wrap",
+							justifyContent: "flex-end",
+						}}
+					>
+						{images.map((img: MessageContent, i: number) => {
+							const imgData = img as unknown as {
+								mimeType?: string
+								data?: string
+								url?: string
+							}
+							const src = imgData.url
+								? imgData.url
+								: imgData.data
+								? `data:${imgData.mimeType || "image/png"};base64,${imgData.data}`
+								: ""
+							if (!src) return null
+							return (
+								<img
+									key={i}
+									src={src}
+									style={{
+										maxWidth: 300,
+										maxHeight: 200,
+										borderRadius: 6,
+										border: "1px solid var(--border-muted)",
+									}}
+								/>
+							)
+						})}
+					</div>
+				)}
+			</div>
 		</div>
 	)
 }

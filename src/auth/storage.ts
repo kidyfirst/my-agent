@@ -22,15 +22,11 @@ import type {
 	OAuthProviderInterface,
 } from "./types.js"
 
-/**
- * Best/default models for each OAuth provider.
- * Used when auto-selecting a model after login.
- */
-const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-	anthropic: "anthropic/claude-opus-4-6",
-	"openai-codex": "openai/gpt-5.3-codex",
-	google: "google/gemini-3.8-flash",
-}
+import {
+	PROVIDER_DEFAULT_MODELS,
+	getDefaultModelForProvider,
+	resolveDefaultModel,
+} from "../constants/models.js"
 
 // Provider registry
 import { anthropicOAuthProvider } from "./providers/anthropic.js"
@@ -83,7 +79,6 @@ export class AuthStorage {
 			if (provider === "google") {
 				process.env.GOOGLE_GENERATIVE_AI_API_KEY = key
 				process.env.GEMINI_API_KEY = key
-				process.env.DEFAULT_OM_MODEL_ID = "google/gemini-3.8-flash"
 			} else if (provider === "anthropic") {
 				process.env.ANTHROPIC_API_KEY = key
 			} else if (provider === "openai" || provider === "openai-codex") {
@@ -96,6 +91,9 @@ export class AuthStorage {
 				process.env.GROQ_API_KEY = key
 			}
 		}
+		process.env.DEFAULT_OM_MODEL_ID = resolveDefaultModel((p) =>
+			this.isLoggedIn(p),
+		)
 	}
 
 	/**
@@ -132,6 +130,17 @@ export class AuthStorage {
 	 */
 	get(provider: string): AuthCredential | undefined {
 		return this.data[provider] ?? undefined
+	}
+
+	/**
+	 * Synchronously get API key or token for a provider.
+	 */
+	getApiKeySync(provider: string): string | undefined {
+		const cred = this.data[provider]
+		if (cred?.type === "api_key") return cred.key
+		if (cred?.type === "oauth" && (cred as any).access)
+			return (cred as any).access
+		return undefined
 	}
 
 	/**

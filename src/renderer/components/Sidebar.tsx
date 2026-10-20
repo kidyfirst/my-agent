@@ -33,11 +33,9 @@ interface SidebarProps {
 	onCreateWorktree: (repoPath: string) => void
 	onDeleteWorktree: (worktreePath: string) => void
 	onOpenSettings: () => void
-	onOpenTasks: () => void
 	onOpenAgents: () => void
 	onOpenAccounts: () => void
 	isSettingsActive: boolean
-	isTasksActive: boolean
 	isAgentsActive: boolean
 	activeAgentCount: number
 }
@@ -74,11 +72,9 @@ export function Sidebar({
 	onCreateWorktree,
 	onDeleteWorktree,
 	onOpenSettings,
-	onOpenTasks,
 	onOpenAgents,
 	onOpenAccounts,
 	isSettingsActive,
-	isTasksActive,
 	isAgentsActive,
 	activeAgentCount,
 }: SidebarProps) {
@@ -139,40 +135,6 @@ export function Sidebar({
 					<span style={{ fontSize: 16, fontWeight: 700, color: "var(--logo-accent, #059669)", letterSpacing: -0.4 }}>Agent</span>
 				</div>
 			</div>
-
-			{/* Tasks — primary navigation, above workspace list */}
-			<button
-				onClick={onOpenTasks}
-				style={{
-					display: "flex",
-					alignItems: "center",
-					gap: 8,
-					width: "100%",
-					padding: "10px 14px",
-					background: isTasksActive ? "var(--selected-bg)" : "transparent",
-					borderLeft: isTasksActive
-						? "3px solid var(--accent)"
-						: "3px solid transparent",
-					borderTop: "none",
-					borderRight: "none",
-					borderBottom: "1px solid var(--border-muted)",
-					cursor: "pointer",
-					flexShrink: 0,
-					textAlign: "left" as const,
-				}}
-			>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-					<path d="M9 11l3 3L22 4" />
-					<path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-				</svg>
-				<span style={{
-					fontSize: 13,
-					fontWeight: 600,
-					color: isTasksActive ? "var(--text)" : "var(--muted)",
-				}}>
-					Tasks
-				</span>
-			</button>
 
 			{/* Agents — agent dashboard navigation */}
 			<button

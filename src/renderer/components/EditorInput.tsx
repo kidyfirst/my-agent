@@ -169,6 +169,10 @@ export function EditorInput({
 				setActiveCommand(null)
 				setAttachedFiles([])
 				setShowSlashMenu(false)
+				if (textareaRef.current) {
+					textareaRef.current.style.height = "auto"
+					textareaRef.current.style.overflowY = "hidden"
+				}
 			}
 			if (e.key === "Escape" && isAgentActive) {
 				onAbort()
@@ -193,7 +197,9 @@ export function EditorInput({
 			// Auto-resize
 			const ta = e.target
 			ta.style.height = "auto"
-			ta.style.height = Math.min(ta.scrollHeight, 200) + "px"
+			const newHeight = Math.min(ta.scrollHeight, 200)
+			ta.style.height = newHeight + "px"
+			ta.style.overflowY = ta.scrollHeight > 200 ? "auto" : "hidden"
 		},
 		[activeCommand],
 	)
@@ -410,7 +416,7 @@ export function EditorInput({
 								? "Agent is running... (Esc to abort)"
 								: activeCommand
 									? "Add a message..."
-									: "Send a message... (Enter to send, Shift+Enter for newline)"
+									: "Send a message..."
 						}
 						disabled={isAgentActive}
 						rows={1}
@@ -427,6 +433,8 @@ export function EditorInput({
 							minHeight: 20,
 							maxHeight: 200,
 							opacity: isAgentActive ? 0.5 : 1,
+							overflowX: "hidden",
+							overflowY: "hidden",
 						}}
 					/>
 					{isAgentActive ? (
@@ -458,6 +466,10 @@ export function EditorInput({
 								setActiveCommand(null)
 								setAttachedFiles([])
 								setShowSlashMenu(false)
+								if (textareaRef.current) {
+									textareaRef.current.style.height = "auto"
+									textareaRef.current.style.overflowY = "hidden"
+								}
 							}}
 							style={{
 								padding: "4px 12px",

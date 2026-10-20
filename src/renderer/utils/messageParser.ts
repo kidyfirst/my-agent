@@ -61,6 +61,13 @@ export function normalizeMessageContent(
 	fallbackText?: string,
 ): MessageContent[] {
 	if (typeof rawContent === "string") {
+		const trimmed = rawContent.trim()
+		if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+			try {
+				const parsed = JSON.parse(trimmed)
+				return normalizeMessageContent(parsed, fallbackText)
+			} catch {}
+		}
 		return [{ type: "text", text: rawContent }]
 	}
 
@@ -72,6 +79,46 @@ export function normalizeMessageContent(
 			} else if (item && typeof item === "object") {
 				const obj = item as Record<string, unknown>
 				const type = String(obj.type || "").toLowerCase()
+				if (type === "data-user-message" && obj.data) {
+					const d = obj.data as any
+					const userText =
+						typeof d.contents === "string"
+							? d.contents
+							: typeof d.content === "string"
+								? d.content
+								: typeof d.text === "string"
+									? d.text
+									: ""
+					if (userText) {
+						blocks.push({
+							type: "text",
+							text: userText,
+						})
+						continue
+					}
+				}
+				if (type === "user") {
+					const userText =
+						typeof obj.text === "string"
+							? obj.text
+							: typeof obj.content === "string"
+								? obj.content
+								: ""
+					if (userText) {
+						blocks.push({
+							type: "text",
+							text: userText,
+						})
+						continue
+					}
+				}
+				if (type === "text-delta" && typeof obj.text === "string") {
+					blocks.push({
+						type: "text",
+						text: obj.text,
+					})
+					continue
+				}
 				if (!type) {
 					if (obj.text != null || obj.content != null || obj.value != null) {
 						blocks.push({

@@ -31,6 +31,13 @@ const api = {
 		ipcRenderer.send("set-badge-count", count)
 	},
 
+	/** Listen for window focus events from the main process */
+	onWindowFocus: (callback: () => void): (() => void) => {
+		const handler = () => callback()
+		ipcRenderer.on("window-focus", handler)
+		return () => ipcRenderer.removeListener("window-focus", handler)
+	},
+
 	/** Listen for URLs that should be opened in the app browser */
 	onOpenUrl: (callback: (url: string) => void): (() => void) => {
 		const handler = (_: Electron.IpcRendererEvent, url: string) => callback(url)

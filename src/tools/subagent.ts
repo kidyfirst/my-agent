@@ -101,7 +101,8 @@ Use this tool when:
 			}
 
 			// Get emit function and abort signal from harness context (if available)
-			const harnessCtx = context?.requestContext?.get("harness") as
+			const harnessCtx = (context?.requestContext?.get("controller") ||
+				context?.requestContext?.get("harness")) as
 				| HarnessRequestContext
 				| undefined
 			const emitEvent = harnessCtx?.emitEvent

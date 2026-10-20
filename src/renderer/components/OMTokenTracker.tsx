@@ -88,13 +88,15 @@ function Metric({
 				alignItems: "center",
 				gap: 4,
 				fontSize: 11,
+				whiteSpace: "nowrap",
+				flexShrink: 0,
 			}}
 		>
-			<span style={{ color: labelColor, fontWeight: 500 }}>{label}</span>
+			<span style={{ color: labelColor, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
 			<ProgressBar percent={percent} width={32} />
-			<span style={{ color, fontWeight: 400 }}>{fraction}</span>
+			<span style={{ color, fontWeight: 400, whiteSpace: "nowrap" }}>{fraction}</span>
 			{bufferedSavings != null && bufferedSavings > 0 && (
-				<span style={{ color: "var(--muted)", fontSize: 10 }}>
+				<span style={{ color: "var(--muted)", fontSize: 10, whiteSpace: "nowrap" }}>
 					↓{formatTokensThreshold(bufferedSavings)}
 				</span>
 			)}
@@ -156,6 +158,8 @@ export function OMTokenTracker({ omProgress }: OMTokenTrackerProps) {
 				display: "inline-flex",
 				alignItems: "center",
 				gap: 10,
+				whiteSpace: "nowrap",
+				flexShrink: 0,
 			}}
 		>
 			{/* Observation (messages) metric */}
@@ -164,6 +168,8 @@ export function OMTokenTracker({ omProgress }: OMTokenTrackerProps) {
 					display: "inline-flex",
 					alignItems: "center",
 					gap: 3,
+					whiteSpace: "nowrap",
+					flexShrink: 0,
 				}}
 			>
 				{isObserving && <SpinnerDot color={OBSERVER_COLOR} />}
@@ -183,6 +189,7 @@ export function OMTokenTracker({ omProgress }: OMTokenTrackerProps) {
 					width: 1,
 					height: 10,
 					background: "var(--border-muted)",
+					flexShrink: 0,
 				}}
 			/>
 
@@ -192,6 +199,8 @@ export function OMTokenTracker({ omProgress }: OMTokenTrackerProps) {
 					display: "inline-flex",
 					alignItems: "center",
 					gap: 3,
+					whiteSpace: "nowrap",
+					flexShrink: 0,
 				}}
 			>
 				{isReflecting && <SpinnerDot color={REFLECTOR_COLOR} />}

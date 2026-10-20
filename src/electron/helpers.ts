@@ -1,7 +1,11 @@
 import type { BrowserWindow } from "electron"
 import { generateText } from "ai"
-import type { Harness } from "@mastra/core/harness"
+import type { MastraCodeHarness as Harness } from "../harness/index.js"
 import type { AuthStorage } from "../auth/storage.js"
+import {
+	upgradeDeprecatedModel,
+	isDeprecatedModel,
+} from "../constants/models.js"
 
 let mainWindowRef: BrowserWindow | null = null
 
@@ -17,25 +21,26 @@ export async function ensureAuthenticatedModel(
 
 	let modelId = h.getCurrentModelId()
 
-	// Automatically upgrade deprecated models (e.g. gemini-2.5-flash -> gemini-3.8-flash)
-	if (modelId === "google/gemini-2.5-flash") {
-		await h.switchModel({ modelId: "google/gemini-3.8-flash", scope: "thread" })
-		await h.switchModel({ modelId: "google/gemini-3.8-flash", scope: "global" })
+	// Automatically upgrade deprecated models (e.g. gemini-2.5-flash/pro -> modern supported alternative)
+	const upgraded = upgradeDeprecatedModel(modelId)
+	if (upgraded !== modelId) {
+		await h.switchModel({ modelId: upgraded, scope: "thread" })
+		await h.switchModel({ modelId: upgraded, scope: "global" })
 		await h.setState({
-			currentModelId: "google/gemini-3.8-flash",
-			subagentModelId: "google/gemini-3.8-flash",
-			observerModelId: "google/gemini-3.8-flash",
-			reflectorModelId: "google/gemini-3.8-flash",
+			currentModelId: upgraded,
+			subagentModelId: upgraded,
+			observerModelId: upgraded,
+			reflectorModelId: upgraded,
 		})
 		mainWindowRef?.webContents.send("harness:event", {
 			type: "model_changed",
-			modelId: "google/gemini-3.8-flash",
+			modelId: upgraded,
 			modeId: h.getCurrentModeId(),
 		})
 		console.log(
-			`[model-auth] Automatically upgraded deprecated google/gemini-2.5-flash to google/gemini-3.8-flash`,
+			`[model-auth] Automatically upgraded deprecated ${modelId} to ${upgraded}`,
 		)
-		modelId = "google/gemini-3.8-flash"
+		modelId = upgraded
 	}
 
 	const provider = modelId ? modelId.split("/")[0] : ""
@@ -43,7 +48,7 @@ export async function ensureAuthenticatedModel(
 	if (
 		authProviderId &&
 		authStorage.isLoggedIn(authProviderId) &&
-		modelId !== "google/gemini-2.5-flash"
+		!isDeprecatedModel(modelId)
 	) {
 		await h.setState({
 			currentModelId: modelId,

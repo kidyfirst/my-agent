@@ -178,8 +178,8 @@ export function getAllowedPathsFromContext(
 		| undefined,
 ): string[] {
 	if (!toolContext?.requestContext) return []
-	const harnessCtx = toolContext.requestContext.get("harness") as
-		| HarnessRequestContext
-		| undefined
-	return harnessCtx?.getState()?.sandboxAllowedPaths ?? []
+	const harnessCtx = (toolContext.requestContext.get("controller") ||
+		toolContext.requestContext.get("harness")) as any
+	const state = harnessCtx?.state ?? harnessCtx?.getState?.()
+	return state?.sandboxAllowedPaths ?? []
 }

@@ -8,7 +8,6 @@ import { AskQuestionDialog } from "./components/AskQuestionDialog"
 import { PlanApproval } from "./components/PlanApproval"
 import { ModelSelector } from "./components/ModelSelector"
 import { Settings } from "./components/Settings"
-import { TaskBoard } from "./components/TaskBoard"
 import { LoginDialog } from "./components/LoginDialog"
 import { WelcomeScreen } from "./components/WelcomeScreen"
 import { RightSidebar, type RightSidebarTab } from "./components/RightSidebar"
@@ -51,8 +50,8 @@ export function App() {
 	})
 	const [omProgress, setOMProgress] = useState<OMProgressState | null>(null)
 	const [omModelIds, setOMModelIds] = useState<{ observer: string; reflector: string }>({
-		observer: "google/gemini-3.8-flash",
-		reflector: "google/gemini-3.8-flash",
+		observer: "",
+		reflector: "",
 	})
 	const [threads, setThreads] = useState<ThreadInfo[]>([])
 	const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
@@ -147,10 +146,10 @@ export function App() {
 			if (state?.thinkingLevel) setThinkingLevel(state.thinkingLevel)
 			if (state?.tasks) setTasks(state.tasks)
 			if (state?.notifications) project.notificationPrefRef.current = state.notifications
-			if (state?.observerModelId || state?.reflectorModelId) {
+			if (state?.observerModelId || state?.reflectorModelId || state?.currentModelId) {
 				setOMModelIds({
-					observer: state.observerModelId ?? "google/gemini-3.8-flash",
-					reflector: state.reflectorModelId ?? "google/gemini-3.8-flash",
+					observer: state.observerModelId || state.currentModelId || "",
+					reflector: state.reflectorModelId || state.currentModelId || "",
 				})
 			}
 
@@ -322,11 +321,28 @@ export function App() {
 			data,
 			name,
 		}))
-		await window.api.invoke({
-			type: "sendMessage",
-			content: finalContent,
-			...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
-		})
+		try {
+			await window.api.invoke({
+				type: "sendMessage",
+				content: finalContent,
+				...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
+			})
+		} catch (err: unknown) {
+			console.error("Failed to invoke sendMessage:", err)
+			const errMsg = err instanceof Error ? err.message : String(err)
+			dispatch({
+				type: "MESSAGE_START",
+				message: {
+					id: `error-${Date.now()}`,
+					role: "assistant",
+					content: [{ type: "text", text: `Error: ${errMsg}` }],
+					createdAt: new Date().toISOString(),
+					stopReason: "error",
+					errorMessage: errMsg,
+				},
+			})
+			dispatch({ type: "AGENT_END" })
+		}
 	}, [])
 
 	const handleAbort = useCallback(async () => {
@@ -431,7 +447,6 @@ export function App() {
 		const items: CommandItem[] = []
 
 		items.push({ id: "settings", label: "Open Settings", group: "Navigation", shortcut: "\u2318,", action: () => { tabs.setActiveTab("settings"); close() } })
-		items.push({ id: "tasks", label: "Open Task Board", group: "Navigation", action: () => { tabs.setActiveTab("tasks"); close() } })
 		items.push({ id: "agents", label: "Open Agent Dashboard", group: "Navigation", action: () => { tabs.setActiveTab("agents"); close() } })
 		items.push({ id: "focus-git", label: "Focus Git Panel", group: "Navigation", shortcut: "\u2318\u21e7G", action: () => { setRightSidebarVisible(true); setRightSidebarTab("git"); close() } })
 		items.push({ id: "focus-files", label: "Focus File Tree", group: "Navigation", action: () => { setRightSidebarVisible(true); setRightSidebarTab("files"); close() } })
@@ -534,10 +549,8 @@ export function App() {
 					tabs.setActiveTab("settings")
 					tabs.setSettingsSection("accounts")
 				}}
-				onOpenTasks={() => tabs.setActiveTab("tasks")}
 				onOpenAgents={() => tabs.setActiveTab("agents")}
 				isSettingsActive={tabs.activeTab === "settings"}
-				isTasksActive={tabs.activeTab === "tasks"}
 				isAgentsActive={tabs.activeTab === "agents"}
 				activeAgentCount={project.activeWorktrees.size}
 			/>
@@ -864,15 +877,7 @@ export function App() {
 					<>
 						<div
 							onMouseDown={() => {
-								const p = project.projectInfoRef.current?.rootPath
-								if (p) {
-									project.setUnreadWorktrees((prev) => {
-										if (!prev.has(p)) return prev
-										const next = new Set(prev)
-										next.delete(p)
-										return next
-									})
-								}
+								project.markWorktreeRead()
 							}}
 							style={{
 								flex: 1,
@@ -911,8 +916,6 @@ export function App() {
 							/>
 						)}
 
-						{tabs.activeTab === "tasks" && <TaskBoard agentTasks={tasks} onClose={() => tabs.setActiveTab("chat")} onStartWork={project.handleStartWorkOnIssue} onStartWorkGithub={project.handleStartWorkOnGithubIssue} linkedIssues={project.linkedIssues} onSwitchToWorktree={project.handleSwitchProject} />}
-
 						{tabs.activeTab === "agents" && (
 							<AgentDashboard
 								onClose={() => tabs.setActiveTab("chat")}
@@ -920,7 +923,7 @@ export function App() {
 							/>
 						)}
 
-						{tabs.activeTab !== "chat" && tabs.activeTab !== "settings" && tabs.activeTab !== "tasks" && tabs.activeTab !== "agents" && !tabs.activeTab.startsWith("thread:") &&
+						{tabs.activeTab !== "chat" && tabs.activeTab !== "settings" && tabs.activeTab !== "agents" && !tabs.activeTab.startsWith("thread:") &&
 							(tabs.activeTab.startsWith("browser:") ? (
 								<BrowserView
 									url={tabs.activeTab.slice(8)}

@@ -7,6 +7,7 @@ import {
 	Menu,
 	dialog,
 	nativeImage,
+	session,
 } from "electron"
 import * as path from "path"
 import * as os from "os"
@@ -15,7 +16,7 @@ import * as fs from "fs"
 import { fileURLToPath } from "url"
 import * as pty from "node-pty"
 
-import { createMastraCode } from "mastracode"
+import { createMastraCode } from "../harness/index.js"
 
 import {
 	createNavigateBrowserTool,
@@ -87,18 +88,12 @@ async function createHarness(projectPath: string) {
 	const navigateBrowserTool = createNavigateBrowserTool(browserManager)
 	const computerUseTool = createComputerUseTool(browserManager)
 
-	process.env.DEFAULT_OM_MODEL_ID = "google/gemini-3.8-flash"
-
 	const { harness, mcpManager, hookManager, resolveModel, storageWarning } =
 		await createMastraCode({
 			cwd: projectPath,
 			extraTools: {
 				"navigate-browser": navigateBrowserTool,
 				computer: computerUseTool,
-			},
-			initialState: {
-				observerModelId: "google/gemini-3.8-flash",
-				reflectorModelId: "google/gemini-3.8-flash",
 			},
 		})
 
@@ -189,7 +184,7 @@ function bridgeAllEvents(window: BrowserWindow) {
 			session.unsubscribe()
 			session.unsubscribe = null
 		}
-		session.unsubscribe = session.harness.subscribe((event) => {
+		session.unsubscribe = session.harness.subscribe((event: any) => {
 			if (window.isDestroyed()) return
 
 			const serialized = { ...event } as Record<string, unknown>
@@ -359,11 +354,16 @@ function createWindow() {
 		},
 	})
 
+	mainWindow.on("focus", () => {
+		mainWindow?.webContents.send("window-focus")
+	})
+
 	// Update mainWindowRef for helpers
 	setMainWindowRef(mainWindow)
 
 	if (process.platform === "darwin" && app.dock) {
 		app.dock.setIcon(appIcon)
+		app.dock.setBadge("")
 	}
 
 	// Dock badge count (macOS)
@@ -526,10 +526,22 @@ function setupMenu() {
 }
 
 // =============================================================================
-// App Lifecycle
+// App Lifecycle & Proxy Configuration
 // =============================================================================
+const systemProxy =
+	process.env.HTTPS_PROXY ||
+	process.env.HTTP_PROXY ||
+	process.env.https_proxy ||
+	process.env.http_proxy
+if (systemProxy) {
+	app.commandLine.appendSwitch("proxy-server", systemProxy)
+}
+
 app.whenReady().then(async () => {
 	app.setName(appName)
+	if (systemProxy) {
+		session.defaultSession.setProxy({ proxyRules: systemProxy }).catch(() => {})
+	}
 
 	// Determine project path
 	const projectPath =
@@ -601,7 +613,14 @@ app.whenReady().then(async () => {
 	}
 
 	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) createWindow()
+		if (BrowserWindow.getAllWindows().length === 0) {
+			createWindow()
+		} else if (mainWindow) {
+			if (mainWindow.isMinimized()) mainWindow.restore()
+			mainWindow.show()
+			mainWindow.focus()
+			mainWindow.webContents.send("window-focus")
+		}
 	})
 })
 

@@ -1,10 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import type { EnrichedProject } from "../types/project-list"
-import type {
-	LinearIssue,
-	GitHubIssue,
-	WorkflowStates,
-} from "../types/taskboard"
 import type { ProjectInfo } from "../types/project"
 import type { ChatAction } from "../types/chat"
 
@@ -62,6 +57,47 @@ export function useProjectManager(
 	useEffect(() => {
 		window.api.setBadgeCount(unreadWorktrees.size)
 	}, [unreadWorktrees])
+
+	// Helper to mark a worktree (defaulting to current active worktree) as read
+	const markWorktreeRead = useCallback((targetPath?: string) => {
+		const pathToClear = targetPath ?? projectInfoRef.current?.rootPath
+		if (!pathToClear) return
+		setUnreadWorktrees((prev) => {
+			if (!prev.has(pathToClear)) return prev
+			const next = new Set(prev)
+			next.delete(pathToClear)
+			return next
+		})
+	}, [])
+
+	// Clear unread badge for active worktree when app/window is focused, visible, or interacted with
+	useEffect(() => {
+		const clearActive = () => markWorktreeRead()
+
+		if (document.hasFocus()) {
+			clearActive()
+		}
+
+		window.addEventListener("focus", clearActive)
+		window.addEventListener("pointerdown", clearActive, { passive: true })
+		window.addEventListener("keydown", clearActive, { passive: true })
+		const unsubFocus = window.api.onWindowFocus?.(clearActive)
+
+		const handleVisibility = () => {
+			if (document.visibilityState === "visible") {
+				clearActive()
+			}
+		}
+		document.addEventListener("visibilitychange", handleVisibility)
+
+		return () => {
+			window.removeEventListener("focus", clearActive)
+			window.removeEventListener("pointerdown", clearActive)
+			window.removeEventListener("keydown", clearActive)
+			document.removeEventListener("visibilitychange", handleVisibility)
+			unsubFocus?.()
+		}
+	}, [projectInfo?.rootPath, markWorktreeRead])
 
 	const loadLinkedIssues = useCallback(async () => {
 		try {
@@ -250,122 +286,6 @@ export function useProjectManager(
 		loadEnrichedProjects()
 	}, [])
 
-	const handleStartWorkOnIssue = useCallback(
-		async (issue: LinearIssue, workflowStates: WorkflowStates) => {
-			const rootPath = projectInfoRef.current?.rootPath
-			if (!rootPath) return
-
-			const parentState = (await window.api.invoke({
-				type: "getState",
-			})) as Record<string, unknown>
-			const apiKey = (parentState?.linearApiKey as string) ?? ""
-			const teamId = (parentState?.linearTeamId as string) ?? ""
-
-			const slug = `${issue.identifier}-${issue.title}`
-				.toLowerCase()
-				.replace(/[^a-z0-9]+/g, "-")
-				.replace(/^-|-$/g, "")
-				.slice(0, 60)
-
-			const currentProject = enrichedProjects.find(
-				(p) => p.rootPath === rootPath,
-			)
-			const mainRepoPath = currentProject?.isWorktree
-				? (currentProject.mainRepoPath ?? rootPath)
-				: rootPath
-
-			const result = (await window.api.invoke({
-				type: "createWorktree",
-				repoPath: mainRepoPath,
-				branchName: slug,
-			})) as { success: boolean; path?: string; error?: string }
-
-			if (!result.success || !result.path) {
-				console.error("Failed to create worktree:", result.error)
-				return
-			}
-
-			dispatch({ type: "CLEAR" })
-			tabSetters.setOpenThreadTabs([])
-			tabSetters.setOpenFiles([])
-			tabSetters.setActiveTab("chat")
-			tabSetters.setThreads([])
-			setProjectSwitching(true)
-			await window.api.invoke({ type: "switchProject", path: result.path })
-
-			await window.api.invoke({
-				type: "linkLinearIssue",
-				issueId: issue.id,
-				issueIdentifier: issue.identifier,
-				doneStateId: workflowStates.doneStateId,
-				startedStateId: workflowStates.startedStateId,
-				linearApiKey: apiKey,
-				linearTeamId: teamId,
-			})
-
-			await loadLinkedIssues()
-		},
-		[loadLinkedIssues, enrichedProjects, dispatch, tabSetters],
-	)
-
-	const handleStartWorkOnGithubIssue = useCallback(
-		async (issue: GitHubIssue) => {
-			const rootPath = projectInfoRef.current?.rootPath
-			if (!rootPath) return
-
-			const parentState = (await window.api.invoke({
-				type: "getState",
-			})) as Record<string, unknown>
-			const token = (parentState?.githubToken as string) ?? ""
-			const owner = (parentState?.githubOwner as string) ?? ""
-			const repo = (parentState?.githubRepo as string) ?? ""
-
-			const slug = `${issue.number}-${issue.title}`
-				.toLowerCase()
-				.replace(/[^a-z0-9]+/g, "-")
-				.replace(/^-|-$/g, "")
-				.slice(0, 60)
-
-			const currentProject = enrichedProjects.find(
-				(p) => p.rootPath === rootPath,
-			)
-			const mainRepoPath = currentProject?.isWorktree
-				? (currentProject.mainRepoPath ?? rootPath)
-				: rootPath
-
-			const result = (await window.api.invoke({
-				type: "createWorktree",
-				repoPath: mainRepoPath,
-				branchName: slug,
-			})) as { success: boolean; path?: string; error?: string }
-
-			if (!result.success || !result.path) {
-				console.error("Failed to create worktree:", result.error)
-				return
-			}
-
-			dispatch({ type: "CLEAR" })
-			tabSetters.setOpenThreadTabs([])
-			tabSetters.setOpenFiles([])
-			tabSetters.setActiveTab("chat")
-			tabSetters.setThreads([])
-			setProjectSwitching(true)
-			await window.api.invoke({ type: "switchProject", path: result.path })
-
-			await window.api.invoke({
-				type: "linkGithubIssue",
-				issueNumber: issue.number,
-				issueTitle: issue.title,
-				githubToken: token,
-				owner,
-				repo,
-			})
-
-			await loadLinkedIssues()
-		},
-		[loadLinkedIssues, enrichedProjects, dispatch, tabSetters],
-	)
-
 	const handleDeleteWorktree = useCallback(
 		async (worktreePath: string) => {
 			const isCurrentProject = projectInfoRef.current?.rootPath === worktreePath
@@ -470,9 +390,8 @@ export function useProjectManager(
 		handleCloneSubmit,
 		handleRemoveProject,
 		handleRenameProject,
-		handleStartWorkOnIssue,
-		handleStartWorkOnGithubIssue,
 		handleDeleteWorktree,
 		handleCreateWorktree,
+		markWorktreeRead,
 	}
 }

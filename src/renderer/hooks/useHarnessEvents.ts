@@ -104,7 +104,12 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 							next.delete(endPath)
 							return next
 						})
-						cb.setUnreadWorktrees((prev) => new Set(prev).add(endPath))
+						const isCurrentAndFocused =
+							document.hasFocus() &&
+							endPath === cb.projectInfoRef?.current?.rootPath
+						if (!isCurrentAndFocused) {
+							cb.setUnreadWorktrees((prev) => new Set(prev).add(endPath))
+						}
 					}
 					const pref = cb.notificationPrefRef.current
 					if (pref === "bell" || pref === "both") {
@@ -116,25 +121,51 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					cb.loadThreads()
 					break
 				case "message_start":
-					if (isActiveWorktree)
+					if (isActiveWorktree && event.message) {
 						cb.dispatch({
 							type: "MESSAGE_START",
 							message: event.message as Message,
 						})
+					}
 					break
 				case "message_update":
-					if (isActiveWorktree)
-						cb.dispatch({
-							type: "MESSAGE_UPDATE",
-							message: event.message as Message,
-						})
+					if (isActiveWorktree) {
+						const msg =
+							(event.message as Message | undefined) ||
+							((event as any).id
+								? ({
+										id: (event as any).id,
+										role: "assistant",
+										content: [],
+										createdAt: new Date().toISOString(),
+									} as Message)
+								: undefined)
+						if (msg) {
+							cb.dispatch({
+								type: "MESSAGE_UPDATE",
+								message: msg,
+							})
+						}
+					}
 					break
 				case "message_end":
 					if (isActiveWorktree) {
-						cb.dispatch({
-							type: "MESSAGE_END",
-							message: event.message as Message,
-						})
+						const msg =
+							(event.message as Message | undefined) ||
+							((event as any).id
+								? ({
+										id: (event as any).id,
+										role: "assistant",
+										content: [],
+										createdAt: new Date().toISOString(),
+									} as Message)
+								: undefined)
+						if (msg) {
+							cb.dispatch({
+								type: "MESSAGE_END",
+								message: msg,
+							})
+						}
 						window.api
 							.invoke({ type: "getTokenUsage" })
 							.then((usage) => {
@@ -441,6 +472,12 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					cb.setProjectSwitching(false)
 					cb.setProjectInfo(proj)
 					cb.setOpenFiles([])
+					cb.setUnreadWorktrees((prev) => {
+						if (!prev.has(proj.rootPath)) return prev
+						const next = new Set(prev)
+						next.delete(proj.rootPath)
+						return next
+					})
 					cb.setTokenUsage({
 						promptTokens: 0,
 						completionTokens: 0,

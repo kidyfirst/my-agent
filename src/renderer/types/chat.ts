@@ -83,6 +83,15 @@ export type ChatAction =
 	| { type: "CLEAR" }
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
+	try {
+		return internalChatReducer(state, action)
+	} catch (err) {
+		console.error("Error in chatReducer:", err, action)
+		return state
+	}
+}
+
+function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 	switch (action.type) {
 		case "AGENT_START":
 			return { ...state, isAgentActive: true, agentStartedAt: Date.now() }
@@ -93,6 +102,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 				streamingMessageId: null,
 			}
 		case "MESSAGE_START": {
+			if (!action.message?.id) return state
 			if (action.message.role === "user") {
 				const lastMsg = state.messages[state.messages.length - 1]
 				if (lastMsg?.role === "user") {
@@ -117,11 +127,22 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 			}
 		}
 		case "MESSAGE_UPDATE": {
+			if (!action.message?.id) return state
 			const exists = state.messages.some((m) => m.id === action.message.id)
 			const msgs = exists
-				? state.messages.map((m) =>
-						m.id === action.message.id ? action.message : m,
-					)
+				? state.messages.map((m) => {
+						if (m.id !== action.message.id) return m
+						const newContent =
+							action.message.content && action.message.content.length > 0
+								? action.message.content
+								: m.content
+						return {
+							...m,
+							...action.message,
+							role: m.role || action.message.role,
+							content: newContent,
+						}
+					})
 				: [...state.messages, action.message]
 			return {
 				...state,
@@ -133,11 +154,24 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 			}
 		}
 		case "MESSAGE_END": {
+			if (!action.message?.id) {
+				return { ...state, streamingMessageId: null }
+			}
 			const exists = state.messages.some((m) => m.id === action.message.id)
 			const msgs = exists
-				? state.messages.map((m) =>
-						m.id === action.message.id ? action.message : m,
-					)
+				? state.messages.map((m) => {
+						if (m.id !== action.message.id) return m
+						const newContent =
+							action.message.content && action.message.content.length > 0
+								? action.message.content
+								: m.content
+						return {
+							...m,
+							...action.message,
+							role: m.role || action.message.role,
+							content: newContent,
+						}
+					})
 				: [...state.messages, action.message]
 			return { ...state, messages: msgs, streamingMessageId: null }
 		}

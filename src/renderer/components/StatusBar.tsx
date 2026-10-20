@@ -99,21 +99,38 @@ export function StatusBar({
 				fontSize: 11,
 				color: "var(--muted)",
 				flexShrink: 0,
+				whiteSpace: "nowrap",
+				overflow: "hidden",
+				minWidth: 0,
 			}}
 		>
 			{/* Git branch (leftmost) */}
 			{gitBranch && (
 				<span
 					style={{
-						display: "flex",
+						display: "inline-flex",
 						alignItems: "center",
 						gap: 3,
+						minWidth: 0,
+						flexShrink: 1,
+						maxWidth: 200,
+						whiteSpace: "nowrap",
 					}}
+					title={gitBranch}
 				>
-					<span style={{ color: "var(--accent)", fontSize: 12 }}>
+					<span style={{ color: "var(--accent)", fontSize: 12, flexShrink: 0 }}>
 						&#x2387;
 					</span>
-					{gitBranch}
+					<span
+						style={{
+							display: "inline-block",
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
+						}}
+					>
+						{gitBranch}
+					</span>
 				</span>
 			)}
 
@@ -128,8 +145,16 @@ export function StatusBar({
 					fontSize: 11,
 					padding: "1px 4px",
 					borderRadius: 3,
+					display: "inline-block",
+					maxWidth: 220,
+					minWidth: 0,
+					flexShrink: 1,
+					overflow: "hidden",
+					textOverflow: "ellipsis",
+					whiteSpace: "nowrap",
+					verticalAlign: "middle",
 				}}
-				title="Change model"
+				title={modelId ? `${modelId} (click to change)` : "Change model"}
 			>
 				{modelShort}
 			</button>
@@ -138,10 +163,12 @@ export function StatusBar({
 			{isAgentActive && (
 				<span
 					style={{
-						display: "flex",
+						display: "inline-flex",
 						alignItems: "center",
 						gap: 4,
 						color: showOMMode ? badgeColor : (modeColors[modeId] ?? "var(--accent)"),
+						whiteSpace: "nowrap",
+						flexShrink: 0,
 					}}
 				>
 					<span
@@ -151,6 +178,7 @@ export function StatusBar({
 							borderRadius: "50%",
 							background: showOMMode ? badgeColor : (modeColors[modeId] ?? "var(--accent)"),
 							animation: "pulse 1.5s ease-in-out infinite",
+							flexShrink: 0,
 						}}
 					/>
 					{showOMMode ? (isObserving ? "observing" : "reflecting") : "running"}
@@ -172,6 +200,8 @@ export function StatusBar({
 					fontFamily: "inherit",
 					transition: "all 0.15s ease",
 					opacity: thinkingEnabled ? 1 : 0.6,
+					whiteSpace: "nowrap",
+					flexShrink: 0,
 				}}
 				title={thinkingEnabled ? "Thinking enabled (click to disable)" : "Thinking disabled (click to enable)"}
 			>
@@ -193,13 +223,15 @@ export function StatusBar({
 					fontFamily: "inherit",
 					transition: "all 0.15s ease",
 					opacity: planningEnabled ? 1 : 0.6,
+					whiteSpace: "nowrap",
+					flexShrink: 0,
 				}}
 				title={planningEnabled ? "Plan mode (click to switch to build)" : "Build mode (click to switch to plan)"}
 			>
 				plan
 			</button>
 
-			<div style={{ flex: 1 }} />
+			<div style={{ flex: 1, minWidth: 8 }} />
 
 			{/* OM Token Tracker or auth warning */}
 			{omHasUnauthModel ? (
@@ -215,13 +247,15 @@ export function StatusBar({
 						fontWeight: 500,
 						cursor: "pointer",
 						fontFamily: "inherit",
-						display: "flex",
+						display: "inline-flex",
 						alignItems: "center",
 						gap: 4,
+						whiteSpace: "nowrap",
+						flexShrink: 0,
 					}}
 					title="OM memory models need authentication — click to configure"
 				>
-					<span style={{ fontSize: 11 }}>&#x26A0;</span>
+					<span style={{ fontSize: 11, flexShrink: 0 }}>&#x26A0;</span>
 					OM model not connected
 				</button>
 			) : (
@@ -235,12 +269,13 @@ export function StatusBar({
 						width: 1,
 						height: 10,
 						background: "var(--border-muted)",
+						flexShrink: 0,
 					}}
 				/>
 			)}
 
 			{/* Token usage */}
-			<span>{formatTokens(tokenUsage.totalTokens)} tokens</span>
+			<span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>{formatTokens(tokenUsage.totalTokens)} tokens</span>
 		</div>
 	)
 }

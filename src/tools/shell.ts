@@ -284,9 +284,8 @@ Usage notes:
 			let capturedOutput = "" // Track output ourselves for abort case
 
 			// Get abort signal and emit function from harness context
-			const harnessCtx = toolContext?.requestContext?.get("harness") as
-				| import("@mastra/core/harness").HarnessRequestContext
-				| undefined
+			const harnessCtx = (toolContext?.requestContext?.get("controller") ||
+				toolContext?.requestContext?.get("harness")) as any
 			const abortSignal = harnessCtx?.abortSignal
 			const emitEvent = harnessCtx?.emitEvent
 			const toolCallId = toolContext?.agent?.toolCallId
