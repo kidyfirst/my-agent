@@ -1,6 +1,12 @@
 import type { IpcCommandHandler, HandlerContext } from "./types.js"
 import { normalizeControllerMessage } from "../../harness/index.js"
 import {
+	captureGitBaseline,
+	diffFileSinceBaseline,
+	diffSinceBaseline,
+	type GitSnapshot,
+} from "../git-task-snapshot.js"
+import {
 	CURATED_CHAT_MODELS,
 	isDeprecatedModel,
 } from "../../constants/models.js"
@@ -66,6 +72,26 @@ function isUsableChatModel(modelId: string): boolean {
 	return true
 }
 
+function modelSupportsVision(modelId: string): boolean {
+	const id = (modelId || "").toLowerCase()
+	if (id.includes("deepseek")) return false
+	if (id.includes("o3-mini") || id.includes("o1-mini")) return false
+	if (id.includes("qwen-") && !id.includes("vl")) return false
+	if (id.includes("llama-") && !id.includes("vision")) return false
+	return true
+}
+
+// Snapshot of the worktree taken when a task starts. Used to report the files
+// a task changed and the diff of a single file.
+let currentTaskSnapshot: { root: string; baseline: GitSnapshot } | null = null
+
+function beginTaskSnapshot(root: string): GitSnapshot | null {
+	if (!root) return null
+	const baseline = captureGitBaseline(root)
+	currentTaskSnapshot = { root, baseline }
+	return baseline
+}
+
 export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 	return {
 		sendMessage: async (command, ctx) => {
@@ -81,20 +107,58 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					error: { message: errMsg },
 					worktreePath: ctx.activeSessionPath,
 				})
+				ctx.mainWindow?.webContents.send("harness:event", {
+					type: "agent_end",
+					reason: "error",
+					worktreePath: ctx.activeSessionPath,
+				})
 				return
 			}
 			const threadBefore = h.getCurrentThreadId()
-			const files = Array.isArray(command.images)
-				? command.images.map((img: any) => ({
+			const currentModelId = h.getCurrentModelId() || ""
+			const baseline = beginTaskSnapshot(ctx.getActiveSession().projectRoot)
+			if (baseline && ctx.mainWindow) {
+				// Lets the renderer know a fresh task baseline exists, so it can
+				// request the changed files once the task ends.
+				ctx.mainWindow.webContents.send("harness:event", {
+					type: "task_baseline",
+					worktreePath: ctx.activeSessionPath,
+				})
+			}
+			const hasImages =
+				Array.isArray(command.images) && command.images.length > 0
+			let messageContent = command.content || ""
+
+			let files: any[] | undefined
+			if (hasImages) {
+				if (modelSupportsVision(currentModelId)) {
+					files = command.images.map((img: any) => ({
 						mediaType: img.mediaType || img.mimeType || "image/png",
 						mimeType: img.mimeType || img.mediaType || "image/png",
 						data: img.data || "",
 						filename: img.name || img.filename || "image.png",
 					}))
-				: undefined
+				} else {
+					// Model is text-only (e.g. DeepSeek). Do not send raw image files to avoid API 400 Bad Request.
+					const fileNames = command.images
+						.map((img: any) => img.name || img.filename || "image.png")
+						.join(", ")
+					messageContent = `${messageContent}\n\n[Attached image: ${fileNames}]\n(Note: The currently selected model "${currentModelId}" is text-only and cannot process images directly. If you need image analysis, please switch to a multimodal model such as Claude, GPT-4o, or Gemini.)`
+				}
+			}
+
+			if (Array.isArray(command.files) && command.files.length > 0) {
+				const nonImgFiles = command.files.map((f: any) => ({
+					mediaType: f.mediaType || f.mimeType || "text/plain",
+					mimeType: f.mimeType || f.mediaType || "text/plain",
+					data: f.data || "",
+					filename: f.name || f.filename || "attachment.txt",
+				}))
+				files = files ? [...files, ...nonImgFiles] : nonImgFiles
+			}
 
 			h.sendMessage({
-				content: command.content || "",
+				content: messageContent,
 				...(files ? { files } : {}),
 			})
 				.then(async () => {
@@ -136,6 +200,37 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		},
 		abort: async (command, ctx) => {
 			ctx.getActiveSession().harness.abort()
+		},
+		// Files changed by the current task, with +/- line counts
+		getTaskChangedFiles: async () => {
+			if (!currentTaskSnapshot) return { files: [] }
+			try {
+				return {
+					files: diffSinceBaseline(
+						currentTaskSnapshot.root,
+						currentTaskSnapshot.baseline,
+					),
+				}
+			} catch (err) {
+				console.warn("getTaskChangedFiles failed:", err)
+				return { files: [] }
+			}
+		},
+		// Unified diff of one file changed by the current task
+		getTaskFileDiff: async (command) => {
+			if (!currentTaskSnapshot || !command.path) return { diff: "" }
+			try {
+				return {
+					diff: diffFileSinceBaseline(
+						currentTaskSnapshot.root,
+						currentTaskSnapshot.baseline,
+						command.path,
+					),
+				}
+			} catch (err) {
+				console.warn("getTaskFileDiff failed:", err)
+				return { diff: "" }
+			}
 		},
 		steer: async (command, ctx) => {
 			await ctx.getActiveSession().harness.steer({ content: command.content })
@@ -243,6 +338,22 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const session = await h.getSession()
 			await h.loadOMProgress?.().catch(() => {})
 			return session
+		},
+		getMessageQueue: async (command, ctx) => {
+			const h = ctx.getActiveSession().harness
+			const threadId = (command.threadId as string) || h.getCurrentThreadId()
+			if (!threadId) return []
+			return await h.getMessageQueue({ threadId })
+		},
+		setMessageQueue: async (command, ctx) => {
+			const h = ctx.getActiveSession().harness
+			const threadId = (command.threadId as string) || h.getCurrentThreadId()
+			if (!threadId) return { success: false }
+			await h.setMessageQueue({
+				threadId,
+				queue: command.queue || [],
+			})
+			return { success: true }
 		},
 		listThreads: async (_command, ctx) => {
 			return await ctx.getActiveSession().harness.listThreads()

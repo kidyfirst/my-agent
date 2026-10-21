@@ -119,6 +119,51 @@ export function normalizeMessageContent(
 					})
 					continue
 				}
+				if (type === "file") {
+					const mediaType = String(obj.mediaType || obj.mimeType || "")
+					const filename = String(obj.filename || obj.name || "")
+					const isImage =
+						mediaType.startsWith("image/") ||
+						/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(filename)
+					if (isImage) {
+						blocks.push({
+							type: "image",
+							data: (obj.data as string) || (obj.image as string) || "",
+							mimeType: mediaType || "image/png",
+							name: filename || "image.png",
+							url:
+								(obj.url as string) ||
+								(typeof obj.data === "string" && obj.data.startsWith("data:")
+									? (obj.data as string)
+									: undefined),
+						})
+						continue
+					}
+					blocks.push({
+						type: "file",
+						data: obj.data as string,
+						name: filename || "attachment",
+						mimeType: mediaType || "text/plain",
+						size: obj.size as number | undefined,
+					})
+					continue
+				}
+				if (type === "image") {
+					const mediaType = String(obj.mimeType || obj.mediaType || "image/png")
+					const filename = String(obj.name || obj.filename || "image.png")
+					blocks.push({
+						type: "image",
+						data: (obj.data as string) || (obj.image as string) || "",
+						mimeType: mediaType,
+						name: filename,
+						url:
+							(obj.url as string) ||
+							(typeof obj.data === "string" && obj.data.startsWith("data:")
+								? (obj.data as string)
+								: undefined),
+					})
+					continue
+				}
 				if (!type) {
 					if (obj.text != null || obj.content != null || obj.value != null) {
 						blocks.push({

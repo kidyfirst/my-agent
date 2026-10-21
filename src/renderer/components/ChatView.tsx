@@ -1,39 +1,12 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { AssistantMessage } from "./AssistantMessage"
 import { UserMessage } from "./UserMessage"
-import { ToolExecution } from "./ToolExecution"
+import { ExecutionBlock, ExecutionStep, ExecutionTool } from "./ExecutionBlock"
 import { SubagentExecution } from "./SubagentExecution"
 import { TodoProgress } from "./TodoProgress"
 import { AsciiLogo } from "./AsciiLogo"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
-
-function ElapsedTime({ startedAt }: { startedAt: number }) {
-	const [elapsed, setElapsed] = useState(0)
-
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setElapsed((Date.now() - startedAt) / 1000)
-		}, 100)
-		return () => clearInterval(interval)
-	}, [startedAt])
-
-	return (
-		<div
-			style={{
-				padding: "4px 0",
-				display: "flex",
-				alignItems: "center",
-				gap: 6,
-				color: "var(--dim)",
-				fontSize: 12,
-			}}
-		>
-			<span style={{ letterSpacing: 2, fontSize: 14 }}>{"\u22EE"}</span>
-			<span>{elapsed.toFixed(1)}s</span>
-		</div>
-	)
-}
 
 interface ChatViewProps {
 	messages: Message[]
@@ -79,6 +52,49 @@ interface ChatViewProps {
 	}>
 }
 
+type RenderItem =
+	| { type: "user"; key: string; data: Message }
+	| {
+			type: "execution"
+			key: string
+			data: {
+				isActive?: boolean
+				steps: ExecutionStep[]
+				durationMs?: number
+				startedAt?: number | null
+			}
+	  }
+	| {
+			type: "assistant"
+			key: string
+			data: Message & { isStreaming: boolean }
+	  }
+	| {
+			type: "subagent"
+			key: string
+			data: {
+				toolCallId: string
+				agentType: string
+				task: string
+				tools: Array<{
+					name: string
+					args: unknown
+					result?: unknown
+					isError?: boolean
+					status: string
+				}>
+				result?: string
+				isError?: boolean
+				durationMs?: number
+				status: string
+			}
+	  }
+	| {
+			type: "system"
+			key: string
+			data: Message
+	  }
+
 export function ChatView({
 	messages,
 	tools,
@@ -104,16 +120,12 @@ export function ChatView({
 		isAutoScroll.current = scrollHeight - scrollTop - clientHeight < 100
 	}
 
-	// Build a flat list of renderable items from messages, preserving the
-	// natural interleaved order of text blocks and tool calls within each
-	// assistant message. The harness accumulates the entire agentic turn into
-	// a single message (text → tool_call → tool_result → text → …), so we
-	// walk the content array in order and emit items as we encounter them.
-	const items: Array<{
-		type: "user" | "assistant" | "tool" | "subagent" | "system"
-		key: string
-		data: unknown
-	}> = []
+	// Build a structured list of renderable items in Antigravity style:
+	// - An Assistant turn groups thinking and tool executions into an ExecutionBlock
+	//   showing: "Thinking ˅", each thinking step with its duration ("Thought for 57s ›"),
+	//   and tool items with checkmarks ("Analyzed ⚛️ ChatView.tsx#L140-250").
+	// - The assistant's markdown answer appears below the execution block.
+	const items: RenderItem[] = []
 
 	for (const msg of messages) {
 		const rawContent = msg.content as unknown
@@ -135,64 +147,23 @@ export function ChatView({
 		} else if (isSystem) {
 			items.push({ type: "system", key: `msg-${msg.id}`, data: msg })
 		} else if (msg.role === "assistant") {
-			// Walk content blocks in order and group consecutive text/thinking
-			// blocks into a single assistant item, emitting tool items inline.
-			let pendingTextBlocks: MessageContent[] = []
-			let textGroupIndex = 0
-			let hasEmittedItemForMessage = false
 			const isStreaming = msg.id === streamingMessageId
+			const contentBlocks = normalizeMessageContent(
+				msg.content,
+				(msg as any).text,
+			)
 
-			const flushText = (isTrailing: boolean) => {
-				const hasContent = pendingTextBlocks.some((c) => {
-					const block = c as unknown as Record<string, unknown>
-					const text = (block.text ?? block.thinking ?? block.reasoning ?? "") as string
-					return typeof text === "string" && text.length > 0
-				})
-				const isError = msg.stopReason === "error" || Boolean(msg.errorMessage)
-				const shouldEmit =
-					hasContent ||
-					(isStreaming && isTrailing) ||
-					(isTrailing && isError) ||
-					(isTrailing && !hasEmittedItemForMessage && !isAgentActive)
-
-				if (shouldEmit) {
-					hasEmittedItemForMessage = true
-					items.push({
-						type: "assistant",
-						key: `msg-${msg.id}-text-${textGroupIndex}`,
-						data: {
-							...msg,
-							content:
-								pendingTextBlocks.length > 0
-									? pendingTextBlocks
-									: [
-											{
-												type: "text",
-												text:
-													msg.errorMessage ??
-													(msg.stopReason === "complete"
-														? ""
-														: ""),
-											},
-										],
-							// Only show streaming cursor on the trailing (last) text group
-							isStreaming: isStreaming && isTrailing,
-						},
-					})
-				}
-				textGroupIndex++
-				pendingTextBlocks = []
-			}
-
-			// Normalize content into MessageContent[]
-			const contentBlocks = normalizeMessageContent(msg.content, (msg as any).text)
-
-			// Pre-index any tool_result blocks in this message so tool_call can pick up its result
-			const toolResultsById = new Map<string, { result: unknown; isError?: boolean }>()
+			// Pre-index any tool_result blocks in this message
+			const toolResultsById = new Map<
+				string,
+				{ result: unknown; isError?: boolean }
+			>()
 			for (const c of contentBlocks) {
 				if (!c || typeof c !== "object") continue
 				const b = c as Record<string, unknown>
-				const t = String(b.type || "").toLowerCase().replace(/[-_]/g, "")
+				const t = String(b.type || "")
+					.toLowerCase()
+					.replace(/[-_]/g, "")
 				if (t === "toolresult") {
 					const id = (b.toolCallId || b.id || b.tool_call_id || "") as string
 					if (id) {
@@ -204,49 +175,144 @@ export function ChatView({
 				}
 			}
 
+			let currentSteps: ExecutionStep[] = []
+			let currentTextBlocks: MessageContent[] = []
+			let execGroupIndex = 0
+			let textGroupIndex = 0
+			let thinkCounter = 0
+
+			const flushExecution = () => {
+				if (currentSteps.length > 0) {
+					const lastItem = items[items.length - 1]
+					if (lastItem && lastItem.type === "execution") {
+						const existingIds = new Set(lastItem.data.steps.map((s) => s.id))
+						for (const s of currentSteps) {
+							if (!existingIds.has(s.id)) {
+								lastItem.data.steps.push(s)
+							}
+						}
+						if (msg.durationMs != null) {
+							lastItem.data.durationMs = msg.durationMs
+						}
+						lastItem.data.isActive = isStreaming && isAgentActive
+						currentSteps = []
+						return
+					}
+
+					items.push({
+						type: "execution",
+						key: `msg-${msg.id}-exec-${execGroupIndex++}`,
+						data: {
+							isActive: isStreaming && isAgentActive,
+							steps: [...currentSteps],
+							durationMs: msg.durationMs,
+							startedAt: isStreaming ? agentStartedAt : null,
+						},
+					})
+					currentSteps = []
+				}
+			}
+
+			const flushText = (isTrailing: boolean) => {
+				const hasContent = currentTextBlocks.some((c) => {
+					const block = c as unknown as Record<string, unknown>
+					const text = (block.text ?? "") as string
+					return typeof text === "string" && text.length > 0
+				})
+				const isError = msg.stopReason === "error" || Boolean(msg.errorMessage)
+				const shouldEmit = hasContent || (isTrailing && isError)
+
+				if (shouldEmit) {
+					items.push({
+						type: "assistant",
+						key: `msg-${msg.id}-text-${textGroupIndex++}`,
+						data: {
+							...msg,
+							content:
+								currentTextBlocks.length > 0
+									? currentTextBlocks
+									: [{ type: "text", text: msg.errorMessage ?? "" }],
+							isStreaming: isStreaming && isTrailing,
+						},
+					})
+				}
+				currentTextBlocks = []
+			}
+
 			for (const c of contentBlocks) {
 				const block = (c as unknown as Record<string, unknown>) || {}
-				const rawType = String(block.type || "").toLowerCase().replace(/[-_]/g, "")
+				const rawType = String(block.type || "")
+					.toLowerCase()
+					.replace(/[-_]/g, "")
 
 				if (
 					rawType === "text" ||
 					rawType === "output" ||
 					rawType === "message" ||
-					(!rawType && (block.text != null || block.content != null || block.value != null))
+					(!rawType &&
+						(block.text != null ||
+							block.content != null ||
+							block.value != null))
 				) {
-					pendingTextBlocks.push({
-						type: "text",
-						text: String(block.text ?? block.content ?? block.value ?? ""),
-					})
+					const textVal = String(
+						block.text ?? block.content ?? block.value ?? "",
+					)
+					// Only non-empty text triggers execution flush; empty stream tokens are ignored
+					if (textVal.trim().length > 0) {
+						flushExecution()
+						currentTextBlocks.push({
+							type: "text",
+							text: textVal,
+						})
+					}
 				} else if (
 					rawType === "thinking" ||
 					rawType === "reasoning" ||
 					rawType === "thought" ||
 					rawType === "redactedthinking"
 				) {
-					pendingTextBlocks.push({
-						type: "thinking",
-						thinking: String(
-							block.thinking ||
-								block.reasoning ||
-								block.thought ||
-								block.text ||
-								block.content ||
-								"",
-						),
-						...(rawType === "redactedthinking" ? { isRedacted: true } : {}),
-					})
+					if (currentTextBlocks.length > 0) {
+						flushText(false)
+					}
+					const thoughtStr = String(
+						block.thinking ||
+							block.reasoning ||
+							block.thought ||
+							block.text ||
+							block.content ||
+							"",
+					)
+					if (thoughtStr) {
+						const durationSec =
+							(block.durationSec as number) ??
+							(msg.durationMs
+								? Math.max(1, Math.round(msg.durationMs / 1000))
+								: Math.max(2, Math.round(thoughtStr.length / 50)))
+
+						currentSteps.push({
+							type: "thinking",
+							id: `think-${msg.id}-${thinkCounter++}`,
+							text: thoughtStr,
+							durationSec,
+							isStreaming: isStreaming && isAgentActive,
+							startedAt: isStreaming ? agentStartedAt : null,
+						})
+					}
 				} else if (
 					rawType === "toolcall" ||
 					rawType === "tooluse" ||
 					rawType === "toolinvocation"
 				) {
-					// Flush any accumulated text before this tool call
-					flushText(false)
+					if (currentTextBlocks.length > 0) {
+						flushText(false)
+					}
 
-					const inv =
-						(block.toolInvocation as Record<string, unknown>) || block
-					const toolId = (inv.toolCallId || block.id || inv.id || (inv as any).tool_use_id || "") as string
+					const inv = (block.toolInvocation as Record<string, unknown>) || block
+					const toolId = (inv.toolCallId ||
+						block.id ||
+						inv.id ||
+						(inv as any).tool_use_id ||
+						"") as string
 					const toolName = (inv.toolName ||
 						block.name ||
 						inv.name ||
@@ -255,7 +321,9 @@ export function ChatView({
 						inv.args ?? block.args ?? (inv as any).input ?? (block as any).input
 					const savedResult = toolResultsById.get(toolId)
 					const toolResult = inv.result ?? block.result ?? savedResult?.result
-					const isError = Boolean(inv.isError ?? block.isError ?? savedResult?.isError)
+					const isError = Boolean(
+						inv.isError ?? block.isError ?? savedResult?.isError,
+					)
 					const isDone =
 						inv.state === "result" ||
 						toolResult !== undefined ||
@@ -264,76 +332,107 @@ export function ChatView({
 					const toolState = tools.get(toolId)
 					const subagentState = subagents.get(toolId)
 
-					hasEmittedItemForMessage = true
-
-					if (subagentState) {
-						items.push({
-							type: "subagent",
-							key: `subagent-${toolId}`,
-							data: subagentState,
-						})
-					} else if (toolName === "subagent") {
-						const saArgs = (toolArgs as Record<string, unknown>) || {}
-						items.push({
-							type: "subagent",
-							key: `subagent-${toolId}`,
-							data: {
-								toolCallId: toolId,
-								agentType: (saArgs.agentType as string) || "explore",
-								task: (saArgs.task as string) || (saArgs.description as string) || "",
-								tools: [],
-								result:
-									typeof toolResult === "string"
-										? toolResult
-										: (toolResult as any)?.content,
-								isError,
-								status: isDone ? "complete" : "running",
-							},
-						})
+					if (subagentState || toolName === "subagent") {
+						flushExecution()
+						if (subagentState) {
+							items.push({
+								type: "subagent",
+								key: `subagent-${toolId}`,
+								data: subagentState,
+							})
+						} else {
+							const saArgs = (toolArgs as Record<string, unknown>) || {}
+							items.push({
+								type: "subagent",
+								key: `subagent-${toolId}`,
+								data: {
+									toolCallId: toolId,
+									agentType: (saArgs.agentType as string) || "explore",
+									task:
+										(saArgs.task as string) ||
+										(saArgs.description as string) ||
+										"",
+									tools: [],
+									result:
+										typeof toolResult === "string"
+											? toolResult
+											: (toolResult as any)?.content,
+									isError,
+									status: isDone ? "complete" : "running",
+								},
+							})
+						}
 					} else {
-						items.push({
+						const resolvedTool: ExecutionTool = toolState ?? {
+							id: toolId,
+							name: toolName,
+							args: toolArgs,
+							result: toolResult,
+							isError,
+							status: isDone ? (isError ? "error" : "complete") : "pending",
+						}
+						currentSteps.push({
 							type: "tool",
-							key: `tool-${toolId}`,
-							data: toolState ?? {
-								id: toolId,
-								name: toolName,
-								args: toolArgs,
-								result: toolResult,
-								isError,
-								status: isDone
-									? isError
-										? "error"
-										: "complete"
-									: "pending",
-							},
+							id: `tool-${toolId}`,
+							tool: resolvedTool,
 						})
 					}
 				}
-				// tool_result / data-om-status blocks are skipped as they are associated with tool calls
 			}
-			// Flush any trailing text (e.g. the final summary after tool calls, or streaming/error placeholders)
+
+			// End of message: flush any remaining execution and text
+			flushExecution()
 			flushText(true)
 		}
 	}
 
-	// Render any tools or subagents from state that haven't been emitted yet
+	// Append any tools from state that haven't been emitted yet
 	const renderedToolIds = new Set<string>()
 	for (const item of items) {
-		if (item.type === "tool") {
-			renderedToolIds.add((item.data as any).id)
+		if (item.type === "execution") {
+			for (const s of item.data.steps) {
+				if (s.type === "tool") {
+					renderedToolIds.add(s.tool.id)
+				}
+			}
 		} else if (item.type === "subagent") {
 			renderedToolIds.add((item.data as any).toolCallId)
 		}
 	}
 
+	const unrenderedTools: ExecutionTool[] = []
 	for (const [toolId, tool] of tools) {
 		if (!renderedToolIds.has(toolId)) {
-			items.push({
-				type: "tool",
-				key: `standalone-tool-${toolId}`,
-				data: tool,
-			})
+			unrenderedTools.push(tool)
 			renderedToolIds.add(toolId)
+		}
+	}
+
+	if (unrenderedTools.length > 0) {
+		const unrenderedSteps: ExecutionStep[] = unrenderedTools.map((t) => ({
+			type: "tool",
+			id: `unrendered-${t.id}`,
+			tool: t,
+		}))
+		const lastItem = items[items.length - 1]
+		if (lastItem && lastItem.type === "execution") {
+			const existingIds = new Set(lastItem.data.steps.map((s) => s.id))
+			for (const s of unrenderedSteps) {
+				if (!existingIds.has(s.id)) {
+					lastItem.data.steps.push(s)
+				}
+			}
+			lastItem.data.isActive = isAgentActive
+		} else {
+			items.push({
+				type: "execution",
+				key: "live-execution-block",
+				data: {
+					isActive: isAgentActive,
+					steps: unrenderedSteps,
+					startedAt: agentStartedAt,
+				},
+			})
 		}
 	}
 
@@ -348,21 +447,47 @@ export function ChatView({
 		}
 	}
 
-	// If the agent is active and the last item is from the user, show an active assistant placeholder
+	// If the agent is active and the last item is from the user, show an active execution block placeholder
 	if (
 		isAgentActive &&
 		(items.length === 0 || items[items.length - 1].type === "user")
 	) {
 		items.push({
-			type: "assistant",
-			key: "streaming-thinking-placeholder",
+			type: "execution",
+			key: "active-execution-placeholder",
 			data: {
-				id: "streaming-thinking-placeholder",
-				role: "assistant",
-				content: [{ type: "text", text: "" }],
-				isStreaming: true,
+				isActive: true,
+				steps: [],
+				startedAt: agentStartedAt,
 			},
 		})
+	}
+
+	// Final cleanup pass: merge any adjacent execution blocks and discard empty ones
+	const cleanedItems: RenderItem[] = []
+	for (const item of items) {
+		const prev = cleanedItems[cleanedItems.length - 1]
+		if (item.type === "execution" && prev && prev.type === "execution") {
+			const existingIds = new Set(prev.data.steps.map((s) => s.id))
+			for (const s of item.data.steps) {
+				if (!existingIds.has(s.id)) {
+					prev.data.steps.push(s)
+				}
+			}
+			if (item.data.durationMs != null) {
+				prev.data.durationMs = item.data.durationMs
+			}
+			prev.data.isActive = prev.data.isActive || item.data.isActive
+			prev.data.startedAt = prev.data.startedAt || item.data.startedAt
+		} else if (
+			item.type === "execution" &&
+			item.data.steps.length === 0 &&
+			!item.data.isActive
+		) {
+			continue
+		} else {
+			cleanedItems.push(item)
+		}
 	}
 
 	return (
@@ -372,16 +497,26 @@ export function ChatView({
 			style={{
 				flex: 1,
 				overflowY: "auto",
+				overflowX: "hidden",
 				padding: "16px 24px",
+				minWidth: 0,
 			}}
 		>
-			{items.length === 0 && !isAgentActive && <AsciiLogo />}
+			{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
 
-			{items.map((item) => {
+			{cleanedItems.map((item) => {
 				switch (item.type) {
 					case "user":
+						return <UserMessage key={item.key} message={item.data as Message} />
+					case "execution":
 						return (
-							<UserMessage key={item.key} message={item.data as Message} />
+							<ExecutionBlock
+								key={item.key}
+								isActive={item.data.isActive}
+								steps={item.data.steps}
+								durationMs={item.data.durationMs}
+								startedAt={item.data.startedAt}
+							/>
 						)
 					case "assistant":
 						return (
@@ -390,47 +525,8 @@ export function ChatView({
 								message={item.data as Message & { isStreaming: boolean }}
 							/>
 						)
-					case "tool":
-						return (
-							<ToolExecution
-								key={item.key}
-								tool={
-									item.data as {
-										id: string
-										name: string
-										args: unknown
-										result?: unknown
-										isError?: boolean
-										status: string
-										shellOutput?: string
-									}
-								}
-							/>
-						)
 					case "subagent":
-						return (
-							<SubagentExecution
-								key={item.key}
-								subagent={
-									item.data as {
-										toolCallId: string
-										agentType: string
-										task: string
-										tools: Array<{
-											name: string
-											args: unknown
-											result?: unknown
-											isError?: boolean
-											status: string
-										}>
-										result?: string
-										isError?: boolean
-										durationMs?: number
-										status: string
-									}
-								}
-							/>
-						)
+						return <SubagentExecution key={item.key} subagent={item.data} />
 					case "system": {
 						const sysMsg = item.data as Message
 						const sysContent = normalizeMessageContent(
@@ -439,14 +535,13 @@ export function ChatView({
 						)
 						const sysText =
 							sysContent
-								.map(
-									(c) =>
-										String(
-											(c as any).text ??
-												(c as any).content ??
-												(c as any).value ??
-												"",
-										),
+								.map((c) =>
+									String(
+										(c as any).text ??
+											(c as any).content ??
+											(c as any).value ??
+											"",
+									),
 								)
 								.join("") ||
 							(typeof sysMsg.content === "string" ? sysMsg.content : "")
@@ -487,15 +582,14 @@ export function ChatView({
 			{/* Todo progress */}
 			{todos.length > 0 && <TodoProgress todos={todos} />}
 
-			{/* Elapsed time indicator */}
-			{isAgentActive && agentStartedAt && (
-				<ElapsedTime startedAt={agentStartedAt} />
-			)}
-
 			<style>{`
 				@keyframes pulse {
 					0%, 100% { opacity: 0.3; }
 					50% { opacity: 1; }
+				}
+				@keyframes blink {
+					0%, 100% { opacity: 1; }
+					50% { opacity: 0; }
 				}
 			`}</style>
 

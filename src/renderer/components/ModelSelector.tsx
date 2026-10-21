@@ -15,6 +15,7 @@ export interface ModelListProps {
 	currentModelId: string
 	filter: string
 	onSelect: (modelId: string) => void
+	onlyConnected?: boolean
 }
 
 export function ModelList({
@@ -23,8 +24,10 @@ export function ModelList({
 	currentModelId,
 	filter,
 	onSelect,
+	onlyConnected,
 }: ModelListProps) {
-	const filtered = models.filter((m) =>
+	const baseModels = onlyConnected ? models.filter((m) => m.hasAuth) : models
+	const filtered = baseModels.filter((m) =>
 		m.id.toLowerCase().includes(filter.toLowerCase()),
 	)
 
@@ -287,6 +290,7 @@ interface ModelPickerInlineProps {
 	models: ModelInfo[]
 	loading: boolean
 	onSelect: (modelId: string) => void
+	onlyConnected?: boolean
 }
 
 export function ModelPickerInline({
@@ -294,6 +298,7 @@ export function ModelPickerInline({
 	models,
 	loading,
 	onSelect,
+	onlyConnected = true,
 }: ModelPickerInlineProps) {
 	// Check if the currently selected model is authenticated
 	const currentModel = models.find((m) => m.id === currentModelId)
@@ -420,6 +425,7 @@ export function ModelPickerInline({
 							currentModelId={currentModelId}
 							filter={filter}
 							onSelect={handleSelect}
+							onlyConnected={onlyConnected}
 						/>
 					</div>
 				</div>

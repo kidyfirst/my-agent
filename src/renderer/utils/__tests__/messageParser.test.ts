@@ -101,6 +101,40 @@ describe("messageParser", () => {
 			const res = normalizeMessageContent([part])
 			expect(res).toEqual([{ type: "text", text: "hello from signal" }])
 		})
+
+		it("normalizes image file part into type image", () => {
+			const filePart = {
+				type: "file",
+				mediaType: "image/png",
+				data: "base64data",
+				filename: "screenshot.png",
+			}
+			const res = normalizeMessageContent([filePart])
+			expect(res[0]).toEqual({
+				type: "image",
+				data: "base64data",
+				mimeType: "image/png",
+				name: "screenshot.png",
+				url: undefined,
+			})
+		})
+
+		it("normalizes document file part into type file", () => {
+			const filePart = {
+				type: "file",
+				mediaType: "text/typescript",
+				data: "const a = 1",
+				filename: "main.ts",
+			}
+			const res = normalizeMessageContent([filePart])
+			expect(res[0]).toEqual({
+				type: "file",
+				data: "const a = 1",
+				mimeType: "text/typescript",
+				name: "main.ts",
+				size: undefined,
+			})
+		})
 	})
 
 	describe("extractMessageDetails", () => {

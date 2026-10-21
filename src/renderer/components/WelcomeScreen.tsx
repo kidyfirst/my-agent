@@ -44,6 +44,15 @@ const providers: Provider[] = [
 		apiKeyPlaceholder: "AIza...",
 		apiKeyHint: "aistudio.google.com",
 	},
+	{
+		id: "deepseek",
+		name: "DeepSeek",
+		description: "DeepSeek API key",
+		models: "deepseek-chat, deepseek-reasoner",
+		hasOAuth: false,
+		apiKeyPlaceholder: "sk-...",
+		apiKeyHint: "platform.deepseek.com",
+	},
 ]
 
 function ProviderCard({

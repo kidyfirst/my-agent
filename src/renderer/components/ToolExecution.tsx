@@ -106,8 +106,22 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 	const shortPath = filePath ? getShortPath(filePath) : null
 
 	switch (tool.name) {
-		case "view": {
+		case "view":
+		case "read_file":
+		case "file_view": {
+			const startLine = (args?.start_line ?? args?.StartLine ?? (args?.view_range as any)?.[0]) as number | undefined
+			const endLine = (args?.end_line ?? args?.EndLine ?? (args?.view_range as any)?.[1]) as number | undefined
+			const lineRange = startLine && endLine ? `#L${startLine}-${endLine}` : startLine ? `#L${startLine}` : ""
 			const lines = countResultLines(tool.result)
+
+			if (lineRange && shortPath) {
+				return {
+					icon: "\u269B\uFE0F",
+					label: "Analyzed",
+					pill: `${shortPath}${lineRange}`,
+				}
+			}
+
 			return {
 				icon: "\u{1F4C4}",
 				label: lines != null ? `Read ${lines} lines` : "Read",
@@ -115,7 +129,8 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 			}
 		}
 		case "string_replace_lsp":
-		case "ast_smart_edit": {
+		case "ast_smart_edit":
+		case "edit_file": {
 			const diff = getDiffCounts(tool.args)
 			return {
 				icon: "\u269B\uFE0F",
@@ -124,18 +139,21 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 				diffCounts: diff,
 			}
 		}
-		case "write_file": {
-			const content = args?.content as string | undefined
-			const lineCount = content ? content.split("\n").length : null
+		case "write_file":
+		case "write": {
+			const diff = getDiffCounts(tool.args)
 			return {
 				icon: "\u269B\uFE0F",
 				label: shortPath ?? "Write",
-				pill: lineCount != null ? `+${lineCount}` : null,
+				pill: null,
+				diffCounts: diff,
 			}
 		}
 		case "execute_command":
-		case "shell": {
-			const cmd = args?.command as string | undefined
+		case "shell":
+		case "run_command":
+		case "bash": {
+			const cmd = (args?.command ?? args?.cmd ?? args?.CommandLine) as string | undefined
 			const shortCmd = cmd
 				? cmd.length > 80
 					? cmd.slice(0, 77) + "\u2026"
@@ -148,8 +166,9 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 			}
 		}
 		case "search_content":
-		case "grep": {
-			const pattern = args?.pattern as string | undefined
+		case "grep":
+		case "search": {
+			const pattern = (args?.pattern ?? args?.query) as string | undefined
 			return {
 				icon: "\u{1F50D}",
 				label: "Search",
@@ -158,7 +177,7 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 		}
 		case "find_files":
 		case "glob": {
-			const pattern = args?.pattern as string | undefined
+			const pattern = (args?.pattern ?? args?.query) as string | undefined
 			return {
 				icon: "\u{1F4C1}",
 				label: "Find files",
@@ -300,9 +319,18 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 				</span>
 
 				{/* Label */}
-				<span style={{ color: "var(--muted)", fontWeight: 500 }}>
-					{display.label}
-				</span>
+				{display.label && (
+					<span
+						style={{
+							color: display.label.includes("/") || display.label.includes(".") ? "var(--text)" : "var(--muted)",
+							fontWeight: 500,
+							fontFamily: display.label.includes("/") || display.label.includes(".") ? "var(--font-mono, monospace)" : "inherit",
+							fontSize: display.label.includes("/") || display.label.includes(".") ? 12 : 13,
+						}}
+					>
+						{display.label}
+					</span>
+				)}
 
 				{/* Pill badge (file path, command, pattern) */}
 				{display.pill && (
@@ -313,7 +341,7 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 							borderRadius: 4,
 							fontFamily: "var(--font-mono, 'SF Mono', Monaco, 'Cascadia Code', monospace)",
 							fontSize: 12,
-							color: "var(--tool-output)",
+							color: "var(--text)",
 							overflow: "hidden",
 							textOverflow: "ellipsis",
 							whiteSpace: "nowrap",
@@ -321,14 +349,6 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 						}}
 					>
 						{display.pill}
-					</span>
-				)}
-
-				{/* Diff counts */}
-				{display.diffCounts && (
-					<span style={{ display: "flex", gap: 4, fontSize: 12, flexShrink: 0 }}>
-						<span style={{ color: "#22c55e" }}>+{display.diffCounts.added}</span>
-						<span style={{ color: "#ef4444" }}>-{display.diffCounts.removed}</span>
 					</span>
 				)}
 
@@ -355,19 +375,19 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 					{tool.status === "running" && (
 						<span
 							style={{
-								width: 5,
-								height: 5,
+								width: 6,
+								height: 6,
 								borderRadius: "50%",
-								background: "var(--accent)",
-								animation: "pulse 1.5s ease-in-out infinite",
+								background: "#8b5cf6",
+								animation: "pulse 1.2s ease-in-out infinite",
 							}}
 						/>
 					)}
 					{tool.status === "complete" && !tool.isError && (
-						<span style={{ color: "var(--success)", fontSize: 11 }}>&#10003;</span>
+						<span style={{ color: "var(--success, #22c55e)", fontSize: 12, fontWeight: 600 }}>✓</span>
 					)}
-					{tool.status === "error" && (
-						<span style={{ color: "var(--error)", fontSize: 11 }}>&#10007;</span>
+					{(tool.status === "error" || tool.isError) && (
+						<span style={{ color: "var(--error, #ef4444)", fontSize: 12 }}>✕</span>
 					)}
 				</span>
 			</button>

@@ -12,7 +12,7 @@ import { createTool } from "@mastra/core/tools"
 import { Agent } from "@mastra/core/agent"
 import { z } from "zod/v3"
 import { getSubagentDefinition, getSubagentIds } from "../agents/index.js"
-import type { HarnessEvent, HarnessRequestContext } from "@mastra/core/harness"
+import type { HarnessEvent, HarnessRequestContext } from "../harness/index.js"
 
 interface SubagentToolDeps {
 	/**

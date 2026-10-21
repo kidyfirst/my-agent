@@ -7,6 +7,7 @@ export const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
 	anthropic: "anthropic/claude-opus-4-6",
 	"openai-codex": "openai/gpt-5.3-codex",
 	google: "google/gemini-3-flash-preview",
+	deepseek: "deepseek/deepseek-v4-flash",
 }
 
 export const DEFAULT_FALLBACK_MODEL_ID = "google/gemini-3-flash-preview"
@@ -56,6 +57,16 @@ export const CURATED_CHAT_MODELS: CuratedModelInfo[] = [
 		name: "gemini-3.1-pro-preview",
 		provider: "google",
 	},
+	{
+		id: "deepseek/deepseek-chat",
+		name: "deepseek-chat",
+		provider: "deepseek",
+	},
+	{
+		id: "deepseek/deepseek-reasoner",
+		name: "deepseek-reasoner",
+		provider: "deepseek",
+	},
 ]
 
 /**
@@ -73,7 +84,7 @@ export function getDefaultModelForProvider(
 export function resolveDefaultModel(
 	isLoggedIn: (provider: string) => boolean,
 ): string {
-	const priority = ["anthropic", "openai-codex", "google"]
+	const priority = ["anthropic", "openai-codex", "google", "deepseek"]
 	for (const pid of priority) {
 		if (isLoggedIn(pid)) {
 			const model = PROVIDER_DEFAULT_MODELS[pid]

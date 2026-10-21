@@ -1,4 +1,4 @@
-import { useState } from "react"
+import React, { useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { Message } from "../types/ipc"
@@ -8,167 +8,259 @@ interface AssistantMessageProps {
 	message: Message & { isStreaming?: boolean }
 }
 
+interface CodeBlockProps {
+	children: React.ReactNode
+	className?: string
+}
+
+function CodeBlock({ children, className }: CodeBlockProps) {
+	const [copied, setCopied] = useState(false)
+	const match = /language-(\w+)/.exec(className || "")
+	const lang = match ? match[1] : ""
+	const rawCode = String(children).replace(/\n$/, "")
+
+	const handleCopy = async () => {
+		try {
+			await navigator.clipboard.writeText(rawCode)
+			setCopied(true)
+			setTimeout(() => setCopied(false), 2000)
+		} catch (e) {
+			console.error("Failed to copy code snippet", e)
+		}
+	}
+
+	return (
+		<div
+			style={{
+				margin: "12px 0",
+				borderRadius: 6,
+				border: "1px solid var(--border-muted)",
+				background: "var(--bg-surface)",
+				overflow: "hidden",
+			}}
+		>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					padding: "5px 12px",
+					background: "var(--bg-elevated)",
+					borderBottom: "1px solid var(--border-muted)",
+					fontSize: 11,
+					color: "var(--muted)",
+					fontFamily: "var(--font-mono, 'SF Mono', Monaco, monospace)",
+					userSelect: "none",
+				}}
+			>
+				<span style={{ textTransform: "lowercase", fontWeight: 500 }}>
+					{lang || "code"}
+				</span>
+				<button
+					type="button"
+					onClick={handleCopy}
+					title={copied ? "Copied" : "Copy code"}
+					aria-label={copied ? "Copied" : "Copy code"}
+					style={{
+						background: "none",
+						border: "none",
+						color: copied ? "var(--success)" : "var(--muted)",
+						cursor: "pointer",
+						display: "inline-flex",
+						alignItems: "center",
+						gap: 4,
+						fontSize: 11,
+						padding: "2px 6px",
+						borderRadius: 3,
+						transition: "color 0.15s, background-color 0.15s",
+					}}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.color = copied
+							? "var(--success)"
+							: "var(--text)"
+						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.color = copied
+							? "var(--success)"
+							: "var(--muted)"
+						e.currentTarget.style.backgroundColor = "transparent"
+					}}
+				>
+					{copied ? (
+						<>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<polyline points="20 6 9 17 4 12" />
+							</svg>
+							<span>Copied</span>
+						</>
+					) : (
+						<>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+								<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+							</svg>
+							<span>Copy</span>
+						</>
+					)}
+				</button>
+			</div>
+			<pre
+				style={{
+					margin: 0,
+					padding: "10px 14px",
+					overflowX: "auto",
+					background: "transparent",
+					border: "none",
+					fontSize: 12,
+					lineHeight: 1.5,
+					fontFamily: "var(--font-mono, 'SF Mono', Monaco, monospace)",
+				}}
+			>
+				<code className={className} style={{ background: "none", padding: 0 }}>
+					{children}
+				</code>
+			</pre>
+		</div>
+	)
+}
+
 export function AssistantMessage({ message }: AssistantMessageProps) {
 	const [showThinking, setShowThinking] = useState(false)
+	const [copiedAnswer, setCopiedAnswer] = useState(false)
 
-	const {
-		text,
-		thinking,
-		isStreamingThinking,
-		hasRedactedThinking,
-	} = extractMessageDetails(message.content, (message as any).text)
+	const { text, thinking, isStreamingThinking, hasRedactedThinking } =
+		extractMessageDetails(message.content, (message as any).text)
 
-	const isError = message.stopReason === "error" || Boolean(message.errorMessage)
+	const isError =
+		message.stopReason === "error" || Boolean(message.errorMessage)
 	const isActivelyStreaming = Boolean(message.isStreaming)
 	const lineCount = thinking ? thinking.split("\n").length : 0
 
+	const formatTime = (iso?: string) => {
+		if (!iso) return ""
+		try {
+			const date = new Date(iso)
+			if (isNaN(date.getTime())) return ""
+			return date.toLocaleTimeString([], {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: false,
+			})
+		} catch {
+			return ""
+		}
+	}
+
+	const timeStr = formatTime(message.createdAt)
+
+	const handleCopyAnswer = async () => {
+		if (!text) return
+		try {
+			await navigator.clipboard.writeText(text)
+			setCopiedAnswer(true)
+			setTimeout(() => setCopiedAnswer(false), 2000)
+		} catch (err) {
+			console.error("Failed to copy assistant answer:", err)
+		}
+	}
+
 	return (
-		<div style={{ padding: "8px 0", lineHeight: 1.6 }}>
-			{/* Thinking block with collapsible preview */}
+		<div
+			style={{
+				padding: "8px 0",
+				lineHeight: 1.6,
+				minWidth: 0,
+				maxWidth: "100%",
+				overflowWrap: "anywhere",
+				wordBreak: "break-word",
+			}}
+		>
+			{/* Thinking block with Antigravity style preview */}
 			{(thinking || isStreamingThinking || hasRedactedThinking) && (
 				<div style={{ marginBottom: 8 }}>
 					<button
 						type="button"
 						onClick={() => setShowThinking(!showThinking)}
 						style={{
-							display: "flex",
+							display: "inline-flex",
 							alignItems: "center",
 							gap: 8,
-							padding: "4px 0",
+							padding: "3px 0",
 							cursor: "pointer",
 							fontSize: 13,
 							background: "none",
 							border: "none",
 							color: "inherit",
-							width: "100%",
 							textAlign: "left",
 						}}
 					>
 						<span
 							style={{
-								fontSize: 12,
+								width: 6,
+								height: 6,
+								borderRadius: "50%",
+								background: "#8b5cf6",
 								flexShrink: 0,
-								width: 16,
-								textAlign: "center",
-								color: "var(--muted)",
+								animation: isActivelyStreaming
+									? "pulse 1.2s ease-in-out infinite"
+									: undefined,
 							}}
-						>
-							{showThinking ? "▾" : "▸"}
-						</span>
-						<span
-							style={{
-								fontSize: 13,
-								flexShrink: 0,
-								color: "var(--muted)",
-							}}
-						>
-							⚙️
-						</span>
+						/>
 						<span style={{ color: "var(--muted)", fontWeight: 500 }}>
-							Thinking
+							Thinking...
 						</span>
-
-						{/* Active pulsing dot when actively streaming thinking */}
-						{isActivelyStreaming && isStreamingThinking && (
-							<span
-								style={{
-									width: 6,
-									height: 6,
-									borderRadius: "50%",
-									background: "var(--accent)",
-									animation: "pulse 1.2s ease-in-out infinite",
-									flexShrink: 0,
-								}}
-							/>
-						)}
-
-						{/* Line count badge when collapsed and lines > 1 */}
 						{!showThinking && lineCount > 1 && (
-							<span
-								style={{
-									fontSize: 11,
-									color: "var(--dim)",
-									flexShrink: 0,
-								}}
-							>
+							<span style={{ fontSize: 11, color: "var(--dim)" }}>
 								({lineCount} lines)
-							</span>
-						)}
-
-						{/* Collapsed one-line preview */}
-						{!showThinking && thinking && (
-							<span
-								style={{
-									background: "var(--bg-surface)",
-									padding: "1px 8px",
-									borderRadius: 4,
-									fontFamily:
-										"var(--font-mono, 'SF Mono', Monaco, 'Cascadia Code', monospace)",
-									fontSize: 12,
-									color: "var(--thinking-text)",
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-									whiteSpace: "nowrap",
-									flex: 1,
-									minWidth: 0,
-								}}
-							>
-								{thinking.replace(/\n/g, " ").slice(0, 120)}
-								{thinking.length > 120 ? "\u2026" : ""}
-							</span>
-						)}
-
-						{/* Redacted thinking badge */}
-						{hasRedactedThinking && (
-							<span
-								style={{
-									fontSize: 11,
-									color: "var(--dim)",
-									fontStyle: "italic",
-									flexShrink: 0,
-									marginLeft: "auto",
-								}}
-							>
-								🔒 Redacted
 							</span>
 						)}
 					</button>
 
 					{/* Expanded thinking container */}
-					{showThinking && (
+					{showThinking && thinking && (
 						<div
 							style={{
-								marginTop: 6,
-								marginLeft: 24,
-								padding: "8px 12px",
-								borderRadius: 6,
-								background: "var(--bg-surface)",
-								border: "1px solid var(--border-muted)",
-								color: "var(--thinking-text)",
-								fontFamily:
-									"var(--font-mono, 'SF Mono', Monaco, 'Cascadia Code', monospace)",
-								fontSize: 12,
-								whiteSpace: "pre-wrap",
-								wordBreak: "break-word",
-								lineHeight: 1.5,
-								maxHeight: 400,
-								overflowY: "auto",
+								marginTop: 4,
+								paddingLeft: 14,
 							}}
 						>
-							{thinking}
-							{isActivelyStreaming && isStreamingThinking && (
-								<span
-									style={{
-										display: "inline-block",
-										width: 2,
-										height: 12,
-										background: "var(--accent)",
-										marginLeft: 2,
-										verticalAlign: "middle",
-										animation: "blink 1s step-end infinite",
-									}}
-								/>
-							)}
+							<div
+								style={{
+									padding: "6px 10px",
+									background: "var(--bg-surface)",
+									border: "1px solid var(--border-muted)",
+									borderRadius: 6,
+									color: "var(--thinking-text, var(--muted))",
+									fontSize: 12,
+									fontFamily: "var(--font-mono, monospace)",
+									lineHeight: 1.5,
+									whiteSpace: "pre-wrap",
+									wordBreak: "break-word",
+									maxHeight: 300,
+									overflowY: "auto",
+								}}
+							>
+								{thinking}
+							</div>
 						</div>
 					)}
 				</div>
@@ -183,7 +275,7 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 						gap: 8,
 						color: "var(--muted)",
 						fontSize: 13,
-						padding: "4px 0",
+						padding: "6px 0",
 					}}
 				>
 					<span
@@ -195,14 +287,36 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 							animation: "pulse 1.2s ease-in-out infinite",
 						}}
 					/>
-					<span>Thinking…</span>
+					<span>Thinking...</span>
 				</div>
 			)}
 
-			{/* Main text or streaming cursor */}
-			{(text || (isActivelyStreaming && !isStreamingThinking)) && (
+			{/* Main text with streaming cursor */}
+			{text && (
 				<div className="markdown-body">
-					{text ? <Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown> : null}
+					<Markdown
+						remarkPlugins={[remarkGfm]}
+						components={{
+							pre({ children }) {
+								const codeElement = React.isValidElement(children)
+									? children
+									: null
+								if (codeElement && codeElement.props) {
+									const { className, children: codeChildren } =
+										codeElement.props as {
+											className?: string
+											children?: React.ReactNode
+										}
+									return (
+										<CodeBlock className={className}>{codeChildren}</CodeBlock>
+									)
+								}
+								return <pre>{children}</pre>
+							},
+						}}
+					>
+						{text}
+					</Markdown>
 					{isActivelyStreaming && !isStreamingThinking && (
 						<span
 							style={{
@@ -223,6 +337,10 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 						@keyframes pulse {
 							0%, 100% { opacity: 0.3; }
 							50% { opacity: 1; }
+						}
+						.markdown-body {
+							overflow-wrap: anywhere;
+							word-break: break-word;
 						}
 						.markdown-body h1, .markdown-body h2, .markdown-body h3 {
 							color: var(--text);
@@ -247,6 +365,9 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 						.markdown-body table {
 							border-collapse: collapse;
 							margin: 8px 0;
+							display: block;
+							max-width: 100%;
+							overflow-x: auto;
 						}
 						.markdown-body th, .markdown-body td {
 							border: 1px solid var(--border);
@@ -269,21 +390,93 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 							border-radius: 4px;
 							font-family: var(--font-mono, 'SF Mono', Monaco, 'Cascadia Code', monospace);
 							font-size: 12px;
-						}
-						.markdown-body pre {
-							background: var(--bg-surface);
-							padding: 10px 12px;
-							border-radius: 6px;
-							border: 1px solid var(--border-muted);
-							overflow-x: auto;
-							margin: 8px 0;
-						}
-						.markdown-body pre code {
-							background: none;
-							padding: 0;
-							border-radius: 0;
+							overflow-wrap: anywhere;
+							word-break: break-word;
 						}
 					`}</style>
+				</div>
+			)}
+
+			{/* Assistant footer toolbar: timestamp + copy entire answer */}
+			{text && !isActivelyStreaming && (
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 8,
+						marginTop: 8,
+						fontSize: 11,
+						color: "var(--dim)",
+						userSelect: "none",
+					}}
+				>
+					{timeStr && <span>{timeStr}</span>}
+					<button
+						type="button"
+						onClick={handleCopyAnswer}
+						title={copiedAnswer ? "Copied" : "Copy response"}
+						aria-label={copiedAnswer ? "Copied" : "Copy response"}
+						style={{
+							background: "none",
+							border: "none",
+							padding: "2px 6px",
+							cursor: "pointer",
+							display: "inline-flex",
+							alignItems: "center",
+							gap: 4,
+							color: copiedAnswer ? "var(--success)" : "var(--dim)",
+							borderRadius: 4,
+							fontSize: 11,
+							transition: "color 0.15s, background-color 0.15s",
+						}}
+						onMouseEnter={(e) => {
+							e.currentTarget.style.color = copiedAnswer
+								? "var(--success)"
+								: "var(--text)"
+							e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+						}}
+						onMouseLeave={(e) => {
+							e.currentTarget.style.color = copiedAnswer
+								? "var(--success)"
+								: "var(--dim)"
+							e.currentTarget.style.backgroundColor = "transparent"
+						}}
+					>
+						{copiedAnswer ? (
+							<>
+								<svg
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								>
+									<polyline points="20 6 9 17 4 12" />
+								</svg>
+								<span>Copied</span>
+							</>
+						) : (
+							<>
+								<svg
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								>
+									<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+									<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+								</svg>
+								<span>Copy</span>
+							</>
+						)}
+					</button>
 				</div>
 			)}
 
@@ -300,6 +493,11 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 						color: "#ef4444",
 						fontSize: 13,
 						lineHeight: 1.5,
+						whiteSpace: "pre-wrap",
+						overflowWrap: "anywhere",
+						wordBreak: "break-word",
+						maxWidth: "100%",
+						boxSizing: "border-box",
 					}}
 				>
 					{message.errorMessage ||

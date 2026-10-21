@@ -1,6 +1,6 @@
 import { promises as fs } from "fs"
 import * as path from "path"
-import type { HarnessRequestContext } from "@mastra/core/harness"
+import type { HarnessRequestContext } from "../harness/index.js"
 import { ToolError } from "./types.js"
 import { truncateStringForTokenEstimate } from "../utils/token-estimator.js"
 

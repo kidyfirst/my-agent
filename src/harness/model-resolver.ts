@@ -73,6 +73,7 @@ function wrapWithFallback(primaryModel: any, getFallbackModel: () => any) {
 	})
 }
 
+export type ModelResolver = ReturnType<typeof createModelResolver>
 export function createModelResolver(authStorage: AuthStorage) {
 	return function resolveModel(
 		modelIdInput: string | { modelId?: string },
@@ -92,12 +93,15 @@ export function createModelResolver(authStorage: AuthStorage) {
 		const settings = loadSettings()
 
 		// 1. Custom providers configured by user
-		const customProvider =
-			providerId && modelName
-				? settings.customProviders?.find(
-						(p) => providerId === getCustomProviderId(p.name),
-					)
-				: undefined
+		const customProvider = settings.customProviders?.find((p) => {
+			const pId = getCustomProviderId(p.name)
+			return (
+				(providerId && pId === providerId) ||
+				p.models?.includes(modelId) ||
+				(modelName && p.models?.includes(modelName)) ||
+				(providerId && p.models?.includes(providerId))
+			)
+		})
 
 		if (customProvider) {
 			return new ModelRouterLanguageModel({
@@ -179,7 +183,39 @@ export function createModelResolver(authStorage: AuthStorage) {
 			return new ModelRouterLanguageModel(modelId as any)
 		}
 
-		// 6. Default ModelRouterLanguageModel for all other providers (DeepSeek, Cerebras, Ollama, etc.)
+		// 6. DeepSeek (OpenAI-compatible)
+		if (
+			modelId.startsWith("deepseek/") ||
+			modelId.startsWith("deepseek-") ||
+			modelId.includes("deepseek")
+		) {
+			let bareModelId = modelId.startsWith("deepseek/")
+				? modelId.substring("deepseek/".length)
+				: modelId
+			const apiKey =
+				authStorage.getApiKeySync("deepseek") || process.env.DEEPSEEK_API_KEY
+			if (apiKey) {
+				process.env.DEEPSEEK_API_KEY = apiKey
+				const baseURL =
+					process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
+				if (
+					(!baseURL || baseURL.includes("api.deepseek.com")) &&
+					bareModelId !== "deepseek-chat" &&
+					bareModelId !== "deepseek-reasoner"
+				) {
+					bareModelId = "deepseek-chat"
+				}
+				return createOpenAI({
+					apiKey,
+					baseURL,
+				}).chat(bareModelId)
+			}
+			return new ModelRouterLanguageModel(
+				(modelId.includes("/") ? modelId : `deepseek/${modelId}`) as any,
+			)
+		}
+
+		// 7. Default ModelRouterLanguageModel for all other providers (Cerebras, Ollama, etc.)
 		const genericKey = authStorage.getApiKeySync(providerId)
 		if (genericKey) {
 			return new ModelRouterLanguageModel({
@@ -236,12 +272,14 @@ export function createDynamicModelGetter(
 
 		if (!modelId && authStorage) {
 			authStorage.reload()
-			if (authStorage.isLoggedIn("google")) {
-				modelId = authStorage.getDefaultModelForProvider("google")
+			if (authStorage.isLoggedIn("anthropic")) {
+				modelId = authStorage.getDefaultModelForProvider("anthropic")
 			} else if (authStorage.isLoggedIn("openai-codex")) {
 				modelId = authStorage.getDefaultModelForProvider("openai-codex")
-			} else if (authStorage.isLoggedIn("anthropic")) {
-				modelId = authStorage.getDefaultModelForProvider("anthropic")
+			} else if (authStorage.isLoggedIn("google")) {
+				modelId = authStorage.getDefaultModelForProvider("google")
+			} else if (authStorage.isLoggedIn("deepseek")) {
+				modelId = authStorage.getDefaultModelForProvider("deepseek")
 			}
 		}
 

@@ -120,4 +120,24 @@ describe("createMastraCode (native @mastra/core implementation)", () => {
 		expect(typeof normalized.content).toBe("object")
 		expect(normalized.content.parts[0].text).toBe("test user input")
 	})
+
+	it("resolves DeepSeek chat and reasoner models with API key", async () => {
+		const { createModelResolver } = await import("../model-resolver.js")
+		const { AuthStorage } = await import("../../auth/storage.js")
+
+		const authStorage = new AuthStorage(`/tmp/test-auth-${Date.now()}.json`)
+		authStorage.set("deepseek", {
+			type: "api_key",
+			key: "sk-mock-deepseek-key",
+		})
+		const resolveModel = createModelResolver(authStorage)
+
+		const chatModel = resolveModel("deepseek/deepseek-chat")
+		expect(chatModel).toBeDefined()
+		expect(chatModel.modelId).toBe("deepseek-chat")
+
+		const reasonerModel = resolveModel("deepseek/deepseek-reasoner")
+		expect(reasonerModel).toBeDefined()
+		expect(reasonerModel.modelId).toBe("deepseek-reasoner")
+	})
 })

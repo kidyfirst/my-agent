@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { Sidebar } from "./components/Sidebar"
 import { ChatView } from "./components/ChatView"
 import { StatusBar } from "./components/StatusBar"
@@ -24,6 +24,7 @@ import type {
 	OMProgressState,
 	Message,
 } from "./types/ipc"
+import type { QueuedMessage, AttachedFile } from "./types/chat"
 import { ensureAudioContext } from "./utils/audio"
 import { useChatReducer } from "./hooks/useChatReducer"
 import { useAuthManager } from "./hooks/useAuthManager"
@@ -55,6 +56,24 @@ export function App() {
 	})
 	const [threads, setThreads] = useState<ThreadInfo[]>([])
 	const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+	const [modelsByThread, setModelsByThread] = useState<Record<string, string>>(() => {
+		try {
+			const saved = localStorage.getItem("myagent-thread-models")
+			return saved ? JSON.parse(saved) : {}
+		} catch {
+			return {}
+		}
+	})
+	const [permissionsByThread, setPermissionsByThread] = useState<
+		Record<string, "default" | "auto-approve" | "read-only">
+	>(() => {
+		try {
+			const saved = localStorage.getItem("myagent-thread-permissions")
+			return saved ? JSON.parse(saved) : {}
+		} catch {
+			return {}
+		}
+	})
 	const [tasks, setTasks] = useState<
 		Array<{
 			content: string
@@ -113,6 +132,48 @@ export function App() {
 				if (session.currentThreadId) {
 					tabs.setOpenThreadTabs([session.currentThreadId])
 					tabs.setActiveTab(`thread:${session.currentThreadId}`)
+
+					const savedModels = (() => {
+						try {
+							return JSON.parse(
+								localStorage.getItem("myagent-thread-models") || "{}",
+							)
+						} catch {
+							return {}
+						}
+					})()
+					const savedPerms = (() => {
+						try {
+							return JSON.parse(
+								localStorage.getItem("myagent-thread-permissions") || "{}",
+							)
+						} catch {
+							return {}
+						}
+					})()
+					const tModel = savedModels[session.currentThreadId]
+					if (tModel) {
+						setModelId(tModel)
+						window.api.invoke({
+							type: "switchModel",
+							modelId: tModel,
+							scope: "thread",
+						})
+					}
+					const tPerm = savedPerms[session.currentThreadId] || "default"
+					if (tPerm === "auto-approve") {
+						window.api.invoke({ type: "setYoloMode", enabled: true })
+						window.api.invoke({ type: "switchMode", modeId: "build" })
+						setModeId("build")
+					} else if (tPerm === "read-only") {
+						window.api.invoke({ type: "setYoloMode", enabled: false })
+						window.api.invoke({ type: "switchMode", modeId: "plan" })
+						setModeId("plan")
+					} else {
+						window.api.invoke({ type: "setYoloMode", enabled: false })
+						window.api.invoke({ type: "switchMode", modeId: "build" })
+						setModeId("build")
+					}
 				}
 			}
 
@@ -213,16 +274,115 @@ export function App() {
 		}
 	}
 
+	const applyPermissionMode = useCallback(
+		async (perm: "default" | "auto-approve" | "read-only") => {
+			if (perm === "auto-approve") {
+				await window.api.invoke({ type: "setYoloMode", enabled: true })
+				await window.api.invoke({ type: "switchMode", modeId: "build" })
+				setModeId("build")
+			} else if (perm === "read-only") {
+				await window.api.invoke({ type: "setYoloMode", enabled: false })
+				await window.api.invoke({ type: "switchMode", modeId: "plan" })
+				setModeId("plan")
+			} else {
+				await window.api.invoke({ type: "setYoloMode", enabled: false })
+				await window.api.invoke({ type: "switchMode", modeId: "build" })
+				setModeId("build")
+			}
+		},
+		[],
+	)
+
+	const activeThreadKey = currentThreadId || "default"
+	const currentThreadModelId =
+		modelsByThread[activeThreadKey] ||
+		modelId ||
+		"anthropic/claude-3-5-sonnet-20241022"
+	const currentThreadPermission =
+		permissionsByThread[activeThreadKey] || "default"
+
+	const handleSelectThreadModel = useCallback(
+		async (newModelId: string) => {
+			const tid = currentThreadId || "default"
+			setModelsByThread((prev) => {
+				const next = { ...prev, [tid]: newModelId }
+				try {
+					localStorage.setItem("myagent-thread-models", JSON.stringify(next))
+				} catch {}
+				return next
+			})
+			setModelId(newModelId)
+			await window.api.invoke({
+				type: "switchModel",
+				modelId: newModelId,
+				scope: "thread",
+			})
+		},
+		[currentThreadId],
+	)
+
+	const handleSelectThreadPermission = useCallback(
+		async (newPerm: "default" | "auto-approve" | "read-only") => {
+			const tid = currentThreadId || "default"
+			setPermissionsByThread((prev) => {
+				const next: Record<string, "default" | "auto-approve" | "read-only"> = {
+					...prev,
+					[tid]: newPerm,
+				}
+				try {
+					localStorage.setItem(
+						"myagent-thread-permissions",
+						JSON.stringify(next),
+					)
+				} catch {}
+				return next
+			})
+			await applyPermissionMode(newPerm)
+		},
+		[currentThreadId, applyPermissionMode],
+	)
+
 	const handleNewThread = useCallback(async () => {
-		const thread = (await window.api.invoke({ type: "createThread" })) as { id: string } | undefined
+		const thread = (await window.api.invoke({ type: "createThread" })) as
+			| { id: string }
+			| undefined
 		dispatch({ type: "CLEAR" })
 		if (thread?.id) {
+			const newThreadId = thread.id
+			const currentModel = currentThreadModelId
+			setModelsByThread((prev) => {
+				const next = { ...prev, [newThreadId]: currentModel }
+				try {
+					localStorage.setItem("myagent-thread-models", JSON.stringify(next))
+				} catch {}
+				return next
+			})
+			setPermissionsByThread((prev) => {
+				const next: Record<string, "default" | "auto-approve" | "read-only"> = {
+					...prev,
+					[newThreadId]: "default",
+				}
+				try {
+					localStorage.setItem(
+						"myagent-thread-permissions",
+						JSON.stringify(next),
+					)
+				} catch {}
+				return next
+			})
+			setCurrentThreadId(newThreadId)
 			tabs.setOpenThreadTabs((prev) =>
-				prev.includes(thread.id) ? prev : [...prev, thread.id],
+				prev.includes(newThreadId) ? prev : [...prev, newThreadId],
 			)
-			tabs.setActiveTab(`thread:${thread.id}`)
+			tabs.setActiveTab(`thread:${newThreadId}`)
+			await window.api.invoke({
+				type: "switchModel",
+				modelId: currentModel,
+				scope: "thread",
+			})
+			await applyPermissionMode("default")
 		}
-	}, [])
+	}, [currentThreadModelId, tabs, applyPermissionMode])
 
 	// Harness events
 	useHarnessEvents({
@@ -265,7 +425,7 @@ export function App() {
 	})
 
 	// Chat handlers
-	const handleSend = useCallback(async (content: string, files?: Array<{ type: "image" | "file"; name: string; mimeType: string; data: string; preview: string }>) => {
+	const handleSend = useCallback(async (content: string, files?: AttachedFile[]) => {
 		ensureAudioContext()
 		let finalContent = content || ""
 		if (typeof finalContent === "string" && finalContent.startsWith("/")) {
@@ -303,7 +463,23 @@ export function App() {
 		}
 		if (imageFiles) {
 			for (const img of imageFiles) {
-				messageContent.push({ type: "image", mimeType: img.mimeType, data: img.data })
+				messageContent.push({
+					type: "image",
+					mimeType: img.mimeType || "image/png",
+					data: img.data,
+					name: img.name,
+					url: img.preview,
+				})
+			}
+		}
+		if (textFiles) {
+			for (const f of textFiles) {
+				messageContent.push({
+					type: "file",
+					mimeType: f.mimeType || "text/plain",
+					data: f.data,
+					name: f.name,
+				})
 			}
 		}
 		dispatch({
@@ -313,11 +489,19 @@ export function App() {
 				role: "user",
 				content: messageContent,
 				createdAt: new Date().toISOString(),
+				attachments: files && files.length > 0 ? files : undefined,
 			},
 		})
+		dispatch({ type: "AGENT_START" })
 		const ipcImages = imageFiles?.map(({ mimeType, data, name }) => ({
 			mediaType: mimeType || "image/png",
 			mimeType: mimeType || "image/png",
+			data,
+			name,
+		}))
+		const ipcFiles = textFiles?.map(({ mimeType, data, name }) => ({
+			mediaType: mimeType || "text/plain",
+			mimeType: mimeType || "text/plain",
 			data,
 			name,
 		}))
@@ -326,6 +510,7 @@ export function App() {
 				type: "sendMessage",
 				content: finalContent,
 				...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
+				...(ipcFiles && ipcFiles.length > 0 ? { files: ipcFiles } : {}),
 			})
 		} catch (err: unknown) {
 			console.error("Failed to invoke sendMessage:", err)
@@ -347,33 +532,313 @@ export function App() {
 
 	const handleAbort = useCallback(async () => {
 		ensureAudioContext()
+		dispatch({ type: "SET_QUEUE_PAUSED", paused: true })
 		await window.api.invoke({ type: "abort" })
 	}, [])
 
-	const handleSwitchThread = useCallback(async (threadId: string) => {
-		await window.api.invoke({ type: "switchThread", threadId })
-		tabs.setOpenThreadTabs((prev) =>
-			prev.includes(threadId) ? prev : [...prev, threadId],
-		)
-		tabs.setActiveTab(`thread:${threadId}`)
+	const handleResumeQueue = useCallback(() => {
+		dispatch({ type: "SET_QUEUE_PAUSED", paused: false })
+		if (!chat.isAgentActive) {
+			const targetThreadId = currentThreadId || "default"
+			const currentQueue = chat.queuesByThread[targetThreadId] || []
+			if (currentQueue.length > 0) {
+				const next = currentQueue[0]
+				const remaining = currentQueue.slice(1)
+				dispatch({
+					type: "DEQUEUE_MESSAGE",
+					threadId: targetThreadId,
+					id: next.id,
+				})
+				dispatch({ type: "AGENT_START" })
+				if (currentThreadId) {
+					window.api
+						.invoke({
+							type: "setMessageQueue",
+							threadId: currentThreadId,
+							queue: remaining,
+						})
+						.catch(() => {})
+				}
+				handleSend(next.content, next.files)
+			}
+		}
+	}, [chat.isAgentActive, currentThreadId, chat.queuesByThread, handleSend])
+
+	const loadQueue = useCallback(async (threadId: string | null) => {
+		if (!threadId) return
+		try {
+			const queue = (await window.api.invoke({
+				type: "getMessageQueue",
+				threadId,
+			})) as QueuedMessage[]
+			if (Array.isArray(queue)) {
+				dispatch({ type: "SET_THREAD_QUEUE", threadId, queue })
+			}
+		} catch (err) {
+			console.warn("[loadQueue] Failed to load message queue for thread:", threadId, err)
+		}
 	}, [])
 
-	const handleDeleteThread = useCallback(async (threadId: string) => {
-		setThreads((prev) => prev.filter((t) => t.id !== threadId))
-		tabs.setOpenThreadTabs((prev) => prev.filter((id) => id !== threadId))
-		if (tabs.activeTab === `thread:${threadId}`) {
-			tabs.setActiveTab("chat")
+	useEffect(() => {
+		if (currentThreadId) {
+			const defaultQueue = chat.queuesByThread["default"] || []
+			if (defaultQueue.length > 0) {
+				const existing = chat.queuesByThread[currentThreadId] || []
+				const merged = [...defaultQueue, ...existing]
+				dispatch({
+					type: "SET_THREAD_QUEUE",
+					threadId: currentThreadId,
+					queue: merged,
+				})
+				dispatch({
+					type: "CLEAR_THREAD_QUEUE",
+					threadId: "default",
+				})
+				window.api
+					.invoke({
+						type: "setMessageQueue",
+						threadId: currentThreadId,
+						queue: merged,
+					})
+					.catch(() => {})
+			} else {
+				loadQueue(currentThreadId)
+			}
 		}
-		if (currentThreadId === threadId) {
-			setCurrentThreadId(null)
-			dispatch({ type: "CLEAR" })
+	}, [currentThreadId, loadQueue])
+
+	const handleQueue = useCallback(
+		async (content: string, files?: AttachedFile[]) => {
+			const targetThreadId = currentThreadId || "default"
+			const queuedItem: QueuedMessage = {
+				id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+				threadId: currentThreadId,
+				content,
+				files,
+				createdAt: new Date().toISOString(),
+			}
+			const existing = chat.queuesByThread[targetThreadId] || []
+			const updated = [...existing, queuedItem]
+			dispatch({
+				type: "ENQUEUE_MESSAGE",
+				threadId: targetThreadId,
+				message: queuedItem,
+			})
+			if (currentThreadId) {
+				window.api
+					.invoke({
+						type: "setMessageQueue",
+						threadId: currentThreadId,
+						queue: updated,
+					})
+					.catch((err) =>
+						console.warn("Failed to persist message queue:", err),
+					)
+			}
+		},
+		[currentThreadId, chat.queuesByThread],
+	)
+
+	const handleSteerQueued = useCallback(
+		async (item: QueuedMessage) => {
+			const targetThreadId = currentThreadId || "default"
+			const existing = chat.queuesByThread[targetThreadId] || []
+			const updated = existing.filter((m) => m.id !== item.id)
+			dispatch({
+				type: "REMOVE_QUEUED_MESSAGE",
+				threadId: targetThreadId,
+				id: item.id,
+			})
+			if (currentThreadId) {
+				window.api
+					.invoke({
+						type: "setMessageQueue",
+						threadId: currentThreadId,
+						queue: updated,
+					})
+					.catch(() => {})
+			}
+			try {
+				await window.api.invoke({
+					type: "steer",
+					content: item.content,
+				})
+			} catch (err) {
+				console.error("Failed to steer queued message:", err)
+			}
+		},
+		[currentThreadId, chat.queuesByThread],
+	)
+
+	const handleDeleteQueued = useCallback(
+		async (id: string) => {
+			const targetThreadId = currentThreadId || "default"
+			const existing = chat.queuesByThread[targetThreadId] || []
+			const updated = existing.filter((m) => m.id !== id)
+			dispatch({
+				type: "REMOVE_QUEUED_MESSAGE",
+				threadId: targetThreadId,
+				id,
+			})
+			if (currentThreadId) {
+				window.api
+					.invoke({
+						type: "setMessageQueue",
+						threadId: currentThreadId,
+						queue: updated,
+					})
+					.catch(() => {})
+			}
+		},
+		[currentThreadId, chat.queuesByThread],
+	)
+
+	const handleReorderQueue = useCallback(
+		async (newQueue: QueuedMessage[]) => {
+			const targetThreadId = currentThreadId || "default"
+			dispatch({
+				type: "REORDER_THREAD_QUEUE",
+				threadId: targetThreadId,
+				queue: newQueue,
+			})
+			if (currentThreadId) {
+				window.api
+					.invoke({
+						type: "setMessageQueue",
+						threadId: currentThreadId,
+						queue: newQueue,
+					})
+					.catch(() => {})
+			}
+		},
+		[currentThreadId],
+	)
+
+	const handleClearQueue = useCallback(async () => {
+		const targetThreadId = currentThreadId || "default"
+		dispatch({
+			type: "CLEAR_THREAD_QUEUE",
+			threadId: targetThreadId,
+		})
+		if (currentThreadId) {
+			window.api
+				.invoke({
+					type: "setMessageQueue",
+					threadId: currentThreadId,
+					queue: [],
+				})
+				.catch(() => {})
 		}
-		try {
-			await window.api.invoke({ type: "deleteThread", threadId })
-		} finally {
-			await loadThreads()
+	}, [currentThreadId])
+
+	const prevIsAgentActiveRef = useRef(chat.isAgentActive)
+
+	// Auto-dequeue next message ONLY when agent completes current turn (transition from active -> idle)
+	useEffect(() => {
+		const wasActive = prevIsAgentActiveRef.current
+		prevIsAgentActiveRef.current = chat.isAgentActive
+
+		// Only auto-dequeue when the agent was active and has now transitioned to idle
+		if (!wasActive || chat.isAgentActive || chat.isQueuePaused) {
+			return
 		}
-	}, [currentThreadId, tabs.activeTab])
+
+		const targetThreadId = currentThreadId || "default"
+		const currentQueue = chat.queuesByThread[targetThreadId] || []
+		if (currentQueue.length > 0) {
+			const next = currentQueue[0]
+			const remaining = currentQueue.slice(1)
+
+			// Dispatch DEQUEUE and synchronously set AGENT_START so subsequent re-renders see isAgentActive = true
+			dispatch({
+				type: "DEQUEUE_MESSAGE",
+				threadId: targetThreadId,
+				id: next.id,
+			})
+			dispatch({ type: "AGENT_START" })
+
+			if (currentThreadId) {
+				window.api
+					.invoke({
+						type: "setMessageQueue",
+						threadId: currentThreadId,
+						queue: remaining,
+					})
+					.catch((err) =>
+						console.warn("Failed to update queue after dequeue:", err),
+					)
+			}
+
+			handleSend(next.content, next.files)
+		}
+	}, [chat.isAgentActive, chat.isQueuePaused, chat.queuesByThread, currentThreadId, handleSend])
+
+	const handleSwitchThread = useCallback(
+		async (threadId: string) => {
+			await window.api.invoke({ type: "switchThread", threadId })
+			setCurrentThreadId(threadId)
+			tabs.setOpenThreadTabs((prev) =>
+				prev.includes(threadId) ? prev : [...prev, threadId],
+			)
+			tabs.setActiveTab(`thread:${threadId}`)
+
+			// Apply thread-scoped model
+			const threadModel = modelsByThread[threadId] || modelId
+			if (threadModel) {
+				setModelId(threadModel)
+				await window.api.invoke({
+					type: "switchModel",
+					modelId: threadModel,
+					scope: "thread",
+				})
+			}
+
+			// Apply thread-scoped permission
+			const threadPerm = permissionsByThread[threadId] || "default"
+			await applyPermissionMode(threadPerm)
+		},
+		[modelsByThread, permissionsByThread, modelId, tabs, applyPermissionMode],
+	)
+
+	const handleDeleteThread = useCallback(
+		async (threadId: string) => {
+			setThreads((prev) => prev.filter((t) => t.id !== threadId))
+			tabs.setOpenThreadTabs((prev) => prev.filter((id) => id !== threadId))
+			dispatch({ type: "CLEAR_THREAD_QUEUE", threadId })
+			setModelsByThread((prev) => {
+				const next = { ...prev }
+				delete next[threadId]
+				try {
+					localStorage.setItem("myagent-thread-models", JSON.stringify(next))
+				} catch {}
+				return next
+			})
+			setPermissionsByThread((prev) => {
+				const next = { ...prev }
+				delete next[threadId]
+				try {
+					localStorage.setItem(
+						"myagent-thread-permissions",
+						JSON.stringify(next),
+					)
+				} catch {}
+				return next
+			})
+			if (tabs.activeTab === `thread:${threadId}`) {
+				tabs.setActiveTab("chat")
+			}
+			if (currentThreadId === threadId) {
+				setCurrentThreadId(null)
+				dispatch({ type: "CLEAR" })
+			}
+			try {
+				await window.api.invoke({ type: "deleteThread", threadId })
+			} finally {
+				await loadThreads()
+			}
+		},
+		[currentThreadId, tabs.activeTab],
+	)
 
 	const handleRenameThread = useCallback(
 		async (threadId: string, title: string) => {
@@ -464,7 +929,7 @@ export function App() {
 		items.push({ id: "toggle-planning", label: modeId === "plan" ? "Switch to Build Mode" : "Switch to Plan Mode", group: "Actions", action: () => { handleTogglePlanning(); close() } })
 		items.push({
 			id: "toggle-theme",
-			label: "Toggle Theme (浅色 / 深色皮肤切换)",
+			label: "Toggle Theme",
 			group: "Actions",
 			action: () => {
 				const current = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"
@@ -522,6 +987,7 @@ export function App() {
 			<Sidebar
 				threads={threads}
 				currentThreadId={currentThreadId}
+				queuesByThread={chat.queuesByThread}
 				loggedInProviders={auth.loggedInProviders}
 				projectName={project.projectInfo?.name ?? ""}
 				sidebarVisible={sidebarVisible}
@@ -618,8 +1084,7 @@ export function App() {
 									<button
 										className="titlebar-no-drag"
 										onClick={async () => {
-											await window.api.invoke({ type: "switchThread", threadId })
-											tabs.setActiveTab(tabId)
+											await handleSwitchThread(threadId)
 										}}
 										style={{
 											padding: "0 4px 0 12px",
@@ -884,6 +1349,7 @@ export function App() {
 								display: tabs.activeTab === "chat" || tabs.activeTab.startsWith("thread:") ? "flex" : "none",
 								flexDirection: "column",
 								overflow: "hidden",
+								minWidth: 0,
 							}}
 						>
 							<ChatView
@@ -897,10 +1363,22 @@ export function App() {
 							/>
 							<EditorInput
 								onSend={handleSend}
+								onQueue={handleQueue}
 								onAbort={handleAbort}
 								isAgentActive={chat.isAgentActive}
 								modeId={modeId}
 								onBuiltinCommand={handleBuiltinCommand}
+								queue={chat.queuesByThread[currentThreadId || "default"] || []}
+								isQueuePaused={chat.isQueuePaused}
+								onResumeQueue={handleResumeQueue}
+								onSteerQueued={handleSteerQueued}
+								onDeleteQueued={handleDeleteQueued}
+								onReorderQueue={handleReorderQueue}
+								onClearQueue={handleClearQueue}
+								currentModelId={currentThreadModelId}
+								onSelectModel={handleSelectThreadModel}
+								permissionMode={currentThreadPermission}
+								onSelectPermissionMode={handleSelectThreadPermission}
 							/>
 						</div>
 
@@ -955,8 +1433,8 @@ export function App() {
 				)}
 
 				<StatusBar
-					modeId={modeId}
-					modelId={modelId}
+					modeId={currentThreadPermission === "read-only" ? "plan" : modeId}
+					modelId={currentThreadModelId}
 					tokenUsage={tokenUsage}
 					isAgentActive={chat.isAgentActive}
 					projectName={project.projectInfo?.name}
@@ -1063,8 +1541,11 @@ export function App() {
 
 			{dialogs.showModelSelector && (
 				<ModelSelector
-					currentModelId={modelId}
-					onSelect={dialogs.handleSwitchModel}
+					currentModelId={currentThreadModelId}
+					onSelect={(newModelId) => {
+						handleSelectThreadModel(newModelId)
+						dialogs.setShowModelSelector(false)
+					}}
 					onClose={() => dialogs.setShowModelSelector(false)}
 				/>
 			)}

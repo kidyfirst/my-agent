@@ -78,7 +78,7 @@ export function ProjectList({
 				) ||
 				projects.find((q) => q.rootPath === groupKey) ||
 				p
-			const wts = p.worktrees || []
+			const wts = root.worktrees || p.worktrees || []
 
 			result.push({
 				root,
@@ -582,12 +582,8 @@ export function ProjectList({
 											<div style={{ flex: 1, minWidth: 0 }}>
 												{editingProjectPath === wt.rootPath ? (
 													<input
-														ref={(el) => {
-															if (el) {
-																el.focus()
-																el.select()
-															}
-														}}
+														autoFocus
+														onFocus={(e) => e.currentTarget.select()}
 														value={editingProjectName}
 														onChange={(e) => setEditingProjectName(e.target.value)}
 														onKeyDown={(e) => {
@@ -680,7 +676,7 @@ export function ProjectList({
 							}}>
 								Repos
 							</div>
-							{filteredGroups.filter((g) => g.worktrees.length === 0).map(({ root }) => (
+							{filteredGroups.map(({ root }) => (
 								<button
 									key={root.rootPath}
 									onClick={() => onSwitchProject(root.rootPath)}
@@ -708,12 +704,8 @@ export function ProjectList({
 								>
 									{editingProjectPath === root.rootPath ? (
 										<input
-											ref={(el) => {
-												if (el) {
-													el.focus()
-													el.select()
-												}
-											}}
+											autoFocus
+											onFocus={(e) => e.currentTarget.select()}
 											value={editingProjectName}
 											onChange={(e) => setEditingProjectName(e.target.value)}
 											onKeyDown={(e) => {
@@ -791,7 +783,18 @@ export function ProjectList({
 							>
 								{/* Root project (repo) */}
 								<div
-									style={{ display: "flex", alignItems: "center" }}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										borderLeft: isActive(root.rootPath)
+											? "3px solid var(--accent)"
+											: "3px solid transparent",
+										background: isActive(root.rootPath)
+											? "var(--selected-bg)"
+											: hoveredProject === root.rootPath
+												? "var(--bg-hover)"
+												: "transparent",
+									}}
 									onMouseEnter={() => setHoveredProject(root.rootPath)}
 									onMouseLeave={() => setHoveredProject(null)}
 									onContextMenu={(e) => {
@@ -806,10 +809,9 @@ export function ProjectList({
 								>
 									<button
 										onClick={() => {
-											if (hasWorktrees) {
+											onSwitchProject(root.rootPath)
+											if (!isExpanded) {
 												toggleCollapse(root.rootPath)
-											} else {
-												onSwitchProject(root.rootPath)
 											}
 										}}
 										style={{
@@ -821,22 +823,27 @@ export function ProjectList({
 											textAlign: "left",
 											cursor: "pointer",
 											borderRadius: 0,
-											borderLeft: isActive(root.rootPath)
-												? "3px solid var(--accent)"
-												: "3px solid transparent",
-											background: isActive(root.rootPath)
-												? "var(--selected-bg)"
-												: "transparent",
+											border: "none",
+											background: "transparent",
 											gap: 10,
 										}}
 									>
 										{hasWorktrees && (
 											<span
+												onClick={(e) => {
+													e.stopPropagation()
+													toggleCollapse(root.rootPath)
+												}}
+												title={isExpanded ? "Collapse worktrees" : "Expand worktrees"}
 												style={{
 													width: 14,
 													fontSize: 9,
 													color: "var(--muted)",
 													flexShrink: 0,
+													cursor: "pointer",
+													display: "inline-flex",
+													alignItems: "center",
+													justifyContent: "center",
 												}}
 											>
 												{isExpanded ? "\u25BC" : "\u25B6"}
@@ -850,12 +857,8 @@ export function ProjectList({
 										>
 											{editingProjectPath === root.rootPath ? (
 												<input
-													ref={(el) => {
-														if (el) {
-															el.focus()
-															el.select()
-														}
-													}}
+													autoFocus
+													onFocus={(e) => e.currentTarget.select()}
 													value={editingProjectName}
 													onChange={(e) => setEditingProjectName(e.target.value)}
 													onKeyDown={(e) => {
@@ -894,21 +897,34 @@ export function ProjectList({
 														whiteSpace: "nowrap",
 														overflow: "hidden",
 														textOverflow: "ellipsis",
+														display: "flex",
+														alignItems: "center",
+														gap: 6,
 													}}
 												>
-													{root.name}
+													<span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+														{root.name}
+													</span>
+													{root.gitBranch && (
+														<span
+															title={`Default branch: ${root.gitBranch}`}
+															style={{
+																fontSize: 10,
+																fontWeight: 500,
+																color: "var(--muted)",
+																background: "var(--bg-elevated)",
+																padding: "1px 5px",
+																borderRadius: 3,
+																border: "1px solid var(--border-muted)",
+																flexShrink: 0,
+															}}
+														>
+															{root.gitBranch}
+														</span>
+													)}
 												</div>
 											)}
 										</div>
-										{hasWorktrees && (
-											<span style={{
-												fontSize: 10,
-												color: "var(--dim)",
-												flexShrink: 0,
-											}}>
-												{worktrees.length}
-											</span>
-										)}
 									</button>
 									{hoveredProject === root.rootPath && editingProjectPath !== root.rootPath && (
 										<button
@@ -916,13 +932,14 @@ export function ProjectList({
 												e.stopPropagation()
 												setConfirmRemovePath(root.rootPath)
 											}}
-											title="Remove workspace"
+											title="Remove project"
 											style={{
 												flexShrink: 0,
 												padding: "4px 10px",
 												fontSize: 14,
 												color: "var(--muted)",
 												background: "transparent",
+												border: "none",
 												cursor: "pointer",
 												lineHeight: 1,
 												opacity: 0.6,
@@ -948,7 +965,18 @@ export function ProjectList({
 										return (
 											<div
 												key={wt.rootPath}
-												style={{ display: "flex", alignItems: "center" }}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													borderLeft: wtIsActive
+														? `3px solid ${wtColor}`
+														: "3px solid transparent",
+													background: wtIsActive
+														? "var(--selected-bg)"
+														: hoveredWorktree === wt.rootPath
+															? "var(--bg-hover)"
+															: "transparent",
+												}}
 												onMouseEnter={() => setHoveredWorktree(wt.rootPath)}
 												onMouseLeave={() => setHoveredWorktree(null)}
 												onContextMenu={(e) => {
@@ -976,12 +1004,8 @@ export function ProjectList({
 														textAlign: "left",
 														cursor: "pointer",
 														borderRadius: 0,
-														borderLeft: wtIsActive
-															? `3px solid ${wtColor}`
-															: "3px solid transparent",
-														background: wtIsActive
-															? "var(--selected-bg)"
-															: "transparent",
+														border: "none",
+														background: "transparent",
 														gap: 8,
 													}}
 												>
@@ -992,12 +1016,8 @@ export function ProjectList({
 													/>
 													{editingProjectPath === wt.rootPath ? (
 														<input
-															ref={(el) => {
-																if (el) {
-																	el.focus()
-																	el.select()
-																}
-															}}
+															autoFocus
+															onFocus={(e) => e.currentTarget.select()}
 															value={editingProjectName}
 															onChange={(e) => setEditingProjectName(e.target.value)}
 															onKeyDown={(e) => {
@@ -1076,6 +1096,7 @@ export function ProjectList({
 															fontSize: 14,
 															color: "var(--muted)",
 															background: "transparent",
+															border: "none",
 															cursor: "pointer",
 															lineHeight: 1,
 															opacity: 0.6,
@@ -1133,7 +1154,18 @@ export function ProjectList({
 					onClose={() => setProjectContextMenu(null)}
 					items={[
 						{
-							label: "重命名 (Rename)",
+							label: "Switch to this directory",
+							icon: (
+								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M5 12h14" /><path d="M12 5l7 7-7 7" />
+								</svg>
+							),
+							onClick: () => {
+								onSwitchProject(projectContextMenu.projectPath)
+							},
+						},
+						{
+							label: "Rename",
 							icon: (
 								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 									<path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -1146,7 +1178,7 @@ export function ProjectList({
 						},
 						projectContextMenu.isWorktree
 							? {
-									label: "删除工作区 (Delete)",
+									label: "Delete worktree",
 									danger: true,
 									icon: (
 										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1161,7 +1193,7 @@ export function ProjectList({
 									},
 							  }
 							: {
-									label: "移除工作区 (Remove)",
+									label: "Remove project",
 									danger: true,
 									icon: (
 										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

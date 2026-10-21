@@ -6,7 +6,7 @@
 import { createTool } from "@mastra/core/tools"
 import { z } from "zod/v3"
 import * as path from "path"
-import type { HarnessRequestContext } from "@mastra/core/harness"
+import type { HarnessRequestContext } from "../harness/index.js"
 import { isPathAllowed, getAllowedPathsFromContext } from "./utils.js"
 
 let requestCounter = 0

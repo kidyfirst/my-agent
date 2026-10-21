@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
 
@@ -6,6 +7,9 @@ interface UserMessageProps {
 }
 
 export function UserMessage({ message }: UserMessageProps) {
+	const [copied, setCopied] = useState(false)
+	const [previewImage, setPreviewImage] = useState<string | null>(null)
+
 	const contentArray = normalizeMessageContent(message.content, (message as any).text)
 
 	const textParts = contentArray.filter(
@@ -27,16 +31,143 @@ export function UserMessage({ message }: UserMessageProps) {
 			? String((message as any).text)
 			: ""
 
-	const images = contentArray.filter(
-		(c: MessageContent) => c.type === "image",
-	)
+	// 1. Collect images from contentArray, attachments, and files
+	const rawImages: Array<{ src: string; name?: string }> = []
+	const seenImageKeys = new Set<string>()
+
+	for (const c of contentArray) {
+		const isImg =
+			c.type === "image" ||
+			(c.type === "file" &&
+				(String(c.mediaType || c.mimeType || "").startsWith("image/") ||
+					/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(String(c.name || c.filename || ""))))
+
+		if (isImg) {
+			const imgData = c as unknown as {
+				mimeType?: string
+				mediaType?: string
+				data?: string
+				url?: string
+				name?: string
+				filename?: string
+			}
+			const src = imgData.url
+				? imgData.url
+				: imgData.data
+				? imgData.data.startsWith("data:")
+					? imgData.data
+					: `data:${imgData.mimeType || imgData.mediaType || "image/png"};base64,${imgData.data}`
+				: ""
+			const key = src.slice(0, 100) || imgData.name || ""
+			if (src && !seenImageKeys.has(key)) {
+				seenImageKeys.add(key)
+				rawImages.push({ src, name: imgData.name || imgData.filename })
+			}
+		}
+	}
+
+	if (Array.isArray(message.attachments)) {
+		for (const att of message.attachments) {
+			const isImg =
+				att.type === "image" ||
+				att.mimeType?.startsWith("image/") ||
+				/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name)
+			if (isImg) {
+				const src =
+					att.preview ||
+					(att.data
+						? att.data.startsWith("data:")
+							? att.data
+							: `data:${att.mimeType || "image/png"};base64,${att.data}`
+						: "")
+				const key = src.slice(0, 100) || att.name
+				if (src && !seenImageKeys.has(key)) {
+					seenImageKeys.add(key)
+					rawImages.push({ src, name: att.name })
+				}
+			}
+		}
+	}
+
+	// 2. Collect non-image file attachments
+	const rawFiles: Array<{ name: string; size?: number; mimeType?: string }> = []
+	const seenFileNames = new Set<string>()
+
+	for (const c of contentArray) {
+		if (c.type === "file") {
+			const mediaType = String(c.mediaType || c.mimeType || "")
+			const name = String(c.name || c.filename || "Attachment")
+			const isImg =
+				mediaType.startsWith("image/") ||
+				/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)
+			if (!isImg && !seenFileNames.has(name)) {
+				seenFileNames.add(name)
+				rawFiles.push({ name, mimeType: mediaType, size: c.size as number | undefined })
+			}
+		}
+	}
+
+	if (Array.isArray(message.attachments)) {
+		for (const att of message.attachments) {
+			const isImg =
+				att.type === "image" ||
+				att.mimeType?.startsWith("image/") ||
+				/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name)
+			if (!isImg && !seenFileNames.has(att.name)) {
+				seenFileNames.add(att.name)
+				rawFiles.push({ name: att.name, mimeType: att.mimeType })
+			}
+		}
+	}
+
+	// 3. Clean inlined file tags from displayed text if present
+	const cleanedText = text
+		? text
+				.replace(/<file name="([^"]+)">[\s\S]*?<\/file>/g, (_, fname) => {
+					if (!seenFileNames.has(fname)) {
+						seenFileNames.add(fname)
+						rawFiles.push({ name: fname })
+					}
+					return ""
+				})
+				.trim()
+		: ""
+	const displayText = cleanedText || text
+
+	const handleCopy = async () => {
+		const textToCopy = displayText || text
+		if (!textToCopy) return
+		try {
+			await navigator.clipboard.writeText(textToCopy)
+			setCopied(true)
+			setTimeout(() => setCopied(false), 2000)
+		} catch (err) {
+			console.error("Failed to copy user message:", err)
+		}
+	}
+
+	const formatTime = (iso?: string) => {
+		if (!iso) return ""
+		try {
+			const date = new Date(iso)
+			if (isNaN(date.getTime())) return ""
+			return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+		} catch {
+			return ""
+		}
+	}
+
+	const timeStr = formatTime(message.createdAt)
 
 	return (
 		<div
 			style={{
 				display: "flex",
-				justifyContent: "flex-end",
-				margin: "8px 0",
+				flexDirection: "column",
+				alignItems: "flex-end",
+				margin: "10px 0 14px",
+				minWidth: 0,
+				maxWidth: "100%",
 			}}
 		>
 			<div
@@ -44,54 +175,215 @@ export function UserMessage({ message }: UserMessageProps) {
 					padding: "10px 14px",
 					background: "var(--user-message-bg)",
 					border: "1px solid var(--border-muted)",
-					borderRadius: 8,
+					borderRadius: "14px 14px 2px 14px",
 					color: "var(--user-message-text)",
 					fontSize: 13,
+					lineHeight: 1.5,
 					whiteSpace: "pre-wrap",
 					wordBreak: "break-word",
-					maxWidth: "70%",
+					overflowWrap: "anywhere",
+					maxWidth: "75%",
 					textAlign: "left",
+					boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
 				}}
 			>
-				{text}
-				{images && images.length > 0 && (
+				{displayText}
+
+				{/* Non-image file chips */}
+				{rawFiles.length > 0 && (
 					<div
 						style={{
-							marginTop: 8,
+							marginTop: displayText ? 8 : 0,
+							display: "flex",
+							gap: 6,
+							flexWrap: "wrap",
+							justifyContent: "flex-end",
+						}}
+					>
+						{rawFiles.map((file, i) => (
+							<div
+								key={i}
+								title={file.name}
+								style={{
+									display: "inline-flex",
+									alignItems: "center",
+									gap: 6,
+									padding: "4px 8px",
+									borderRadius: 6,
+									background: "var(--bg-elevated)",
+									border: "1px solid var(--border)",
+									fontSize: 11,
+									color: "var(--text)",
+									maxWidth: 220,
+								}}
+							>
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="var(--muted)"
+									strokeWidth="1.5"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									style={{ flexShrink: 0 }}
+								>
+									<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+									<polyline points="14 2 14 8 20 8" />
+								</svg>
+								<span
+									style={{
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+									}}
+								>
+									{file.name}
+								</span>
+							</div>
+						))}
+					</div>
+				)}
+
+				{/* Image attachments */}
+				{rawImages.length > 0 && (
+					<div
+						style={{
+							marginTop: displayText || rawFiles.length > 0 ? 8 : 0,
 							display: "flex",
 							gap: 8,
 							flexWrap: "wrap",
 							justifyContent: "flex-end",
 						}}
 					>
-						{images.map((img: MessageContent, i: number) => {
-							const imgData = img as unknown as {
-								mimeType?: string
-								data?: string
-								url?: string
-							}
-							const src = imgData.url
-								? imgData.url
-								: imgData.data
-								? `data:${imgData.mimeType || "image/png"};base64,${imgData.data}`
-								: ""
-							if (!src) return null
-							return (
-								<img
-									key={i}
-									src={src}
-									style={{
-										maxWidth: 300,
-										maxHeight: 200,
-										borderRadius: 6,
-										border: "1px solid var(--border-muted)",
-									}}
-								/>
-							)
-						})}
+						{rawImages.map((img, i) => (
+							<img
+								key={i}
+								src={img.src}
+								alt={img.name || "User attachment"}
+								title={img.name || "Click to zoom"}
+								onClick={() => setPreviewImage(img.src)}
+								style={{
+									maxWidth: 320,
+									maxHeight: 220,
+									borderRadius: 8,
+									border: "1px solid var(--border-muted)",
+									cursor: "pointer",
+									objectFit: "cover",
+									transition: "opacity 0.15s, transform 0.1s",
+								}}
+								onMouseEnter={(e) => {
+									e.currentTarget.style.opacity = "0.9"
+								}}
+								onMouseLeave={(e) => {
+									e.currentTarget.style.opacity = "1"
+								}}
+							/>
+						))}
 					</div>
 				)}
 			</div>
+
+			{/* Sub-bar below bubble aligned right: timestamp + copy button */}
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					gap: 6,
+					marginTop: 4,
+					marginRight: 2,
+					fontSize: 11,
+					color: "var(--dim)",
+					userSelect: "none",
+				}}
+			>
+				{timeStr && <span>{timeStr}</span>}
+				<button
+					type="button"
+					onClick={handleCopy}
+					title={copied ? "Copied" : "Copy"}
+					aria-label={copied ? "Copied" : "Copy message"}
+					style={{
+						background: "none",
+						border: "none",
+						padding: "2px 4px",
+						cursor: "pointer",
+						display: "inline-flex",
+						alignItems: "center",
+						justifyContent: "center",
+						color: copied ? "var(--success)" : "var(--dim)",
+						borderRadius: 4,
+						transition: "color 0.15s, background-color 0.15s",
+					}}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.color = copied ? "var(--success)" : "var(--text)"
+						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.color = copied ? "var(--success)" : "var(--dim)"
+						e.currentTarget.style.backgroundColor = "transparent"
+					}}
+				>
+					{copied ? (
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<polyline points="20 6 9 17 4 12" />
+						</svg>
+					) : (
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+							<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+						</svg>
+					)}
+				</button>
+			</div>
+
+			{/* Fullscreen image preview modal */}
+			{previewImage && (
+				<div
+					style={{
+						position: "fixed",
+						inset: 0,
+						background: "rgba(0, 0, 0, 0.75)",
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						zIndex: 1000,
+						padding: 24,
+						cursor: "zoom-out",
+					}}
+					onClick={() => setPreviewImage(null)}
+				>
+					<img
+						src={previewImage}
+						alt="Preview"
+						style={{
+							maxWidth: "90vw",
+							maxHeight: "90vh",
+							borderRadius: 8,
+							boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+							objectFit: "contain",
+						}}
+					/>
+				</div>
+			)}
 		</div>
 	)
 }

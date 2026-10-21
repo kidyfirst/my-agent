@@ -212,7 +212,7 @@ export function getDatabasePath(): string {
  * Storage configuration for LibSQLStore.
  * Either a local file URL or a remote Turso URL with auth token.
  */
-interface StorageConfig {
+export interface StorageConfig {
 	url: string
 	authToken?: string
 	isRemote: boolean

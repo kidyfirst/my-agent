@@ -1,15 +1,25 @@
 import type { BrowserWindow } from "electron"
 import type * as pty from "node-pty"
-import type { MastraCodeHarness as Harness } from "../../harness/index.js"
+import type {
+	MastraCodeHarness as Harness,
+	Session,
+} from "../../harness/index.js"
+import type { HarnessState } from "../../harness/state.js"
 import type { ElectronStateManager } from "../electron-state.js"
 import type { PlaywrightBrowserManager } from "../../browser/playwright-manager.js"
+import type { MCPManager } from "../../mcp/manager.js"
+import type { AuthStorage } from "../../auth/storage.js"
+import type { ModelResolver } from "../../harness/model-resolver.js"
+
+export type { Session }
 
 export interface WorktreeSession {
-	harness: Harness<any>
-	mcpManager: any
+	harness: Harness
+	session?: Session<HarnessState> | null
+	mcpManager?: MCPManager
 	browserManager: PlaywrightBrowserManager
-	resolveModel: (modelId: string) => any
-	authStorage: any
+	resolveModel: ModelResolver
+	authStorage: AuthStorage
 	electronState: ElectronStateManager
 	projectRoot: string
 	unsubscribe: (() => void) | null
@@ -37,18 +47,21 @@ export interface HandlerContext {
 	cleanupSession: (path: string) => void
 	bridgeAllEvents: (window: BrowserWindow) => void
 	createHarness: (path: string) => Promise<{
-		harness: Harness<any>
-		mcpManager: any
+		harness: Harness
+		mcpManager?: MCPManager
 		browserManager: PlaywrightBrowserManager
-		resolveModel: (modelId: string) => any
-		authStorage: any
+		resolveModel: ModelResolver
+		authStorage: AuthStorage
 		electronState: ElectronStateManager
 	}>
-	ensureAuthenticatedModel: (h: Harness<any>, authStorage: any) => Promise<void>
-	generateThreadTitle: (
-		h: Harness<any>,
-		userMessage: string,
-		resolveModel: (modelId: string) => any,
+	ensureAuthenticatedModel: (
+		h: Harness,
+		authStorage: AuthStorage,
 	) => Promise<void>
-	deleteThread: (h: Harness<any>, threadId: string) => Promise<void>
+	generateThreadTitle: (
+		h: Harness,
+		userMessage: string,
+		resolveModel: ModelResolver,
+	) => Promise<void>
+	deleteThread: (h: Harness, threadId: string) => Promise<void>
 }

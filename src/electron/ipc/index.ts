@@ -18,6 +18,7 @@ export type {
 	IpcCommandHandler,
 	WorktreeSession,
 	AgentTiming,
+	Session,
 } from "./types.js"
 
 export function getAllHandlers(): Record<string, IpcCommandHandler> {

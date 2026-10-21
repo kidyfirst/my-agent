@@ -5,21 +5,30 @@ import type { IpcCommandHandler } from "./types.js"
 export function getMcpHandlers(): Record<string, IpcCommandHandler> {
 	return {
 		getMcpStatuses: async (_command, ctx) => {
-			return ctx.getActiveSession().mcpManager.getServerStatuses()
+			return ctx.getActiveSession().mcpManager?.getServerStatuses() ?? {}
 		},
 		getMcpConfig: async (_command, ctx) => {
-			return ctx.getActiveSession().mcpManager.getConfig()
+			return (
+				ctx.getActiveSession().mcpManager?.getConfig() ?? { mcpServers: {} }
+			)
 		},
 		getMcpConfigPaths: async (_command, ctx) => {
-			return ctx.getActiveSession().mcpManager.getConfigPaths()
+			return (
+				ctx.getActiveSession().mcpManager?.getConfigPaths() ?? {
+					project: "",
+					global: "",
+				}
+			)
 		},
 		reloadMcp: async (_command, ctx) => {
 			const mcpManager = ctx.getActiveSession().mcpManager
+			if (!mcpManager) return {}
 			await mcpManager.reload()
 			return mcpManager.getServerStatuses()
 		},
 		addMcpServer: async (command, ctx) => {
 			const mcpManager = ctx.getActiveSession().mcpManager
+			if (!mcpManager) return {}
 			const configPath =
 				command.scope === "global"
 					? mcpManager.getConfigPaths().global
@@ -46,6 +55,7 @@ export function getMcpHandlers(): Record<string, IpcCommandHandler> {
 		},
 		removeMcpServer: async (command, ctx) => {
 			const mcpManager = ctx.getActiveSession().mcpManager
+			if (!mcpManager) return {}
 			for (const configPath of [
 				mcpManager.getConfigPaths().project,
 				mcpManager.getConfigPaths().global,

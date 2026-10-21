@@ -1,5 +1,5 @@
-import { taskWriteTool, taskCheckTool } from "@mastra/core/harness"
-import type { HarnessSubagent } from "@mastra/core/harness"
+import { taskWriteTool, taskCheckTool } from "@mastra/core/agent-controller"
+import type { HarnessSubagent } from "./index.js"
 import { exploreSubagent } from "../agents/explore.js"
 import { planSubagent } from "../agents/plan.js"
 import { executeSubagent } from "../agents/execute.js"

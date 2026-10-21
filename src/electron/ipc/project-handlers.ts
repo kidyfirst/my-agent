@@ -390,6 +390,9 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 			const result = await ctx.createHarness(newPath)
 			const newSession: WorktreeSession = {
 				harness: result.harness,
+				get session() {
+					return result.harness.activeSession
+				},
 				mcpManager: result.mcpManager,
 				browserManager: result.browserManager,
 				resolveModel: result.resolveModel,

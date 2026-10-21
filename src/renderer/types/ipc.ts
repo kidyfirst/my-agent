@@ -119,7 +119,16 @@ export interface MessageContent {
 		| "tool_result"
 		| "tool_use"
 		| "image"
+		| "file"
 	[key: string]: unknown
+}
+
+export interface AttachedFile {
+	name: string
+	type: "image" | "file"
+	data: string
+	preview?: string
+	mimeType?: string
 }
 
 export interface Message {
@@ -129,6 +138,8 @@ export interface Message {
 	createdAt: string
 	stopReason?: "complete" | "tool_use" | "aborted" | "error"
 	errorMessage?: string
+	durationMs?: number
+	attachments?: AttachedFile[]
 }
 
 export interface ThreadInfo {

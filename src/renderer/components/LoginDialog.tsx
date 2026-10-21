@@ -55,7 +55,11 @@ export function LoginDialog({
 			? "Anthropic (Claude Pro/Max)"
 			: providerId === "openai-codex"
 				? "ChatGPT Plus/Pro (Codex)"
-				: providerId
+				: providerId === "deepseek"
+					? "DeepSeek"
+					: providerId === "google"
+						? "Google Gemini"
+						: providerId
 
 	return (
 		<div

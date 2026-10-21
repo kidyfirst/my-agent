@@ -41,4 +41,11 @@ export const accountProviders = [
 		hasOAuth: false,
 		apiKeyPlaceholder: "AIza...",
 	},
+	{
+		id: "deepseek",
+		name: "DeepSeek",
+		description: "DeepSeek models (V3, R1) via API key",
+		hasOAuth: false,
+		apiKeyPlaceholder: "sk-...",
+	},
 ]

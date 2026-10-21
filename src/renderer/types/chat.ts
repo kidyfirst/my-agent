@@ -28,6 +28,23 @@ export type SubagentState = {
 	status: "running" | "complete"
 }
 
+export interface AttachedFile {
+	type: "image" | "file"
+	name: string
+	mimeType: string
+	data: string // base64 for images, text content for files
+	preview: string // data URL for images, empty for files
+	size?: number
+}
+
+export interface QueuedMessage {
+	id: string
+	threadId: string | null
+	content: string
+	files?: AttachedFile[]
+	createdAt: string
+}
+
 export type ChatState = {
 	messages: Message[]
 	isAgentActive: boolean
@@ -35,6 +52,8 @@ export type ChatState = {
 	streamingMessageId: string | null
 	tools: Map<string, ToolState>
 	subagents: Map<string, SubagentState>
+	queuesByThread: Record<string, QueuedMessage[]>
+	isQueuePaused?: boolean
 }
 
 export type ChatAction =
@@ -80,6 +99,13 @@ export type ChatAction =
 			durationMs: number
 	  }
 	| { type: "SET_MESSAGES"; messages: Message[] }
+	| { type: "SET_THREAD_QUEUE"; threadId: string; queue: QueuedMessage[] }
+	| { type: "ENQUEUE_MESSAGE"; threadId: string; message: QueuedMessage }
+	| { type: "DEQUEUE_MESSAGE"; threadId: string; id: string }
+	| { type: "REMOVE_QUEUED_MESSAGE"; threadId: string; id: string }
+	| { type: "REORDER_THREAD_QUEUE"; threadId: string; queue: QueuedMessage[] }
+	| { type: "CLEAR_THREAD_QUEUE"; threadId: string }
+	| { type: "SET_QUEUE_PAUSED"; paused: boolean }
 	| { type: "CLEAR" }
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
@@ -95,12 +121,23 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 	switch (action.type) {
 		case "AGENT_START":
 			return { ...state, isAgentActive: true, agentStartedAt: Date.now() }
-		case "AGENT_END":
+		case "AGENT_END": {
+			const durationMs = state.agentStartedAt
+				? Date.now() - state.agentStartedAt
+				: undefined
+			const msgs = state.messages.map((m, idx) => {
+				if (idx === state.messages.length - 1 && m.role === "assistant") {
+					return { ...m, durationMs: m.durationMs ?? durationMs }
+				}
+				return m
+			})
 			return {
 				...state,
+				messages: msgs,
 				isAgentActive: false,
 				streamingMessageId: null,
 			}
+		}
 		case "MESSAGE_START": {
 			if (!action.message?.id) return state
 			if (action.message.role === "user") {
@@ -141,6 +178,7 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 							...action.message,
 							role: m.role || action.message.role,
 							content: newContent,
+							durationMs: m.durationMs ?? (action.message as any).durationMs,
 						}
 					})
 				: [...state.messages, action.message]
@@ -170,6 +208,7 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 							...action.message,
 							role: m.role || action.message.role,
 							content: newContent,
+							durationMs: m.durationMs ?? (action.message as any).durationMs,
 						}
 					})
 				: [...state.messages, action.message]
@@ -293,8 +332,63 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				subagents: new Map(),
 			}
 		}
+		case "SET_THREAD_QUEUE": {
+			return {
+				...state,
+				queuesByThread: {
+					...state.queuesByThread,
+					[action.threadId]: action.queue,
+				},
+			}
+		}
+		case "ENQUEUE_MESSAGE": {
+			const existing = state.queuesByThread[action.threadId] || []
+			return {
+				...state,
+				queuesByThread: {
+					...state.queuesByThread,
+					[action.threadId]: [...existing, action.message],
+				},
+			}
+		}
+		case "DEQUEUE_MESSAGE":
+		case "REMOVE_QUEUED_MESSAGE": {
+			const existing = state.queuesByThread[action.threadId] || []
+			return {
+				...state,
+				queuesByThread: {
+					...state.queuesByThread,
+					[action.threadId]: existing.filter((m) => m.id !== action.id),
+				},
+			}
+		}
+		case "REORDER_THREAD_QUEUE": {
+			return {
+				...state,
+				queuesByThread: {
+					...state.queuesByThread,
+					[action.threadId]: action.queue,
+				},
+			}
+		}
+		case "CLEAR_THREAD_QUEUE": {
+			return {
+				...state,
+				queuesByThread: {
+					...state.queuesByThread,
+					[action.threadId]: [],
+				},
+			}
+		}
+		case "SET_QUEUE_PAUSED": {
+			return {
+				...state,
+				isQueuePaused: action.paused,
+			}
+		}
 		case "CLEAR":
 			return {
+				...state,
 				messages: [],
 				isAgentActive: false,
 				agentStartedAt: null,
@@ -314,4 +408,6 @@ export const initialChatState: ChatState = {
 	streamingMessageId: null,
 	tools: new Map(),
 	subagents: new Map(),
+	queuesByThread: {},
+	isQueuePaused: false,
 }

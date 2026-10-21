@@ -2,6 +2,7 @@ import type { BrowserWindow } from "electron"
 import { generateText } from "ai"
 import type { MastraCodeHarness as Harness } from "../harness/index.js"
 import type { AuthStorage } from "../auth/storage.js"
+import type { ModelResolver } from "../harness/model-resolver.js"
 import {
 	upgradeDeprecatedModel,
 	isDeprecatedModel,
@@ -14,7 +15,7 @@ export function setMainWindowRef(win: BrowserWindow | null) {
 }
 
 export async function ensureAuthenticatedModel(
-	h: Harness<any>,
+	h: Harness,
 	authStorage: AuthStorage,
 ) {
 	authStorage.syncCredentials()
@@ -44,7 +45,19 @@ export async function ensureAuthenticatedModel(
 	}
 
 	const provider = modelId ? modelId.split("/")[0] : ""
-	const authProviderId = provider === "openai" ? "openai-codex" : provider
+	let authProviderId = provider === "openai" ? "openai-codex" : provider
+	if (modelId.startsWith("deepseek")) authProviderId = "deepseek"
+	else if (modelId.startsWith("anthropic") || modelId.startsWith("claude"))
+		authProviderId = "anthropic"
+	else if (
+		modelId.startsWith("openai") ||
+		modelId.startsWith("gpt") ||
+		modelId.startsWith("o1") ||
+		modelId.startsWith("o3")
+	)
+		authProviderId = "openai-codex"
+	else if (modelId.startsWith("google") || modelId.startsWith("gemini"))
+		authProviderId = "google"
 	if (
 		authProviderId &&
 		authStorage.isLoggedIn(authProviderId) &&
@@ -69,6 +82,7 @@ export async function ensureAuthenticatedModel(
 		{ authId: "google", prefix: "google" },
 		{ authId: "openai-codex", prefix: "openai" },
 		{ authId: "anthropic", prefix: "anthropic" },
+		{ authId: "deepseek", prefix: "deepseek" },
 	]
 	for (const { authId } of providerMapping) {
 		if (authStorage.isLoggedIn(authId)) {
@@ -103,9 +117,9 @@ export async function ensureAuthenticatedModel(
 }
 
 export async function generateThreadTitle(
-	h: Harness<any>,
+	h: Harness,
 	userMessage: string,
-	resolveModel: (modelId: string) => any,
+	resolveModel: ModelResolver,
 ) {
 	try {
 		const modelId = h.getCurrentModelId()
@@ -159,7 +173,7 @@ export async function generateThreadTitle(
 }
 
 export async function deleteThread(
-	h: Harness<any>,
+	h: Harness,
 	threadId: string,
 ): Promise<void> {
 	const currentThreadId = h.getCurrentThreadId()

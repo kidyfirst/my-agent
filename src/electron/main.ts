@@ -108,7 +108,7 @@ async function createHarness(projectPath: string) {
 	const electronState = new ElectronStateManager()
 
 	// Hook manager session tracking + OM progress loading
-	harness.subscribe((event: any) => {
+	harness.subscribe((event) => {
 		if (event.type === "thread_changed") {
 			// Close browser when switching threads — browser state is conversation-specific
 			browserManager.close().catch(() => {})
@@ -184,7 +184,7 @@ function bridgeAllEvents(window: BrowserWindow) {
 			session.unsubscribe()
 			session.unsubscribe = null
 		}
-		session.unsubscribe = session.harness.subscribe((event: any) => {
+		session.unsubscribe = session.harness.subscribe((event) => {
 			if (window.isDestroyed()) return
 
 			const serialized = { ...event } as Record<string, unknown>
@@ -283,7 +283,7 @@ function bridgeAllEvents(window: BrowserWindow) {
 					case "ask_question":
 						sendDesktopNotification(
 							"Question from agent",
-							event.question,
+							event.question ?? "",
 							sessions,
 							activeSessionPath,
 						)
@@ -291,7 +291,7 @@ function bridgeAllEvents(window: BrowserWindow) {
 					case "plan_approval_required":
 						sendDesktopNotification(
 							"Plan review",
-							event.title,
+							event.title ?? "",
 							sessions,
 							activeSessionPath,
 						)
@@ -559,6 +559,9 @@ app.whenReady().then(async () => {
 	const result = await createHarness(projectPath)
 	const initialSession: WorktreeSession = {
 		harness: result.harness,
+		get session() {
+			return result.harness.activeSession
+		},
 		mcpManager: result.mcpManager,
 		browserManager: result.browserManager,
 		resolveModel: result.resolveModel,

@@ -22,14 +22,14 @@ export function GeneralSection({
 			<SectionHeader title="Appearance" />
 			<SettingRow
 				label="Theme"
-				description="Choose interface color scheme (浅色 / 深色皮肤)"
+				description="Choose interface color scheme"
 			>
 				<Select
 					value={state.theme ?? "light"}
 					options={[
-						{ value: "light", label: "Light (浅色皮肤)" },
-						{ value: "dark", label: "Dark (深色皮肤)" },
-						{ value: "system", label: "System (跟随系统)" },
+						{ value: "light", label: "Light" },
+						{ value: "dark", label: "Dark" },
+						{ value: "system", label: "System" },
 					]}
 					onChange={(v) => update("theme", v)}
 				/>

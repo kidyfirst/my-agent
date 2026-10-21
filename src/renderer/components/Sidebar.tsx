@@ -6,10 +6,12 @@ import { ResizeHandle } from "./ResizeHandle"
 import { ContextMenu } from "./ContextMenu"
 import type { ThreadInfo } from "../types/ipc"
 import type { WorktreeStatus } from "../types/project"
+import type { QueuedMessage } from "../types/chat"
 
 interface SidebarProps {
 	threads: ThreadInfo[]
 	currentThreadId: string | null
+	queuesByThread?: Record<string, QueuedMessage[]>
 	loggedInProviders: Set<string>
 	projectName: string
 	sidebarVisible: boolean
@@ -44,11 +46,13 @@ const providers = [
 	{ id: "anthropic", label: "Anthropic" },
 	{ id: "openai-codex", label: "OpenAI" },
 	{ id: "google", label: "Google" },
+	{ id: "deepseek", label: "DeepSeek" },
 ]
 
 export function Sidebar({
 	threads,
 	currentThreadId,
+	queuesByThread,
 	loggedInProviders,
 	projectName,
 	sidebarVisible,
@@ -324,12 +328,8 @@ export function Sidebar({
 							{editingThreadId === thread.id ? (
 								<div style={{ flex: 1, minWidth: 0, padding: "3px 8px 3px 12px" }}>
 									<input
-										ref={(el) => {
-											if (el) {
-												el.focus()
-												el.select()
-											}
-										}}
+										autoFocus
+										onFocus={(e) => e.currentTarget.select()}
 										value={editingThreadTitle}
 										onChange={(e) => setEditingThreadTitle(e.target.value)}
 										onKeyDown={(e) => {
@@ -374,17 +374,44 @@ export function Sidebar({
 								>
 									<div
 										style={{
-											fontSize: 11,
-											color:
-												thread.id === currentThreadId
-													? "var(--text)"
-													: "var(--muted)",
-											whiteSpace: "nowrap",
-											overflow: "hidden",
-											textOverflow: "ellipsis",
+											display: "flex",
+											alignItems: "center",
+											gap: 4,
+											minWidth: 0,
 										}}
 									>
-										{thread.title || "New Thread"}
+										<span
+											style={{
+												fontSize: 11,
+												color:
+													thread.id === currentThreadId
+														? "var(--text)"
+														: "var(--muted)",
+												whiteSpace: "nowrap",
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												flex: 1,
+											}}
+										>
+											{thread.title || "New Thread"}
+										</span>
+										{queuesByThread?.[thread.id] &&
+											queuesByThread[thread.id].length > 0 && (
+												<span
+													title={`${queuesByThread[thread.id].length} queued message${queuesByThread[thread.id].length > 1 ? "s" : ""}`}
+													style={{
+														fontSize: 9,
+														color: "var(--accent)",
+														background: "rgba(59, 130, 246, 0.15)",
+														padding: "1px 5px",
+														borderRadius: 8,
+														fontWeight: 600,
+														flexShrink: 0,
+													}}
+												>
+													⏳ {queuesByThread[thread.id].length}
+												</span>
+											)}
 									</div>
 								</button>
 							)}
@@ -401,6 +428,7 @@ export function Sidebar({
 										fontSize: 12,
 										color: "var(--muted)",
 										background: "transparent",
+										border: "none",
 										cursor: "pointer",
 										lineHeight: 1,
 										opacity: 0.6,
@@ -536,7 +564,7 @@ export function Sidebar({
 					onClose={() => setThreadContextMenu(null)}
 					items={[
 						{
-							label: "重命名 (Rename)",
+							label: "Rename",
 							icon: (
 								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 									<path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -548,7 +576,7 @@ export function Sidebar({
 							},
 						},
 						{
-							label: "删除 (Delete)",
+							label: "Delete",
 							danger: true,
 							icon: (
 								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
