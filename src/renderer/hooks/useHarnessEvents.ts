@@ -97,7 +97,10 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						// message.
 						const lastAssistant = cb.getLastAssistantMessageId()
 						window.api
-							.invoke({ type: "getTaskChangedFiles" })
+							.invoke({
+								type: "getTaskChangedFiles",
+								messageId: lastAssistant || undefined,
+							})
 							.then((result: unknown) => {
 								const files = (result as { files?: Message["changedFiles"] })
 									?.files

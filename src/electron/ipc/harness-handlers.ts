@@ -7,6 +7,12 @@ import {
 	type GitSnapshot,
 } from "../git-task-snapshot.js"
 import {
+	deleteThreadTaskChanges,
+	getStoredFileDiff,
+	getThreadTaskChanges,
+	saveTaskChanges,
+} from "../task-changes-store.js"
+import {
 	CURATED_CHAT_MODELS,
 	isDeprecatedModel,
 } from "../../constants/models.js"
@@ -203,15 +209,28 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			ctx.getActiveSession().harness.abort()
 		},
 		// Files changed by the current task, with +/- line counts
-		getTaskChangedFiles: async (_command, ctx) => {
+		getTaskChangedFiles: async (command, ctx) => {
 			const root =
 				currentTaskSnapshot?.root || ctx?.getActiveSession()?.projectRoot
 			const baseline = currentTaskSnapshot?.baseline || {}
 			if (!root) return { files: [] }
 			try {
-				return {
-					files: diffSinceBaseline(root, baseline),
+				const files = diffSinceBaseline(root, baseline)
+				const threadId =
+					(command.threadId as string) ||
+					ctx.getActiveSession().harness.getCurrentThreadId() ||
+					""
+				const messageId = command.messageId as string
+				if (threadId && messageId && files.length > 0) {
+					// Diffs are captured now because the in-memory baseline is gone
+					// after a restart and HEAD moves on once the work is committed.
+					const diffs: Record<string, string> = {}
+					for (const file of files) {
+						diffs[file.path] = diffFileSinceBaseline(root, baseline, file.path)
+					}
+					saveTaskChanges({ threadId, messageId, files, diffs })
 				}
+				return { files }
 			} catch (err) {
 				console.warn("getTaskChangedFiles failed:", err)
 				return { files: [] }
@@ -219,10 +238,24 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		},
 		// Unified diff of one file changed by the current task
 		getTaskFileDiff: async (command, ctx) => {
+			if (!command.path) return { diff: "" }
+			const threadId =
+				(command.threadId as string) ||
+				ctx?.getActiveSession()?.harness.getCurrentThreadId() ||
+				""
+			const messageId = command.messageId as string
+			if (threadId && messageId) {
+				const stored = getStoredFileDiff(
+					threadId,
+					messageId,
+					command.path as string,
+				)
+				if (stored !== null) return { diff: stored }
+			}
 			const root =
 				currentTaskSnapshot?.root || ctx?.getActiveSession()?.projectRoot
 			const baseline = currentTaskSnapshot?.baseline || {}
-			if (!root || !command.path) return { diff: "" }
+			if (!root) return { diff: "" }
 			try {
 				return {
 					diff: diffFileSinceBaseline(root, baseline, command.path),
@@ -304,6 +337,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		},
 		deleteThread: async (command, ctx) => {
 			await ctx.deleteThread(ctx.getActiveSession().harness, command.threadId)
+			deleteThreadTaskChanges(command.threadId)
 		},
 		getMessages: async (command, ctx) => {
 			const h = ctx.getActiveSession().harness
@@ -313,7 +347,18 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				threadId,
 				limit: command.limit,
 			})
-			return (rawMessages ?? []).map(normalizeControllerMessage)
+			const messages = (rawMessages ?? []).map(normalizeControllerMessage)
+			// Restore the files each task changed, saved when the task ended, so
+			// the records survive an app restart.
+			const stored = getThreadTaskChanges(threadId)
+			if (Object.keys(stored).length === 0) return messages
+			return messages.map((m) => {
+				const id = (m as { id?: string })?.id
+				const files = id ? stored[id]?.files : undefined
+				return files && files.length > 0
+					? { ...(m as Record<string, unknown>), changedFiles: files }
+					: m
+			})
 		},
 		getModes: async (_command, ctx) => {
 			return ctx

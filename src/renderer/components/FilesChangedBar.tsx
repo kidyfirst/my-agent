@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react"
 import { DiffView } from "./DiffView"
 
-function FileDiff({ path, isLive }: { path: string; isLive: boolean }) {
+function FileDiff({
+	path,
+	isLive,
+	messageId,
+}: {
+	path: string
+	isLive: boolean
+	messageId?: string
+}) {
 	const [diff, setDiff] = useState<string | null>(null)
 
 	useEffect(() => {
 		let cancelled = false
 		setDiff(null)
 		window.api
-			.invoke({ type: "getTaskFileDiff", path })
+			.invoke({ type: "getTaskFileDiff", path, messageId })
 			.then((result: unknown) => {
 				if (cancelled) return
 				const res = result as { diff?: string }
@@ -20,7 +28,7 @@ function FileDiff({ path, isLive }: { path: string; isLive: boolean }) {
 		return () => {
 			cancelled = true
 		}
-	}, [path, isLive])
+	}, [path, isLive, messageId])
 
 	if (diff === null) {
 		return (
@@ -48,6 +56,8 @@ export interface ChangedFile {
 
 interface FilesChangedBarProps {
 	files: ChangedFile[]
+	/** Id of the assistant message the record belongs to. */
+	messageId?: string
 	/** True while the task is still running, so the diff can keep changing. */
 	isLive: boolean
 	/** Open the file's full diff (e.g. as a tab) instead of expanding inline. */
@@ -97,6 +107,7 @@ function Chevron({ open, size }: { open: boolean; size: number }) {
 
 export function FilesChangedBar({
 	files,
+	messageId,
 	isLive,
 	onOpenDiff,
 }: FilesChangedBarProps) {
@@ -115,34 +126,40 @@ export function FilesChangedBar({
 				background: "var(--bg-surface)",
 				border: "1px solid var(--border-muted)",
 				borderRadius: 8,
-				padding: "7px 12px",
 				fontSize: 12,
 			}}
 		>
 			<div
+				onClick={() => setExpanded((v) => !v)}
+				onKeyDown={(e) => {
+					if (e.target !== e.currentTarget) return
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault()
+						setExpanded((v) => !v)
+					}
+				}}
+				role="button"
+				tabIndex={0}
+				aria-expanded={expanded}
 				style={{
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "space-between",
 					gap: 8,
+					padding: "7px 12px",
+					cursor: "pointer",
+					userSelect: "none",
+					outline: "none",
 				}}
 			>
-				<button
-					type="button"
-					onClick={() => setExpanded(!expanded)}
+				<div
 					style={{
 						display: "inline-flex",
 						alignItems: "center",
 						gap: 6,
-						padding: 0,
-						background: "none",
-						border: "none",
-						cursor: "pointer",
 						fontSize: 12,
-						fontFamily: "inherit",
 						color: "var(--text)",
 						lineHeight: 1.4,
-						userSelect: "none",
 					}}
 				>
 					<span style={{ fontWeight: 500 }}>
@@ -155,12 +172,16 @@ export function FilesChangedBar({
 						-{deleted}
 					</span>
 					<Chevron open={expanded} size={10} />
-				</button>
+				</div>
 
 				{onOpenDiff && (
 					<button
 						type="button"
-						onClick={() => onOpenDiff(files[0]?.path || "")}
+						onClick={(e) => {
+							e.stopPropagation()
+							onOpenDiff(files[0]?.path || "")
+						}}
+						onKeyDown={(e) => e.stopPropagation()}
 						title="Review all changes"
 						style={{
 							display: "inline-flex",
@@ -211,8 +232,8 @@ export function FilesChangedBar({
 			{expanded && (
 				<div
 					style={{
-						marginTop: 8,
-						paddingTop: 8,
+						margin: "0 12px",
+						padding: "8px 0 7px 0",
 						borderTop: "1px solid var(--border-muted)",
 					}}
 				>
@@ -326,7 +347,11 @@ export function FilesChangedBar({
 											margin: "6px 0",
 										}}
 									>
-										<FileDiff path={file.path} isLive={isLive} />
+										<FileDiff
+											path={file.path}
+											isLive={isLive}
+											messageId={messageId}
+										/>
 									</div>
 								)}
 							</div>
