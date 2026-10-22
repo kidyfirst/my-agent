@@ -83,6 +83,9 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 		return [id]
 	})
 	const [activeTab, setActiveTab] = useState<string>(tabs[0])
+	const [titles, setTitles] = useState<Record<string, string>>({})
+	const [editingTabId, setEditingTabId] = useState<string | null>(null)
+	const [editingTitle, setEditingTitle] = useState("")
 
 	// Update active terminals when theme changes
 	useEffect(() => {
@@ -245,6 +248,12 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 				)
 				return next
 			})
+			setTitles((prev) => {
+				if (!prev[id]) return prev
+				const next = { ...prev }
+				delete next[id]
+				return next
+			})
 		},
 		[],
 	)
@@ -388,7 +397,7 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 			<div
 				style={{
 					display: "flex",
-					alignItems: "center",
+					alignItems: "stretch",
 					borderTop: "1px solid var(--border-muted)",
 					borderBottom: "1px solid var(--border-muted)",
 					background: "var(--bg-surface)",
@@ -402,91 +411,199 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 						fontSize: 10,
 						fontWeight: 600,
 						color: "var(--muted)",
-						padding: "0 8px",
+						padding: "0 10px",
 						textTransform: "uppercase",
 						letterSpacing: "0.5px",
 						flexShrink: 0,
+						display: "flex",
+						alignItems: "center",
+						borderRight: "1px solid var(--border-muted)",
+						userSelect: "none",
 					}}
 				>
 					Terminal
 				</span>
 
-				{tabs.length > 1 && (
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							flex: 1,
-							overflow: "hidden",
-							gap: 1,
-						}}
-					>
-						{tabs.map((id, i) => (
+				<div
+					style={{
+						display: "flex",
+						alignItems: "stretch",
+						flex: 1,
+						overflowX: "auto",
+						overflowY: "hidden",
+						scrollbarWidth: "none",
+					}}
+				>
+					{tabs.map((id, i) => {
+						const isActive = activeTab === id
+						const isEditing = editingTabId === id
+						const title = titles[id] || `Terminal ${i + 1}`
+						return (
 							<div
 								key={id}
+								onClick={() => {
+									if (!isEditing) setActiveTab(id)
+								}}
+								onDoubleClick={(e) => {
+									e.stopPropagation()
+									setEditingTabId(id)
+									setEditingTitle(title)
+								}}
+								title="Double click to rename"
 								style={{
 									display: "flex",
 									alignItems: "center",
-									gap: 2,
-									padding: "0 2px 0 8px",
+									gap: 6,
+									padding: "0 8px 0 10px",
 									fontSize: 11,
-									color:
-										activeTab === id
-											? "var(--text)"
-											: "var(--muted)",
-									background:
-										activeTab === id
-											? "#09090b"
-											: "transparent",
-									borderRadius: "3px 3px 0 0",
+									fontWeight: 500,
+									color: isActive ? "var(--text)" : "var(--muted)",
+									background: isActive ? "var(--bg)" : "transparent",
+									borderBottom: isActive
+										? "2px solid var(--accent)"
+										: "2px solid transparent",
+									borderRight: "1px solid var(--border-muted)",
 									cursor: "pointer",
 									flexShrink: 0,
-									height: 22,
+									height: "100%",
+									userSelect: "none",
+									transition: "background-color 0.15s, color 0.15s",
 								}}
-								onClick={() => setActiveTab(id)}
+								onMouseEnter={(e) => {
+									if (!isActive) {
+										e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+										e.currentTarget.style.color = "var(--text)"
+									}
+								}}
+								onMouseLeave={(e) => {
+									if (!isActive) {
+										e.currentTarget.style.backgroundColor = "transparent"
+										e.currentTarget.style.color = "var(--muted)"
+									}
+								}}
 							>
-								<span style={{ fontSize: 11 }}>{i + 1}</span>
-								<button
-									onClick={(e) => {
-										e.stopPropagation()
-										closeTerminal(id)
-									}}
-									style={{
-										background: "transparent",
-										border: "none",
-										color: "var(--dim)",
-										cursor: "pointer",
-										fontSize: 11,
-										padding: "0 2px",
-										lineHeight: 1,
-									}}
-									title="Close terminal"
-								>
-									&times;
-								</button>
-							</div>
-						))}
-					</div>
-				)}
+								{isEditing ? (
+									<input
+										autoFocus
+										value={editingTitle}
+										onChange={(e) => setEditingTitle(e.target.value)}
+										onFocus={(e) => e.currentTarget.select()}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												const trimmed = editingTitle.trim()
+												if (trimmed) {
+													setTitles((prev) => ({ ...prev, [id]: trimmed }))
+												}
+												setEditingTabId(null)
+											} else if (e.key === "Escape") {
+												setEditingTabId(null)
+											}
+										}}
+										onBlur={() => {
+											const trimmed = editingTitle.trim()
+											if (trimmed) {
+												setTitles((prev) => ({ ...prev, [id]: trimmed }))
+											}
+											setEditingTabId(null)
+										}}
+										onClick={(e) => e.stopPropagation()}
+										style={{
+											fontSize: 11,
+											height: 18,
+											padding: "0 4px",
+											borderRadius: 3,
+											border: "1px solid var(--accent)",
+											background: "var(--bg)",
+											color: "var(--text)",
+											outline: "none",
+											width: 80,
+										}}
+									/>
+								) : (
+									<span>{title}</span>
+								)}
 
-				{tabs.length <= 1 && <div style={{ flex: 1 }} />}
+								{tabs.length > 1 && (
+									<button
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation()
+											closeTerminal(id)
+										}}
+										style={{
+											background: "transparent",
+											border: "none",
+											color: "var(--dim)",
+											cursor: "pointer",
+											fontSize: 12,
+											padding: "1px 2px",
+											lineHeight: 1,
+											borderRadius: 3,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											transition: "color 0.1s, background-color 0.1s",
+										}}
+										onMouseEnter={(e) => {
+											e.currentTarget.style.color = "var(--error, #ef4444)"
+											e.currentTarget.style.backgroundColor =
+												"rgba(239, 68, 68, 0.1)"
+										}}
+										onMouseLeave={(e) => {
+											e.currentTarget.style.color = "var(--dim)"
+											e.currentTarget.style.backgroundColor = "transparent"
+										}}
+										title="Close terminal"
+									>
+										&times;
+									</button>
+								)}
+							</div>
+						)
+					})}
+				</div>
 
 				{/* Add terminal button */}
 				<button
+					type="button"
 					onClick={addTerminal}
 					style={{
 						background: "transparent",
 						border: "none",
+						borderLeft: "1px solid var(--border-muted)",
 						color: "var(--muted)",
 						cursor: "pointer",
-						fontSize: 14,
-						padding: "0 6px",
-						lineHeight: 1,
+						fontSize: 13,
+						padding: "0 10px",
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						height: "100%",
 						flexShrink: 0,
+						transition: "color 0.15s, background-color 0.15s",
+					}}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.color = "var(--text)"
+						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.color = "var(--muted)"
+						e.currentTarget.style.backgroundColor = "transparent"
 					}}
 					title="New terminal"
 				>
-					+
+					<svg
+						width="12"
+						height="12"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.8"
+						strokeLinecap="round"
+					>
+						<line x1="8" y1="2" x2="8" y2="14" />
+						<line x1="2" y1="8" x2="14" y2="8" />
+					</svg>
 				</button>
 			</div>
 
