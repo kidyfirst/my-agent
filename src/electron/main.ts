@@ -23,11 +23,7 @@ import {
 	createComputerUseTool,
 } from "../tools/index.js"
 import { getAppDataDir } from "../utils/project.js"
-import {
-	getToolCategory,
-	TOOL_CATEGORIES,
-	YOLO_POLICIES,
-} from "../permissions.js"
+import { getToolCategory, TOOL_CATEGORIES } from "../permissions.js"
 import type { ToolCategory } from "../permissions.js"
 
 import { AuthStorage } from "../auth/storage.js"
@@ -124,15 +120,6 @@ async function createHarness(projectPath: string) {
 			harness.loadOMProgress?.().catch(() => {})
 		}
 	})
-
-	// Default to YOLO mode
-	await harness.setState({ yolo: true })
-	for (const [category, policy] of Object.entries(YOLO_POLICIES)) {
-		harness.setPermissionForCategory({
-			category: category as ToolCategory,
-			policy,
-		})
-	}
 
 	return {
 		harness,

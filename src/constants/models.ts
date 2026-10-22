@@ -7,7 +7,7 @@ export const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
 	anthropic: "anthropic/claude-opus-4-6",
 	"openai-codex": "openai/gpt-5.3-codex",
 	google: "google/gemini-3-flash-preview",
-	deepseek: "deepseek/deepseek-v4-flash",
+	deepseek: "deepseek/deepseek-flash",
 }
 
 export const DEFAULT_FALLBACK_MODEL_ID = "google/gemini-3-flash-preview"
@@ -58,13 +58,13 @@ export const CURATED_CHAT_MODELS: CuratedModelInfo[] = [
 		provider: "google",
 	},
 	{
-		id: "deepseek/deepseek-chat",
-		name: "deepseek-chat",
+		id: "deepseek/deepseek-flash",
+		name: "deepseek-flash",
 		provider: "deepseek",
 	},
 	{
-		id: "deepseek/deepseek-reasoner",
-		name: "deepseek-reasoner",
+		id: "deepseek/deepseek-v4-pro",
+		name: "deepseek-v4-pro",
 		provider: "deepseek",
 	},
 ]
@@ -98,11 +98,18 @@ export function resolveDefaultModel(
  * Checks if a model ID is deprecated by its provider.
  */
 export function isDeprecatedModel(modelId: string): boolean {
-	const id = modelId.toLowerCase()
+	const id = (modelId || "").toLowerCase()
 	return (
 		id === "google/gemini-2.5-flash" ||
 		id === "google/gemini-2.5-pro" ||
-		id.includes("gemini-1.0")
+		id.includes("gemini-1.0") ||
+		id === "deepseek/deepseek-v4-flash" ||
+		id === "deepseek-v4-flash" ||
+		id.includes("deepseek-v4-flash") ||
+		id === "deepseek/deepseek-chat" ||
+		id === "deepseek-chat" ||
+		id === "deepseek/deepseek-reasoner" ||
+		id === "deepseek-reasoner"
 	)
 }
 
@@ -110,11 +117,22 @@ export function isDeprecatedModel(modelId: string): boolean {
  * Automatically upgrades deprecated model IDs to modern supported alternatives.
  */
 export function upgradeDeprecatedModel(modelId: string): string {
-	if (
-		modelId === "google/gemini-2.5-flash" ||
-		modelId === "google/gemini-2.5-pro"
-	) {
+	if (!modelId) return modelId
+	const id = modelId.toLowerCase()
+	if (id === "google/gemini-2.5-flash" || id === "google/gemini-2.5-pro") {
 		return "google/gemini-3-flash-preview"
+	}
+	if (
+		id === "deepseek/deepseek-v4-flash" ||
+		id === "deepseek-v4-flash" ||
+		id.includes("deepseek-v4-flash") ||
+		id === "deepseek/deepseek-chat" ||
+		id === "deepseek-chat"
+	) {
+		return "deepseek/deepseek-flash"
+	}
+	if (id === "deepseek/deepseek-reasoner" || id === "deepseek-reasoner") {
+		return "deepseek/deepseek-v4-pro"
 	}
 	return modelId
 }

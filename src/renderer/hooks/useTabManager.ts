@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import type { FileEditorHandle } from "../components/FileEditor"
 
+export type TabManager = ReturnType<typeof useTabManager>
+
 export function useTabManager(currentThreadId: string | null) {
 	const [openFiles, setOpenFiles] = useState<string[]>([])
 	const [openThreadTabs, setOpenThreadTabs] = useState<string[]>([])

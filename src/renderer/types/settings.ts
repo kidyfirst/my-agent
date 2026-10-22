@@ -4,7 +4,6 @@ export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high"
 export interface SettingsState {
 	theme?: "light" | "dark" | "system"
 	notifications: NotificationMode
-	yolo: boolean
 	smartEditing: boolean
 	thinkingLevel: ThinkingLevel
 	observerModelId: string

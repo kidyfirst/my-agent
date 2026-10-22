@@ -48,7 +48,7 @@ const providers: Provider[] = [
 		id: "deepseek",
 		name: "DeepSeek",
 		description: "DeepSeek API key",
-		models: "deepseek-chat, deepseek-reasoner",
+		models: "deepseek-flash, deepseek-v4-pro",
 		hasOAuth: false,
 		apiKeyPlaceholder: "sk-...",
 		apiKeyHint: "platform.deepseek.com",
@@ -188,7 +188,9 @@ function ProviderCard({
 						disabled={!apiKey.trim() || submitting}
 						style={{
 							padding: "7px 14px",
-							background: apiKey.trim() ? "var(--accent)" : "var(--bg-elevated)",
+							background: apiKey.trim()
+								? "var(--accent)"
+								: "var(--bg-elevated)",
 							color: apiKey.trim() ? "#fff" : "var(--dim)",
 							borderRadius: 6,
 							cursor: apiKey.trim() ? "pointer" : "default",
@@ -206,7 +208,11 @@ function ProviderCard({
 	)
 }
 
-export function WelcomeScreen({ onLogin, onApiKey, onSkip }: WelcomeScreenProps) {
+export function WelcomeScreen({
+	onLogin,
+	onApiKey,
+	onSkip,
+}: WelcomeScreenProps) {
 	return (
 		<div
 			style={{

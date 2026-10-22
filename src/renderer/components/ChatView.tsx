@@ -1,14 +1,16 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo } from "react"
 import { AssistantMessage } from "./AssistantMessage"
 import { UserMessage } from "./UserMessage"
 import { ExecutionBlock, ExecutionStep, ExecutionTool } from "./ExecutionBlock"
 import { SubagentExecution } from "./SubagentExecution"
+import { FilesChangedBar } from "./FilesChangedBar"
 import { TodoProgress } from "./TodoProgress"
 import { AsciiLogo } from "./AsciiLogo"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
+import { isUserMessage, getMessageText } from "../types/chat"
 
-interface ChatViewProps {
+export interface ChatViewProps {
 	messages: Message[]
 	tools: Map<
 		string,
@@ -62,6 +64,9 @@ type RenderItem =
 				steps: ExecutionStep[]
 				durationMs?: number
 				startedAt?: number | null
+				changedFiles?: Message["changedFiles"]
+				messageId?: string
+				isStreaming?: boolean
 			}
 	  }
 	| {
@@ -111,8 +116,13 @@ export function ChatView({
 	useEffect(() => {
 		if (isAutoScroll.current && scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+			requestAnimationFrame(() => {
+				if (isAutoScroll.current && scrollRef.current) {
+					scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+				}
+			})
 		}
-	}, [messages, tools, subagents, isAgentActive])
+	}, [messages.length, messages, tools, subagents, isAgentActive])
 
 	const handleScroll = () => {
 		if (!scrollRef.current) return
@@ -125,24 +135,25 @@ export function ChatView({
 	//   showing: "Thinking ˅", each thinking step with its duration ("Thought for 57s ›"),
 	//   and tool items with checkmarks ("Analyzed ⚛️ ChatView.tsx#L140-250").
 	// - The assistant's markdown answer appears below the execution block.
-	const items: RenderItem[] = []
+	const cleanedItems = useMemo(() => {
+		const items: RenderItem[] = []
 
 	for (const msg of messages) {
-		const rawContent = msg.content as unknown
-		const isUser =
-			msg.role === "user" ||
-			((msg.role as string) === "signal" &&
-				((msg as any).type === "user" ||
-					(typeof rawContent === "object" &&
-						(rawContent as any)?.metadata?.signal?.type === "user") ||
-					(typeof rawContent === "string" &&
-						(rawContent.includes('"type":"user"') ||
-							rawContent.includes('"data-user-message"')))))
+		const isUser = isUserMessage(msg)
 		const isSystem =
 			msg.role === "system" ||
 			((msg.role as string) === "signal" && (msg as any).type === "system")
 
 		if (isUser) {
+			const lastItem = items[items.length - 1]
+			if (lastItem && lastItem.type === "user") {
+				const lastText = getMessageText(lastItem.data)
+				const currentText = getMessageText(msg)
+				if (lastText && currentText && lastText === currentText) {
+					// Guard against duplicate consecutive user bubble
+					continue
+				}
+			}
 			items.push({ type: "user", key: `msg-${msg.id}`, data: msg })
 		} else if (isSystem) {
 			items.push({ type: "system", key: `msg-${msg.id}`, data: msg })
@@ -181,7 +192,7 @@ export function ChatView({
 			let textGroupIndex = 0
 			let thinkCounter = 0
 
-			const flushExecution = () => {
+			const flushExecution = (showChangedFiles = false) => {
 				if (currentSteps.length > 0) {
 					const lastItem = items[items.length - 1]
 					if (lastItem && lastItem.type === "execution") {
@@ -195,6 +206,9 @@ export function ChatView({
 							lastItem.data.durationMs = msg.durationMs
 						}
 						lastItem.data.isActive = isStreaming && isAgentActive
+						if (showChangedFiles) {
+							lastItem.data.changedFiles = msg.changedFiles
+						}
 						currentSteps = []
 						return
 					}
@@ -207,6 +221,7 @@ export function ChatView({
 							steps: [...currentSteps],
 							durationMs: msg.durationMs,
 							startedAt: isStreaming ? agentStartedAt : null,
+							changedFiles: showChangedFiles ? msg.changedFiles : undefined,
 						},
 					})
 					currentSteps = []
@@ -381,7 +396,7 @@ export function ChatView({
 			}
 
 			// End of message: flush any remaining execution and text
-			flushExecution()
+			flushExecution(true)
 			flushText(true)
 		}
 	}
@@ -489,6 +504,15 @@ export function ChatView({
 			cleanedItems.push(item)
 		}
 	}
+	return cleanedItems
+}, [
+	messages,
+	tools,
+	subagents,
+	isAgentActive,
+	agentStartedAt,
+	streamingMessageId,
+])
 
 	return (
 		<div
@@ -510,21 +534,28 @@ export function ChatView({
 						return <UserMessage key={item.key} message={item.data as Message} />
 					case "execution":
 						return (
-							<ExecutionBlock
-								key={item.key}
-								isActive={item.data.isActive}
-								steps={item.data.steps}
-								durationMs={item.data.durationMs}
-								startedAt={item.data.startedAt}
-							/>
+							<div key={item.key}>
+								<ExecutionBlock
+									isActive={item.data.isActive}
+									steps={item.data.steps}
+									durationMs={item.data.durationMs}
+									startedAt={item.data.startedAt}
+								/>
+								{item.data.changedFiles &&
+									item.data.changedFiles.length > 0 && (
+										<FilesChangedBar
+											files={item.data.changedFiles}
+											isLive={Boolean(isAgentActive && item.data.isActive)}
+										/>
+									)}
+							</div>
 						)
-					case "assistant":
-						return (
-							<AssistantMessage
-								key={item.key}
-								message={item.data as Message & { isStreaming: boolean }}
-							/>
-						)
+					case "assistant": {
+						const assistantMsg = item.data as Message & {
+							isStreaming: boolean
+						}
+						return <AssistantMessage key={item.key} message={assistantMsg} />
+					}
 					case "subagent":
 						return <SubagentExecution key={item.key} subagent={item.data} />
 					case "system": {

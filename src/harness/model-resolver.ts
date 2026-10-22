@@ -199,11 +199,18 @@ export function createModelResolver(authStorage: AuthStorage) {
 				const baseURL =
 					process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
 				if (
-					(!baseURL || baseURL.includes("api.deepseek.com")) &&
-					bareModelId !== "deepseek-chat" &&
-					bareModelId !== "deepseek-reasoner"
+					bareModelId === "deepseek-v4-flash" ||
+					bareModelId === "deepseek-v4-flash-vision-exp" ||
+					bareModelId === "deepseek-chat"
 				) {
-					bareModelId = "deepseek-chat"
+					bareModelId = "deepseek-flash"
+				} else if (bareModelId === "deepseek-reasoner") {
+					bareModelId = "deepseek-v4-pro"
+				} else if (
+					bareModelId !== "deepseek-flash" &&
+					bareModelId !== "deepseek-v4-pro"
+				) {
+					bareModelId = "deepseek-flash"
 				}
 				return createOpenAI({
 					apiKey,

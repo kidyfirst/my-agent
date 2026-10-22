@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, memo } from "react"
 import { ToolExecution } from "./ToolExecution"
 
 export interface ExecutionTool {
@@ -157,7 +157,7 @@ function ThoughtStepItem({
 	)
 }
 
-export function ExecutionBlock({
+export const ExecutionBlock = memo(function ExecutionBlock({
 	isActive = false,
 	steps,
 	durationMs,
@@ -246,11 +246,13 @@ export function ExecutionBlock({
 				<div
 					ref={scrollContainerRef}
 					onClick={!expanded ? () => setExpanded(true) : undefined}
+					className="scrollbar-none"
 					style={{
 						marginTop: 6,
 						paddingLeft: 14,
 						maxHeight: expanded ? "none" : 82,
 						overflowY: "auto",
+						scrollbarWidth: "none",
 						cursor: !expanded ? "pointer" : "default",
 						transition: "max-height 0.2s ease",
 					}}
@@ -278,4 +280,4 @@ export function ExecutionBlock({
 			)}
 		</div>
 	)
-}
+})

@@ -1,12 +1,13 @@
-import { useState } from "react"
+import { useState, memo } from "react"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
+import { ImagePreviewModal } from "./ImagePreviewModal"
 
 interface UserMessageProps {
 	message: Message
 }
 
-export function UserMessage({ message }: UserMessageProps) {
+export const UserMessage = memo(function UserMessage({ message }: UserMessageProps) {
 	const [copied, setCopied] = useState(false)
 	const [previewImage, setPreviewImage] = useState<string | null>(null)
 
@@ -356,34 +357,10 @@ export function UserMessage({ message }: UserMessageProps) {
 			</div>
 
 			{/* Fullscreen image preview modal */}
-			{previewImage && (
-				<div
-					style={{
-						position: "fixed",
-						inset: 0,
-						background: "rgba(0, 0, 0, 0.75)",
-						display: "flex",
-						alignItems: "center",
-						justifyContent: "center",
-						zIndex: 1000,
-						padding: 24,
-						cursor: "zoom-out",
-					}}
-					onClick={() => setPreviewImage(null)}
-				>
-					<img
-						src={previewImage}
-						alt="Preview"
-						style={{
-							maxWidth: "90vw",
-							maxHeight: "90vh",
-							borderRadius: 8,
-							boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-							objectFit: "contain",
-						}}
-					/>
-				</div>
-			)}
+			<ImagePreviewModal
+				src={previewImage}
+				onClose={() => setPreviewImage(null)}
+			/>
 		</div>
 	)
-}
+})

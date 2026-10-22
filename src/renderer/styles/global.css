@@ -62,8 +62,9 @@ body.light-theme {
 	--dir-icon: #2563eb;
 
 	/* Scrollbar */
-	--scrollbar-track: #f8fafc;
-	--scrollbar-thumb: #cbd5e1;
+	--scrollbar-track: transparent;
+	--scrollbar-thumb: rgba(0, 0, 0, 0.16);
+	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 
 	/* Brand & Logo */
 	--logo-accent: #059669;
@@ -132,8 +133,9 @@ body.dark-theme {
 	--dir-icon: #60a5fa;
 
 	/* Scrollbar */
-	--scrollbar-track: #18181b;
-	--scrollbar-thumb: #3f3f46;
+	--scrollbar-track: transparent;
+	--scrollbar-thumb: rgba(255, 255, 255, 0.18);
+	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 
 	/* Brand & Logo */
 	--logo-accent: #00FF41;
@@ -164,22 +166,53 @@ body,
 	-webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - hidden by default across all containers, visible on hover */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: transparent transparent;
+}
+
+*:hover {
+	scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
 ::-webkit-scrollbar {
-	width: 8px;
+	width: 6px;
+	height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-	background: var(--scrollbar-track);
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
+	background: transparent;
+	border-radius: 9999px;
+	transition: background-color 0.15s ease;
+}
+
+*:hover::-webkit-scrollbar-thumb {
 	background: var(--scrollbar-thumb);
-	border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: var(--muted);
+	background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+/* Completely hidden scrollbar utility */
+.scrollbar-none {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
 }
 
 /* Selection */

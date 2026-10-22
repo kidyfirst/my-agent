@@ -1,30 +1,18 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Sidebar } from "./components/Sidebar"
-import { ChatView } from "./components/ChatView"
+import { AppModals } from "./components/AppModals"
+import { MainContent } from "./components/MainContent"
+import type { CommandItem } from "./components/CommandPalette"
 import { StatusBar } from "./components/StatusBar"
-import { EditorInput } from "./components/EditorInput"
-import { ToolApprovalDialog } from "./components/ToolApprovalDialog"
-import { AskQuestionDialog } from "./components/AskQuestionDialog"
-import { PlanApproval } from "./components/PlanApproval"
-import { ModelSelector } from "./components/ModelSelector"
-import { Settings } from "./components/Settings"
-import { LoginDialog } from "./components/LoginDialog"
-import { WelcomeScreen } from "./components/WelcomeScreen"
 import { RightSidebar, type RightSidebarTab } from "./components/RightSidebar"
-import { FileEditor } from "./components/FileEditor"
-import { DiffEditor } from "./components/DiffEditor"
-import { AgentDashboard } from "./components/AgentDashboard"
-import { CommandPalette, type CommandItem } from "./components/CommandPalette"
-import { QuickFileOpen } from "./components/QuickFileOpen"
-import { BrowserView } from "./components/BrowserView"
-import { OpenInDropdown } from "./components/OpenInDropdown"
+import { TabBar } from "./components/TabBar"
 import type {
 	TokenUsage,
 	ThreadInfo,
 	OMProgressState,
 	Message,
 } from "./types/ipc"
-import type { QueuedMessage, AttachedFile } from "./types/chat"
+import type { AttachedFile } from "./types/chat"
 import { ensureAudioContext } from "./utils/audio"
 import { useChatReducer } from "./hooks/useChatReducer"
 import { useAuthManager } from "./hooks/useAuthManager"
@@ -33,6 +21,15 @@ import { useTabManager } from "./hooks/useTabManager"
 import { useProjectManager } from "./hooks/useProjectManager"
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
 import { useHarnessEvents } from "./hooks/useHarnessEvents"
+import {
+	useThreadModelPermissions,
+	applyPermissionMode as applyPermissionModeIPC,
+	type PermissionMode,
+} from "./hooks/useThreadModelPermissions"
+import { useThreadActions } from "./hooks/useThreadActions"
+import { useMessageQueue } from "./hooks/useMessageQueue"
+import { buildCommandItems } from "./utils/commandItems"
+import { upgradeDeprecatedModel } from "../constants/models"
 
 export function App() {
 	// Core hooks
@@ -50,30 +47,20 @@ export function App() {
 		totalTokens: 0,
 	})
 	const [omProgress, setOMProgress] = useState<OMProgressState | null>(null)
-	const [omModelIds, setOMModelIds] = useState<{ observer: string; reflector: string }>({
+	const [omModelIds, setOMModelIds] = useState<{
+		observer: string
+		reflector: string
+	}>({
 		observer: "",
 		reflector: "",
 	})
 	const [threads, setThreads] = useState<ThreadInfo[]>([])
 	const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
-	const [modelsByThread, setModelsByThread] = useState<Record<string, string>>(() => {
-		try {
-			const saved = localStorage.getItem("myagent-thread-models")
-			return saved ? JSON.parse(saved) : {}
-		} catch {
-			return {}
-		}
-	})
-	const [permissionsByThread, setPermissionsByThread] = useState<
-		Record<string, "default" | "auto-approve" | "read-only">
-	>(() => {
-		try {
-			const saved = localStorage.getItem("myagent-thread-permissions")
-			return saved ? JSON.parse(saved) : {}
-		} catch {
-			return {}
-		}
-	})
+	const threadModel = useThreadModelPermissions(currentThreadId)
+	const modelsByThread = threadModel.modelsByThread
+	const permissionsByThread = threadModel.permissionsByThread
+	const setThreadModel = threadModel.setThreadModel
+	const setThreadPermission = threadModel.setThreadPermission
 	const [tasks, setTasks] = useState<
 		Array<{
 			content: string
@@ -85,7 +72,8 @@ export function App() {
 	// Sidebar state
 	const [sidebarVisible, setSidebarVisible] = useState(true)
 	const [rightSidebarVisible, setRightSidebarVisible] = useState(true)
-	const [rightSidebarTab, setRightSidebarTab] = useState<RightSidebarTab>("files")
+	const [rightSidebarTab, setRightSidebarTab] =
+		useState<RightSidebarTab>("files")
 
 	// Tab manager
 	const tabs = useTabManager(currentThreadId)
@@ -152,6 +140,8 @@ export function App() {
 						}
 					})()
 					const tModel = savedModels[session.currentThreadId]
+						? upgradeDeprecatedModel(savedModels[session.currentThreadId])
+						: undefined
 					if (tModel) {
 						setModelId(tModel)
 						window.api.invoke({
@@ -161,19 +151,8 @@ export function App() {
 						})
 					}
 					const tPerm = savedPerms[session.currentThreadId] || "default"
-					if (tPerm === "auto-approve") {
-						window.api.invoke({ type: "setYoloMode", enabled: true })
-						window.api.invoke({ type: "switchMode", modeId: "build" })
-						setModeId("build")
-					} else if (tPerm === "read-only") {
-						window.api.invoke({ type: "setYoloMode", enabled: false })
-						window.api.invoke({ type: "switchMode", modeId: "plan" })
-						setModeId("plan")
-					} else {
-						window.api.invoke({ type: "setYoloMode", enabled: false })
-						window.api.invoke({ type: "switchMode", modeId: "build" })
-						setModeId("build")
-					}
+					applyPermissionModeIPC(tPerm)
+					setModeId(tPerm === "read-only" ? "plan" : "build")
 				}
 			}
 
@@ -203,11 +182,17 @@ export function App() {
 					: theme
 			document.documentElement.setAttribute("data-theme", effectiveTheme)
 
-			if (state?.currentModelId) setModelId(state.currentModelId)
+			if (state?.currentModelId)
+				setModelId(upgradeDeprecatedModel(state.currentModelId))
 			if (state?.thinkingLevel) setThinkingLevel(state.thinkingLevel)
 			if (state?.tasks) setTasks(state.tasks)
-			if (state?.notifications) project.notificationPrefRef.current = state.notifications
-			if (state?.observerModelId || state?.reflectorModelId || state?.currentModelId) {
+			if (state?.notifications)
+				project.notificationPrefRef.current = state.notifications
+			if (
+				state?.observerModelId ||
+				state?.reflectorModelId ||
+				state?.currentModelId
+			) {
 				setOMModelIds({
 					observer: state.observerModelId || state.currentModelId || "",
 					reflector: state.reflectorModelId || state.currentModelId || "",
@@ -219,9 +204,12 @@ export function App() {
 			})) as TokenUsage
 			if (usage) setTokenUsage(usage)
 
-			window.api.invoke({ type: "getOMProgress" }).then((progress) => {
-				setOMProgress((progress as OMProgressState) ?? null)
-			}).catch(() => {})
+			window.api
+				.invoke({ type: "getOMProgress" })
+				.then((progress) => {
+					setOMProgress((progress as OMProgressState) ?? null)
+				})
+				.catch(() => {})
 
 			const loggedIn = (await window.api.invoke({
 				type: "getLoggedInProviders",
@@ -236,7 +224,12 @@ export function App() {
 			try {
 				const proj = (await window.api.invoke({
 					type: "getProjectInfo",
-				})) as { name: string; rootPath: string; gitBranch?: string; isWorktree?: boolean }
+				})) as {
+					name: string
+					rootPath: string
+					gitBranch?: string
+					isWorktree?: boolean
+				}
 				if (proj) project.setProjectInfo(proj)
 			} catch {
 				// ignore
@@ -274,43 +267,23 @@ export function App() {
 		}
 	}
 
-	const applyPermissionMode = useCallback(
-		async (perm: "default" | "auto-approve" | "read-only") => {
-			if (perm === "auto-approve") {
-				await window.api.invoke({ type: "setYoloMode", enabled: true })
-				await window.api.invoke({ type: "switchMode", modeId: "build" })
-				setModeId("build")
-			} else if (perm === "read-only") {
-				await window.api.invoke({ type: "setYoloMode", enabled: false })
-				await window.api.invoke({ type: "switchMode", modeId: "plan" })
-				setModeId("plan")
-			} else {
-				await window.api.invoke({ type: "setYoloMode", enabled: false })
-				await window.api.invoke({ type: "switchMode", modeId: "build" })
-				setModeId("build")
-			}
-		},
-		[],
-	)
+	const applyPermissionMode = useCallback(async (perm: PermissionMode) => {
+		await applyPermissionModeIPC(perm)
+		setModeId(perm === "read-only" ? "plan" : "build")
+	}, [])
 
 	const activeThreadKey = currentThreadId || "default"
-	const currentThreadModelId =
+	const currentThreadModelId = upgradeDeprecatedModel(
 		modelsByThread[activeThreadKey] ||
-		modelId ||
-		"anthropic/claude-3-5-sonnet-20241022"
+			modelId ||
+			"anthropic/claude-3-5-sonnet-20241022",
+	)
 	const currentThreadPermission =
 		permissionsByThread[activeThreadKey] || "default"
 
 	const handleSelectThreadModel = useCallback(
 		async (newModelId: string) => {
-			const tid = currentThreadId || "default"
-			setModelsByThread((prev) => {
-				const next = { ...prev, [tid]: newModelId }
-				try {
-					localStorage.setItem("myagent-thread-models", JSON.stringify(next))
-				} catch {}
-				return next
-			})
+			setThreadModel(currentThreadId || "default", newModelId)
 			setModelId(newModelId)
 			await window.api.invoke({
 				type: "switchModel",
@@ -318,28 +291,15 @@ export function App() {
 				scope: "thread",
 			})
 		},
-		[currentThreadId],
+		[currentThreadId, setThreadModel],
 	)
 
 	const handleSelectThreadPermission = useCallback(
-		async (newPerm: "default" | "auto-approve" | "read-only") => {
-			const tid = currentThreadId || "default"
-			setPermissionsByThread((prev) => {
-				const next: Record<string, "default" | "auto-approve" | "read-only"> = {
-					...prev,
-					[tid]: newPerm,
-				}
-				try {
-					localStorage.setItem(
-						"myagent-thread-permissions",
-						JSON.stringify(next),
-					)
-				} catch {}
-				return next
-			})
+		async (newPerm: PermissionMode) => {
+			setThreadPermission(currentThreadId || "default", newPerm)
 			await applyPermissionMode(newPerm)
 		},
-		[currentThreadId, applyPermissionMode],
+		[currentThreadId, setThreadPermission, applyPermissionMode],
 	)
 
 	const handleNewThread = useCallback(async () => {
@@ -350,26 +310,8 @@ export function App() {
 		if (thread?.id) {
 			const newThreadId = thread.id
 			const currentModel = currentThreadModelId
-			setModelsByThread((prev) => {
-				const next = { ...prev, [newThreadId]: currentModel }
-				try {
-					localStorage.setItem("myagent-thread-models", JSON.stringify(next))
-				} catch {}
-				return next
-			})
-			setPermissionsByThread((prev) => {
-				const next: Record<string, "default" | "auto-approve" | "read-only"> = {
-					...prev,
-					[newThreadId]: "default",
-				}
-				try {
-					localStorage.setItem(
-						"myagent-thread-permissions",
-						JSON.stringify(next),
-					)
-				} catch {}
-				return next
-			})
+			setThreadModel(newThreadId, currentModel)
+			setThreadPermission(newThreadId, "default")
 			setCurrentThreadId(newThreadId)
 			tabs.setOpenThreadTabs((prev) =>
 				prev.includes(newThreadId) ? prev : [...prev, newThreadId],
@@ -382,7 +324,13 @@ export function App() {
 			})
 			await applyPermissionMode("default")
 		}
-	}, [currentThreadModelId, tabs, applyPermissionMode])
+	}, [
+		currentThreadModelId,
+		tabs,
+		applyPermissionMode,
+		setThreadModel,
+		setThreadPermission,
+	])
 
 	// Harness events
 	useHarnessEvents({
@@ -414,6 +362,12 @@ export function App() {
 		projectInfoRef: project.projectInfoRef,
 		notificationPrefRef: project.notificationPrefRef,
 		loadMessages,
+		getLastAssistantMessageId: () => {
+			for (let i = chat.messages.length - 1; i >= 0; i--) {
+				if (chat.messages[i].role === "assistant") return chat.messages[i].id
+			}
+			return null
+		},
 		loadThreads,
 		loadPRStatus: project.loadPRStatus,
 		loadEnrichedProjects: project.loadEnrichedProjects,
@@ -425,110 +379,122 @@ export function App() {
 	})
 
 	// Chat handlers
-	const handleSend = useCallback(async (content: string, files?: AttachedFile[]) => {
-		ensureAudioContext()
-		let finalContent = content || ""
-		if (typeof finalContent === "string" && finalContent.startsWith("/")) {
-			const spaceIndex = finalContent.indexOf(" ")
-			const commandName = spaceIndex === -1 ? finalContent.slice(1) : finalContent.slice(1, spaceIndex)
-			const args = spaceIndex === -1 ? [] : finalContent.slice(spaceIndex + 1).trim().split(/\s+/)
-			try {
-				finalContent = (await window.api.invoke({
-					type: "processSlashCommand",
-					commandName,
-					args,
-				})) as string
-			} catch {
-				// Command not found — send as-is
+	const handleSend = useCallback(
+		async (content: string, files?: AttachedFile[]) => {
+			ensureAudioContext()
+			let finalContent = content || ""
+			if (typeof finalContent === "string" && finalContent.startsWith("/")) {
+				const spaceIndex = finalContent.indexOf(" ")
+				const commandName =
+					spaceIndex === -1
+						? finalContent.slice(1)
+						: finalContent.slice(1, spaceIndex)
+				const args =
+					spaceIndex === -1
+						? []
+						: finalContent
+								.slice(spaceIndex + 1)
+								.trim()
+								.split(/\s+/)
+				try {
+					finalContent = (await window.api.invoke({
+						type: "processSlashCommand",
+						commandName,
+						args,
+					})) as string
+				} catch {
+					// Command not found — send as-is
+				}
 			}
-		}
 
-		// Separate images from non-image files
-		const imageFiles = files?.filter((f) => f.type === "image")
-		const textFiles = files?.filter((f) => f.type === "file")
+			// Separate images from non-image files
+			const imageFiles = files?.filter((f) => f.type === "image")
+			const textFiles = files?.filter((f) => f.type === "file")
 
-		// Inline non-image file contents into the message text
-		if (textFiles && textFiles.length > 0) {
-			const fileBlocks = textFiles
-				.map((f) => `<file name="${f.name}">\n${f.data}\n</file>`)
-				.join("\n\n")
-			finalContent = finalContent
-				? `${finalContent}\n\n${fileBlocks}`
-				: fileBlocks
-		}
-
-		const messageContent: Message["content"] = []
-		if (finalContent) {
-			messageContent.push({ type: "text", text: finalContent })
-		}
-		if (imageFiles) {
-			for (const img of imageFiles) {
-				messageContent.push({
-					type: "image",
-					mimeType: img.mimeType || "image/png",
-					data: img.data,
-					name: img.name,
-					url: img.preview,
-				})
+			// Inline non-image file contents into the message text
+			if (textFiles && textFiles.length > 0) {
+				const fileBlocks = textFiles
+					.map((f) => `<file name="${f.name}">\n${f.data}\n</file>`)
+					.join("\n\n")
+				finalContent = finalContent
+					? `${finalContent}\n\n${fileBlocks}`
+					: fileBlocks
 			}
-		}
-		if (textFiles) {
-			for (const f of textFiles) {
-				messageContent.push({
-					type: "file",
-					mimeType: f.mimeType || "text/plain",
-					data: f.data,
-					name: f.name,
-				})
+
+			const messageContent: Message["content"] = []
+			if (finalContent) {
+				messageContent.push({ type: "text", text: finalContent })
 			}
-		}
-		dispatch({
-			type: "MESSAGE_START",
-			message: {
-				id: `user-${Date.now()}`,
-				role: "user",
-				content: messageContent,
-				createdAt: new Date().toISOString(),
-				attachments: files && files.length > 0 ? files : undefined,
-			},
-		})
-		dispatch({ type: "AGENT_START" })
-		const ipcImages = imageFiles?.map(({ mimeType, data, name }) => ({
-			mediaType: mimeType || "image/png",
-			mimeType: mimeType || "image/png",
-			data,
-			name,
-		}))
-		const ipcFiles = textFiles?.map(({ mimeType, data, name }) => ({
-			mediaType: mimeType || "text/plain",
-			mimeType: mimeType || "text/plain",
-			data,
-			name,
-		}))
-		try {
-			await window.api.invoke({
-				type: "sendMessage",
-				content: finalContent,
-				...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
-				...(ipcFiles && ipcFiles.length > 0 ? { files: ipcFiles } : {}),
-			})
-		} catch (err: unknown) {
-			console.error("Failed to invoke sendMessage:", err)
-			const errMsg = err instanceof Error ? err.message : String(err)
+			if (imageFiles) {
+				for (const img of imageFiles) {
+					messageContent.push({
+						type: "image",
+						mimeType: img.mimeType || "image/png",
+						data: img.data,
+						name: img.name,
+						url: img.preview,
+					})
+				}
+			}
+			if (textFiles) {
+				for (const f of textFiles) {
+					messageContent.push({
+						type: "file",
+						mimeType: f.mimeType || "text/plain",
+						data: f.data,
+						name: f.name,
+					})
+				}
+			}
 			dispatch({
 				type: "MESSAGE_START",
 				message: {
-					id: `error-${Date.now()}`,
-					role: "assistant",
-					content: [{ type: "text", text: `Error: ${errMsg}` }],
+					id: `user-${Date.now()}`,
+					role: "user",
+					content: messageContent,
 					createdAt: new Date().toISOString(),
-					stopReason: "error",
-					errorMessage: errMsg,
+					attachments: files && files.length > 0 ? files : undefined,
 				},
 			})
-			dispatch({ type: "AGENT_END" })
-		}
-	}, [])
+			dispatch({ type: "AGENT_START" })
+			const ipcImages = imageFiles?.map(({ mimeType, data, name }) => ({
+				mediaType: mimeType || "image/png",
+				mimeType: mimeType || "image/png",
+				data,
+				name,
+			}))
+			const ipcFiles = textFiles?.map(({ mimeType, data, name }) => ({
+				mediaType: mimeType || "text/plain",
+				mimeType: mimeType || "text/plain",
+				data,
+				name,
+			}))
+			try {
+				await window.api.invoke({
+					type: "sendMessage",
+					content: finalContent,
+					...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
+					...(ipcFiles && ipcFiles.length > 0 ? { files: ipcFiles } : {}),
+				})
+			} catch (err: unknown) {
+				console.error("Failed to invoke sendMessage:", err)
+				const errMsg = err instanceof Error ? err.message : String(err)
+				dispatch({
+					type: "MESSAGE_START",
+					message: {
+						id: `error-${Date.now()}`,
+						role: "assistant",
+						content: [{ type: "text", text: `Error: ${errMsg}` }],
+						createdAt: new Date().toISOString(),
+						stopReason: "error",
+						errorMessage: errMsg,
+					},
+				})
+				dispatch({ type: "AGENT_END" })
+			}
+		},
+		[],
+	)
 
 	const handleAbort = useCallback(async () => {
 		ensureAudioContext()
@@ -536,444 +502,78 @@ export function App() {
 		await window.api.invoke({ type: "abort" })
 	}, [])
 
-	const handleResumeQueue = useCallback(() => {
-		dispatch({ type: "SET_QUEUE_PAUSED", paused: false })
-		if (!chat.isAgentActive) {
-			const targetThreadId = currentThreadId || "default"
-			const currentQueue = chat.queuesByThread[targetThreadId] || []
-			if (currentQueue.length > 0) {
-				const next = currentQueue[0]
-				const remaining = currentQueue.slice(1)
-				dispatch({
-					type: "DEQUEUE_MESSAGE",
-					threadId: targetThreadId,
-					id: next.id,
-				})
-				dispatch({ type: "AGENT_START" })
-				if (currentThreadId) {
-					window.api
-						.invoke({
-							type: "setMessageQueue",
-							threadId: currentThreadId,
-							queue: remaining,
-						})
-						.catch(() => {})
-				}
-				handleSend(next.content, next.files)
-			}
-		}
-	}, [chat.isAgentActive, currentThreadId, chat.queuesByThread, handleSend])
+	const {
+		handleResumeQueue,
+		handleQueue,
+		handleSteerQueued,
+		handleDeleteQueued,
+		handleReorderQueue,
+		handleClearQueue,
+	} = useMessageQueue(chat, dispatch, currentThreadId, handleSend)
 
-	const loadQueue = useCallback(async (threadId: string | null) => {
-		if (!threadId) return
-		try {
-			const queue = (await window.api.invoke({
-				type: "getMessageQueue",
-				threadId,
-			})) as QueuedMessage[]
-			if (Array.isArray(queue)) {
-				dispatch({ type: "SET_THREAD_QUEUE", threadId, queue })
-			}
-		} catch (err) {
-			console.warn("[loadQueue] Failed to load message queue for thread:", threadId, err)
-		}
-	}, [])
-
-	useEffect(() => {
-		if (currentThreadId) {
-			const defaultQueue = chat.queuesByThread["default"] || []
-			if (defaultQueue.length > 0) {
-				const existing = chat.queuesByThread[currentThreadId] || []
-				const merged = [...defaultQueue, ...existing]
-				dispatch({
-					type: "SET_THREAD_QUEUE",
-					threadId: currentThreadId,
-					queue: merged,
-				})
-				dispatch({
-					type: "CLEAR_THREAD_QUEUE",
-					threadId: "default",
-				})
-				window.api
-					.invoke({
-						type: "setMessageQueue",
-						threadId: currentThreadId,
-						queue: merged,
-					})
-					.catch(() => {})
-			} else {
-				loadQueue(currentThreadId)
-			}
-		}
-	}, [currentThreadId, loadQueue])
-
-	const handleQueue = useCallback(
-		async (content: string, files?: AttachedFile[]) => {
-			const targetThreadId = currentThreadId || "default"
-			const queuedItem: QueuedMessage = {
-				id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-				threadId: currentThreadId,
-				content,
-				files,
-				createdAt: new Date().toISOString(),
-			}
-			const existing = chat.queuesByThread[targetThreadId] || []
-			const updated = [...existing, queuedItem]
-			dispatch({
-				type: "ENQUEUE_MESSAGE",
-				threadId: targetThreadId,
-				message: queuedItem,
-			})
-			if (currentThreadId) {
-				window.api
-					.invoke({
-						type: "setMessageQueue",
-						threadId: currentThreadId,
-						queue: updated,
-					})
-					.catch((err) =>
-						console.warn("Failed to persist message queue:", err),
-					)
-			}
-		},
-		[currentThreadId, chat.queuesByThread],
-	)
-
-	const handleSteerQueued = useCallback(
-		async (item: QueuedMessage) => {
-			const targetThreadId = currentThreadId || "default"
-			const existing = chat.queuesByThread[targetThreadId] || []
-			const updated = existing.filter((m) => m.id !== item.id)
-			dispatch({
-				type: "REMOVE_QUEUED_MESSAGE",
-				threadId: targetThreadId,
-				id: item.id,
-			})
-			if (currentThreadId) {
-				window.api
-					.invoke({
-						type: "setMessageQueue",
-						threadId: currentThreadId,
-						queue: updated,
-					})
-					.catch(() => {})
-			}
-			try {
-				await window.api.invoke({
-					type: "steer",
-					content: item.content,
-				})
-			} catch (err) {
-				console.error("Failed to steer queued message:", err)
-			}
-		},
-		[currentThreadId, chat.queuesByThread],
-	)
-
-	const handleDeleteQueued = useCallback(
-		async (id: string) => {
-			const targetThreadId = currentThreadId || "default"
-			const existing = chat.queuesByThread[targetThreadId] || []
-			const updated = existing.filter((m) => m.id !== id)
-			dispatch({
-				type: "REMOVE_QUEUED_MESSAGE",
-				threadId: targetThreadId,
-				id,
-			})
-			if (currentThreadId) {
-				window.api
-					.invoke({
-						type: "setMessageQueue",
-						threadId: currentThreadId,
-						queue: updated,
-					})
-					.catch(() => {})
-			}
-		},
-		[currentThreadId, chat.queuesByThread],
-	)
-
-	const handleReorderQueue = useCallback(
-		async (newQueue: QueuedMessage[]) => {
-			const targetThreadId = currentThreadId || "default"
-			dispatch({
-				type: "REORDER_THREAD_QUEUE",
-				threadId: targetThreadId,
-				queue: newQueue,
-			})
-			if (currentThreadId) {
-				window.api
-					.invoke({
-						type: "setMessageQueue",
-						threadId: currentThreadId,
-						queue: newQueue,
-					})
-					.catch(() => {})
-			}
-		},
-		[currentThreadId],
-	)
-
-	const handleClearQueue = useCallback(async () => {
-		const targetThreadId = currentThreadId || "default"
-		dispatch({
-			type: "CLEAR_THREAD_QUEUE",
-			threadId: targetThreadId,
-		})
-		if (currentThreadId) {
-			window.api
-				.invoke({
-					type: "setMessageQueue",
-					threadId: currentThreadId,
-					queue: [],
-				})
-				.catch(() => {})
-		}
-	}, [currentThreadId])
-
-	const prevIsAgentActiveRef = useRef(chat.isAgentActive)
-
-	// Auto-dequeue next message ONLY when agent completes current turn (transition from active -> idle)
-	useEffect(() => {
-		const wasActive = prevIsAgentActiveRef.current
-		prevIsAgentActiveRef.current = chat.isAgentActive
-
-		// Only auto-dequeue when the agent was active and has now transitioned to idle
-		if (!wasActive || chat.isAgentActive || chat.isQueuePaused) {
-			return
-		}
-
-		const targetThreadId = currentThreadId || "default"
-		const currentQueue = chat.queuesByThread[targetThreadId] || []
-		if (currentQueue.length > 0) {
-			const next = currentQueue[0]
-			const remaining = currentQueue.slice(1)
-
-			// Dispatch DEQUEUE and synchronously set AGENT_START so subsequent re-renders see isAgentActive = true
-			dispatch({
-				type: "DEQUEUE_MESSAGE",
-				threadId: targetThreadId,
-				id: next.id,
-			})
-			dispatch({ type: "AGENT_START" })
-
-			if (currentThreadId) {
-				window.api
-					.invoke({
-						type: "setMessageQueue",
-						threadId: currentThreadId,
-						queue: remaining,
-					})
-					.catch((err) =>
-						console.warn("Failed to update queue after dequeue:", err),
-					)
-			}
-
-			handleSend(next.content, next.files)
-		}
-	}, [chat.isAgentActive, chat.isQueuePaused, chat.queuesByThread, currentThreadId, handleSend])
-
-	const handleSwitchThread = useCallback(
-		async (threadId: string) => {
-			await window.api.invoke({ type: "switchThread", threadId })
-			setCurrentThreadId(threadId)
-			tabs.setOpenThreadTabs((prev) =>
-				prev.includes(threadId) ? prev : [...prev, threadId],
-			)
-			tabs.setActiveTab(`thread:${threadId}`)
-
-			// Apply thread-scoped model
-			const threadModel = modelsByThread[threadId] || modelId
-			if (threadModel) {
-				setModelId(threadModel)
-				await window.api.invoke({
-					type: "switchModel",
-					modelId: threadModel,
-					scope: "thread",
-				})
-			}
-
-			// Apply thread-scoped permission
-			const threadPerm = permissionsByThread[threadId] || "default"
-			await applyPermissionMode(threadPerm)
-		},
-		[modelsByThread, permissionsByThread, modelId, tabs, applyPermissionMode],
-	)
-
-	const handleDeleteThread = useCallback(
-		async (threadId: string) => {
-			setThreads((prev) => prev.filter((t) => t.id !== threadId))
-			tabs.setOpenThreadTabs((prev) => prev.filter((id) => id !== threadId))
-			dispatch({ type: "CLEAR_THREAD_QUEUE", threadId })
-			setModelsByThread((prev) => {
-				const next = { ...prev }
-				delete next[threadId]
-				try {
-					localStorage.setItem("myagent-thread-models", JSON.stringify(next))
-				} catch {}
-				return next
-			})
-			setPermissionsByThread((prev) => {
-				const next = { ...prev }
-				delete next[threadId]
-				try {
-					localStorage.setItem(
-						"myagent-thread-permissions",
-						JSON.stringify(next),
-					)
-				} catch {}
-				return next
-			})
-			if (tabs.activeTab === `thread:${threadId}`) {
-				tabs.setActiveTab("chat")
-			}
-			if (currentThreadId === threadId) {
-				setCurrentThreadId(null)
-				dispatch({ type: "CLEAR" })
-			}
-			try {
-				await window.api.invoke({ type: "deleteThread", threadId })
-			} finally {
-				await loadThreads()
-			}
-		},
-		[currentThreadId, tabs.activeTab],
-	)
-
-	const handleRenameThread = useCallback(
-		async (threadId: string, title: string) => {
-			const trimmed = title.trim()
-			if (!trimmed) return
-			setThreads((prev) =>
-				prev.map((t) => (t.id === threadId ? { ...t, title: trimmed } : t)),
-			)
-			try {
-				await window.api.invoke({
-					type: "renameThread",
-					threadId,
-					title: trimmed,
-				})
-			} finally {
-				await loadThreads()
-			}
-		},
-		[],
-	)
-
-	const handleToggleThinking = useCallback(async () => {
-		const newLevel = thinkingLevel === "off" ? "medium" : "off"
-		setThinkingLevel(newLevel)
-		await window.api.invoke({ type: "setThinkingLevel", level: newLevel })
-	}, [thinkingLevel])
-
-	const handleTogglePlanning = useCallback(async () => {
-		const newMode = modeId === "plan" ? "build" : "plan"
-		await window.api.invoke({ type: "switchMode", modeId: newMode })
-	}, [modeId])
-
-	const handleBuiltinCommand = useCallback(
-		async (name: string) => {
-			switch (name) {
-				case "new":
-					handleNewThread()
-					break
-				case "clear":
-					dispatch({ type: "CLEAR" })
-					break
-				case "plan":
-					await window.api.invoke({ type: "switchMode", modeId: "plan" })
-					break
-				case "build":
-					await window.api.invoke({ type: "switchMode", modeId: "build" })
-					break
-				case "fast":
-					await window.api.invoke({ type: "switchMode", modeId: "fast" })
-					break
-				case "model":
-					dialogs.setShowModelSelector(true)
-					break
-				case "thinking":
-					handleToggleThinking()
-					break
-				case "settings":
-					tabs.setActiveTab("settings")
-					break
-				case "help":
-					dialogs.setShowCommandPalette(true)
-					break
-			}
-		},
-		[handleNewThread, handleToggleThinking],
-	)
+	const threadActions = useThreadActions({
+		dispatch,
+		currentThreadId,
+		modelId,
+		modeId,
+		thinkingLevel,
+		modelsByThread,
+		permissionsByThread,
+		threadModel,
+		setCurrentThreadId,
+		setModelId,
+		setThinkingLevel,
+		setThreads,
+		tabs,
+		dialogs,
+		applyPermissionMode,
+		loadThreads,
+	})
+	const {
+		handleSwitchThread,
+		handleDeleteThread,
+		handleRenameThread,
+		handleToggleThinking,
+		handleTogglePlanning,
+		handleBuiltinCommand,
+	} = threadActions
 
 	// Command palette items
 	const commandPaletteItems = useMemo((): CommandItem[] => {
-		const close = () => dialogs.setShowCommandPalette(false)
-		const items: CommandItem[] = []
-
-		items.push({ id: "settings", label: "Open Settings", group: "Navigation", shortcut: "\u2318,", action: () => { tabs.setActiveTab("settings"); close() } })
-		items.push({ id: "agents", label: "Open Agent Dashboard", group: "Navigation", action: () => { tabs.setActiveTab("agents"); close() } })
-		items.push({ id: "focus-git", label: "Focus Git Panel", group: "Navigation", shortcut: "\u2318\u21e7G", action: () => { setRightSidebarVisible(true); setRightSidebarTab("git"); close() } })
-		items.push({ id: "focus-files", label: "Focus File Tree", group: "Navigation", action: () => { setRightSidebarVisible(true); setRightSidebarTab("files"); close() } })
-		items.push({ id: "focus-context", label: "Focus Context Panel", group: "Navigation", action: () => { setRightSidebarVisible(true); setRightSidebarTab("context"); close() } })
-
-		items.push({ id: "search-files", label: "Search Files", group: "Actions", shortcut: "\u2318P", action: () => { dialogs.setShowQuickFileOpen(true); close() } })
-		items.push({ id: "new-thread", label: "New Thread", group: "Actions", action: () => { handleNewThread(); close() } })
-		items.push({ id: "switch-model", label: "Switch Model", group: "Actions", action: () => { dialogs.setShowModelSelector(true); close() } })
-		items.push({ id: "open-folder", label: "Open Folder", group: "Actions", shortcut: "\u2318O", action: () => { project.handleOpenFolder(); close() } })
-		items.push({ id: "clone-repo", label: "Clone from URL", group: "Actions", action: () => { project.handleShowCloneModal(); close() } })
-		items.push({ id: "toggle-left-sidebar", label: "Toggle Left Sidebar", group: "Actions", shortcut: "\u2318B", action: () => { setSidebarVisible((v) => !v); close() } })
-		items.push({ id: "toggle-right-sidebar", label: "Toggle Right Sidebar", group: "Actions", shortcut: "\u2318`", action: () => { setRightSidebarVisible((v) => !v); close() } })
-		items.push({ id: "open-browser", label: "Open Browser", group: "Actions", action: () => { tabs.handleBrowserOpen("about:blank"); close() } })
-		items.push({ id: "toggle-thinking", label: thinkingLevel === "off" ? "Enable Thinking" : "Disable Thinking", group: "Actions", action: () => { handleToggleThinking(); close() } })
-		items.push({ id: "toggle-planning", label: modeId === "plan" ? "Switch to Build Mode" : "Switch to Plan Mode", group: "Actions", action: () => { handleTogglePlanning(); close() } })
-		items.push({
-			id: "toggle-theme",
-			label: "Toggle Theme",
-			group: "Actions",
-			action: () => {
-				const current = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"
-				document.documentElement.setAttribute("data-theme", current)
-				if (typeof localStorage !== "undefined") {
-					localStorage.setItem("myagent-theme", current)
-				}
-				window.api.invoke({ type: "setState", patch: { theme: current } })
-				close()
-			},
+		return buildCommandItems({
+			close: () => dialogs.setShowCommandPalette(false),
+			openThreadTabs: tabs.openThreadTabs,
+			openFiles: tabs.openFiles,
+			threads,
+			enrichedProjects: project.enrichedProjects,
+			modeId,
+			thinkingLevel,
+			setActiveTab: tabs.setActiveTab,
+			setRightSidebarVisible,
+			setRightSidebarTab,
+			setSidebarVisible,
+			setRightSidebarVisibleUpdater: setRightSidebarVisible,
+			setShowQuickFileOpen: dialogs.setShowQuickFileOpen,
+			setShowModelSelector: dialogs.setShowModelSelector,
+			handleNewThread,
+			handleOpenFolder: project.handleOpenFolder,
+			handleShowCloneModal: project.handleShowCloneModal,
+			handleBrowserOpen: tabs.handleBrowserOpen,
+			handleToggleThinking,
+			handleTogglePlanning,
+			handleSwitchProject: project.handleSwitchProject,
 		})
-
-		for (const threadId of tabs.openThreadTabs) {
-			const thread = threads.find((t) => t.id === threadId)
-			items.push({
-				id: `tab-thread-${threadId}`,
-				label: thread?.title || "New Thread",
-				group: "Open Tabs",
-				action: () => { tabs.setActiveTab(`thread:${threadId}`); close() },
-			})
-		}
-		for (const fileTab of tabs.openFiles) {
-			const name = fileTab.split("/").pop() || fileTab
-			items.push({
-				id: `tab-file-${fileTab}`,
-				label: name,
-				description: fileTab,
-				group: "Open Tabs",
-				action: () => { tabs.setActiveTab(fileTab); close() },
-			})
-		}
-
-		for (const p of project.enrichedProjects) {
-			items.push({
-				id: `project-${p.rootPath}`,
-				label: p.name,
-				description: p.gitBranch || "",
-				group: "Workspaces",
-				action: () => { project.handleSwitchProject(p.rootPath); close() },
-			})
-		}
-
-		return items
-	}, [tabs.openThreadTabs, tabs.openFiles, threads, project.enrichedProjects, modeId, thinkingLevel])
+	}, [
+		tabs.openThreadTabs,
+		tabs.openFiles,
+		threads,
+		project.enrichedProjects,
+		modeId,
+		thinkingLevel,
+		handleNewThread,
+		handleToggleThinking,
+		handleTogglePlanning,
+	])
 
 	return (
 		<div
@@ -1021,416 +621,63 @@ export function App() {
 				activeAgentCount={project.activeWorktrees.size}
 			/>
 
-			{/* Center panel */}
+			{/* Center panel (middle chat box + editors) */}
 			<div
 				style={{
 					flex: 1,
 					display: "flex",
 					flexDirection: "column",
 					overflow: "hidden",
-					minWidth: 0,
+					minWidth: sidebarVisible ? 440 : 700,
 				}}
 			>
 				{/* Tab bar */}
-				<div
-					className="titlebar-drag"
-					style={{
-						height: 38,
-						borderBottom: "1px solid var(--border-muted)",
-						display: "flex",
-						alignItems: "stretch",
-						background: "var(--bg-surface)",
-						flexShrink: 0,
-						paddingLeft: sidebarVisible ? 0 : 78,
-					}}
-				>
-					{tabs.openThreadTabs.length === 0 ? (
-						<button
-							className="titlebar-no-drag"
-							onClick={() => tabs.setActiveTab("chat")}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 6,
-								padding: "0 16px",
-								fontSize: 11,
-								fontWeight: 500,
-								color: tabs.activeTab === "chat" || tabs.activeTab.startsWith("thread:") ? "var(--text)" : "var(--muted)",
-								background: tabs.activeTab === "chat" || tabs.activeTab.startsWith("thread:") ? "var(--bg)" : "transparent",
-								borderBottom: tabs.activeTab === "chat" || tabs.activeTab.startsWith("thread:") ? "2px solid var(--accent)" : "2px solid transparent",
-								cursor: "pointer",
-							}}
-						>
-							New Thread
-						</button>
-					) : (
-						tabs.openThreadTabs.map((threadId) => {
-							const thread = threads.find((t) => t.id === threadId)
-							const tabId = `thread:${threadId}`
-							const isActive = tabs.activeTab === tabId
-							return (
-								<div
-									key={tabId}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 4,
-										background: isActive ? "var(--bg)" : "transparent",
-										borderBottom: isActive
-											? "2px solid var(--accent)"
-											: "2px solid transparent",
-									}}
-								>
-									<button
-										className="titlebar-no-drag"
-										onClick={async () => {
-											await handleSwitchThread(threadId)
-										}}
-										style={{
-											padding: "0 4px 0 12px",
-											fontSize: 11,
-											fontWeight: 500,
-											color: isActive ? "var(--text)" : "var(--muted)",
-											cursor: "pointer",
-											transition: "color 0.1s",
-										}}
-									>
-										{thread?.title || "New Thread"}
-									</button>
-									<button
-										className="titlebar-no-drag"
-										onClick={(e) => {
-											e.stopPropagation()
-											tabs.handleCloseTab(tabId)
-										}}
-										style={{
-											color: "var(--dim)",
-											cursor: "pointer",
-											fontSize: 11,
-											padding: "0 8px 0 2px",
-											lineHeight: 1,
-										}}
-										title="Close"
-									>
-										&times;
-									</button>
-								</div>
-							)
-						})
-					)}
-
-					{/* Open file/diff/browser tabs */}
-					{tabs.openFiles.map((tabId) => {
-						const isDiff = tabId.startsWith("diff:")
-						const isBrowser = tabId.startsWith("browser:")
-						const filePath = isDiff ? tabId.slice(5) : isBrowser ? tabId.slice(8) : tabId
-						const fileName = isBrowser
-							? (() => { try { return new URL(filePath).host || "Browser" } catch { return "Browser" } })()
-							: filePath.split("/").pop() || filePath
-						const isActive = tabs.activeTab === tabId
-						const isDirtyTab = tabs.dirtyFiles.has(tabId)
-						return (
-							<div
-								key={tabId}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 4,
-									background: isActive ? "var(--bg)" : "transparent",
-									borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
-								}}
-							>
-								<button
-									className="titlebar-no-drag"
-									onClick={() => tabs.setActiveTab(tabId)}
-									style={{
-										padding: "0 4px 0 12px",
-										fontSize: 11,
-										fontWeight: 500,
-										color: isActive ? "var(--text)" : "var(--muted)",
-										cursor: "pointer",
-										transition: "color 0.1s",
-										display: "flex",
-										alignItems: "center",
-										gap: 4,
-									}}
-								>
-									{isDiff && (
-										<span style={{ fontSize: 9, color: "var(--warning)", fontWeight: 700 }}>M</span>
-									)}
-									{isBrowser && (
-										<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-											<circle cx="12" cy="12" r="10" />
-											<line x1="2" y1="12" x2="22" y2="12" />
-											<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-										</svg>
-									)}
-									{fileName}
-									{isDirtyTab && (
-										<span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--text)", flexShrink: 0 }} />
-									)}
-								</button>
-								<button
-									className="titlebar-no-drag"
-									onClick={(e) => { e.stopPropagation(); tabs.handleCloseTab(tabId) }}
-									style={{ color: "var(--dim)", cursor: "pointer", fontSize: 11, padding: "0 8px 0 2px", lineHeight: 1 }}
-									title="Close"
-								>
-									&times;
-								</button>
-							</div>
+				<TabBar
+					activeTab={tabs.activeTab}
+					openThreadTabs={tabs.openThreadTabs}
+					openFiles={tabs.openFiles}
+					dirtyFiles={tabs.dirtyFiles}
+					threads={threads}
+					sidebarVisible={sidebarVisible}
+					rightSidebarVisible={rightSidebarVisible}
+					gitBranch={project.projectInfo?.gitBranch ?? undefined}
+					prStatus={project.prStatus}
+					isAgentActive={chat.isAgentActive}
+					onSelectTab={tabs.setActiveTab}
+					onCloseTab={tabs.handleCloseTab}
+					onSwitchThread={handleSwitchThread}
+					onNewThread={handleNewThread}
+					onToggleRightSidebar={() => setRightSidebarVisible((v) => !v)}
+					onCreatePR={() =>
+						handleSend(
+							"Create a pull request for this branch. Push if needed first.",
 						)
-					})}
+					}
+					projectRootPath={project.projectInfo?.rootPath ?? null}
+				/>
 
-					{/* New thread button */}
-					<button
-						className="titlebar-no-drag"
-						onClick={handleNewThread}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							padding: "0 8px",
-							fontSize: 16,
-							color: "var(--muted)",
-							cursor: "pointer",
-							transition: "color 0.1s",
-						}}
-						title="New Thread"
-					>
-						+
-					</button>
-
-					<div style={{ flex: 1 }} />
-
-					{/* PR button */}
-					{project.projectInfo?.gitBranch && project.projectInfo.gitBranch !== "main" && project.projectInfo.gitBranch !== "master" && (() => {
-						const pr = project.prStatus
-						const hasOpenPR = pr?.exists && (pr.state === "open")
-						const isMerged = pr?.exists && pr.state === "merged"
-						let label = "Create PR"
-						let dotColor = ""
-						let titleText = "Create PR from current branch"
-						if (hasOpenPR) {
-							label = `#${pr.number}`
-							titleText = `${pr.title} — ${pr.url}`
-							if (pr.checks === "passing") { dotColor = "var(--success)"; label += " passing" }
-							else if (pr.checks === "failing") { dotColor = "var(--error)"; label += " failing" }
-							else if (pr.checks === "pending") { dotColor = "var(--warning)"; label += " pending" }
-							if (pr.isDraft) label = `#${pr.number} draft`
-						} else if (isMerged) {
-							label = `#${pr!.number} merged`
-							dotColor = "var(--accent)"
-							titleText = `Merged — ${pr!.url}`
-						}
-						return (
-							<button
-								className="titlebar-no-drag"
-								onClick={() => {
-									if (hasOpenPR && pr?.url) {
-										window.api.invoke({ type: "openExternal", url: pr.url })
-									} else if (!isMerged) {
-										if (chat.isAgentActive) return
-										handleSend("Create a pull request for this branch. Push if needed first.")
-									}
-								}}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 5,
-									padding: "0 10px",
-									fontSize: 11,
-									fontWeight: 500,
-									color: hasOpenPR ? "var(--text)" : isMerged ? "var(--dim)" : chat.isAgentActive ? "var(--dim)" : "var(--muted)",
-									cursor: isMerged ? "default" : "pointer",
-									transition: "color 0.1s",
-								}}
-								title={titleText}
-							>
-								{dotColor && (
-									<span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-								)}
-								{!dotColor && (
-									<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-										<circle cx="5" cy="3.5" r="2" />
-										<circle cx="5" cy="12.5" r="2" />
-										<circle cx="11" cy="5.5" r="2" />
-										<line x1="5" y1="5.5" x2="5" y2="10.5" />
-										<path d="M9 5.5 H7 C5.9 5.5 5 6.4 5 7.5" />
-									</svg>
-								)}
-								{label}
-							</button>
-						)
-					})()}
-
-					{/* Open in... dropdown */}
-					<OpenInDropdown projectPath={project.projectInfo?.rootPath ?? null} />
-
-					{/* Right sidebar toggle */}
-					<button
-						className="titlebar-no-drag"
-						onClick={() => setRightSidebarVisible((v) => !v)}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							padding: "0 10px",
-							color: rightSidebarVisible ? "var(--text)" : "var(--muted)",
-							cursor: "pointer",
-							transition: "color 0.1s",
-						}}
-						title="Toggle Explorer (Cmd+Shift+E)"
-					>
-						<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-							<rect x="1" y="2" width="14" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-							<line x1="10.5" y1="2" x2="10.5" y2="14" stroke="currentColor" strokeWidth="1.2" />
-						</svg>
-					</button>
-				</div>
-
-				{auth.isAuthenticated === null ? (
-					<div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-						<div style={{ width: 24, height: 24, border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-						<style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-					</div>
-				) : auth.isAuthenticated === false ? (
-					<WelcomeScreen onLogin={auth.handleLogin} onApiKey={auth.handleApiKey} onSkip={auth.handleSkipLogin} />
-				) : project.enrichedProjects.length === 0 && (tabs.activeTab === "chat" || tabs.activeTab.startsWith("thread:")) ? (
-					<div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, gap: 24 }}>
-						<div style={{ display: "flex", alignItems: "center", gap: 8, height: 32 }}>
-							<span style={{ fontSize: 26, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>My</span>
-							<span style={{ fontSize: 26, fontWeight: 700, color: "var(--logo-accent, #059669)", letterSpacing: -0.5 }}>Agent</span>
-						</div>
-						<div style={{ textAlign: "center", maxWidth: 420 }}>
-							<div style={{ fontSize: 20, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
-								Open a project to get started
-							</div>
-							<div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
-								Point MyAgent at a repository or folder to start coding with AI.
-							</div>
-						</div>
-						<div style={{ display: "flex", gap: 12 }}>
-							<button
-								onClick={project.handleOpenFolder}
-								style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 28px", background: "var(--accent)", color: "#fff", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14, border: "none", transition: "opacity 0.15s" }}
-								onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85" }}
-								onMouseLeave={(e) => { e.currentTarget.style.opacity = "1" }}
-							>
-								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-									<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-								</svg>
-								Open Folder
-							</button>
-							<button
-								onClick={project.handleShowCloneModal}
-								style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 28px", background: "transparent", color: "var(--text)", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14, border: "1px solid var(--border)", transition: "opacity 0.15s" }}
-								onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85" }}
-								onMouseLeave={(e) => { e.currentTarget.style.opacity = "1" }}
-							>
-								<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-									<circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" />
-									<path d="M13 6h3a2 2 0 012 2v7" /><line x1="6" y1="9" x2="6" y2="21" />
-								</svg>
-								Clone from URL
-							</button>
-						</div>
-						<div style={{ fontSize: 11, color: "var(--dim)" }}>
-							or press <kbd style={{ padding: "2px 6px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 4, fontSize: 11, fontFamily: "inherit" }}>&#8984;O</kbd> anytime
-						</div>
-					</div>
-				) : (
-					<>
-						<div
-							onMouseDown={() => {
-								project.markWorktreeRead()
-							}}
-							style={{
-								flex: 1,
-								display: tabs.activeTab === "chat" || tabs.activeTab.startsWith("thread:") ? "flex" : "none",
-								flexDirection: "column",
-								overflow: "hidden",
-								minWidth: 0,
-							}}
-						>
-							<ChatView
-								messages={chat.messages}
-								tools={chat.tools}
-								subagents={chat.subagents}
-								isAgentActive={chat.isAgentActive}
-								agentStartedAt={chat.agentStartedAt}
-								streamingMessageId={chat.streamingMessageId}
-								todos={tasks}
-							/>
-							<EditorInput
-								onSend={handleSend}
-								onQueue={handleQueue}
-								onAbort={handleAbort}
-								isAgentActive={chat.isAgentActive}
-								modeId={modeId}
-								onBuiltinCommand={handleBuiltinCommand}
-								queue={chat.queuesByThread[currentThreadId || "default"] || []}
-								isQueuePaused={chat.isQueuePaused}
-								onResumeQueue={handleResumeQueue}
-								onSteerQueued={handleSteerQueued}
-								onDeleteQueued={handleDeleteQueued}
-								onReorderQueue={handleReorderQueue}
-								onClearQueue={handleClearQueue}
-								currentModelId={currentThreadModelId}
-								onSelectModel={handleSelectThreadModel}
-								permissionMode={currentThreadPermission}
-								onSelectPermissionMode={handleSelectThreadPermission}
-							/>
-						</div>
-
-						{tabs.activeTab === "settings" && (
-							<Settings
-								onClose={() => tabs.setActiveTab("chat")}
-								loggedInProviders={auth.loggedInProviders}
-								onLogin={auth.handleLogin}
-								onApiKey={auth.handleApiKey}
-								onLogout={auth.handleLogout}
-								initialSection={tabs.settingsSection}
-								onSectionChange={(s) => tabs.setSettingsSection(s)}
-							/>
-						)}
-
-						{tabs.activeTab === "agents" && (
-							<AgentDashboard
-								onClose={() => tabs.setActiveTab("chat")}
-								onSwitchToAgent={project.handleSwitchProject}
-							/>
-						)}
-
-						{tabs.activeTab !== "chat" && tabs.activeTab !== "settings" && tabs.activeTab !== "agents" && !tabs.activeTab.startsWith("thread:") &&
-							(tabs.activeTab.startsWith("browser:") ? (
-								<BrowserView
-									url={tabs.activeTab.slice(8)}
-									onNavigate={(newUrl) => {
-										const oldTab = tabs.activeTab
-										const newTab = `browser:${newUrl}`
-										if (oldTab !== newTab) {
-											tabs.setOpenFiles((prev) => prev.map((f) => (f === oldTab ? newTab : f)))
-											tabs.setActiveTab(newTab)
-										}
-									}}
-									onClose={() => tabs.handleCloseTab(tabs.activeTab)}
-								/>
-							) : tabs.activeTab.startsWith("diff:") ? (
-								<DiffEditor
-									filePath={tabs.activeTab.slice(5)}
-									onClose={() => tabs.handleCloseTab(tabs.activeTab)}
-									onOpenFile={tabs.handleFileClick}
-								/>
-							) : (
-								<FileEditor
-									ref={tabs.fileEditorRef}
-									filePath={tabs.activeTab}
-									onClose={() => tabs.handleCloseTab(tabs.activeTab)}
-									onDirtyChange={(dirty) => tabs.handleDirtyChange(tabs.activeTab, dirty)}
-								/>
-							))}
-					</>
-				)}
+				<MainContent
+					auth={auth}
+					project={project}
+					tabs={tabs}
+					chat={chat}
+					tasks={tasks}
+					activeThreadKey={currentThreadId || "default"}
+					currentModelId={currentThreadModelId}
+					modeId={modeId}
+					permissionMode={currentThreadPermission}
+					onSend={handleSend}
+					onQueue={handleQueue}
+					onAbort={handleAbort}
+					onBuiltinCommand={handleBuiltinCommand}
+					onSelectModel={handleSelectThreadModel}
+					onSelectPermissionMode={handleSelectThreadPermission}
+					onResumeQueue={handleResumeQueue}
+					onSteerQueued={handleSteerQueued}
+					onDeleteQueued={handleDeleteQueued}
+					onReorderQueue={handleReorderQueue}
+					onClearQueue={handleClearQueue}
+				/>
 
 				<StatusBar
 					modeId={currentThreadPermission === "read-only" ? "plan" : modeId}
@@ -1461,164 +708,43 @@ export function App() {
 				onTabChange={setRightSidebarTab}
 				projectName={project.projectInfo?.name ?? ""}
 				projectPath={project.projectInfo?.rootPath ?? null}
+				gitBranch={project.projectInfo?.gitBranch}
 				onFileClick={tabs.handleFileClick}
 				onDiffClick={tabs.handleDiffClick}
-				activeFilePath={tabs.openFiles.includes(tabs.activeTab) ? tabs.activeTab : null}
-				activeDiffPath={tabs.activeTab.startsWith("diff:") ? tabs.activeTab.slice(5) : null}
+				activeFilePath={
+					tabs.openFiles.includes(tabs.activeTab) ? tabs.activeTab : null
+				}
+				activeDiffPath={
+					tabs.activeTab.startsWith("diff:") ? tabs.activeTab.slice(5) : null
+				}
 				loading={project.projectSwitching}
 				onOpenBrowser={tabs.handleBrowserOpen}
+				currentThreadId={currentThreadId}
+				threadTitle={
+					threads.find((t) => t.id === currentThreadId)?.title ||
+					(currentThreadId
+						? `Thread #${currentThreadId.slice(0, 8)}`
+						: "Current Session")
+				}
+				currentThreadModelId={currentThreadModelId}
+				currentThreadPermission={currentThreadPermission}
+				modeId={modeId}
+				tokenUsage={tokenUsage}
+				messages={chat.messages}
+				tools={chat.tools}
+				openFiles={tabs.openFiles}
+				tasks={tasks}
 			/>
 
-			{/* Modal dialogs */}
-			{dialogs.pendingApproval && (
-				<ToolApprovalDialog
-					toolCallId={dialogs.pendingApproval.toolCallId}
-					toolName={dialogs.pendingApproval.toolName}
-					args={dialogs.pendingApproval.args}
-					category={dialogs.pendingApproval.category}
-					categoryLabel={dialogs.pendingApproval.categoryLabel}
-					onApprove={dialogs.handleApprove}
-					onDecline={dialogs.handleDecline}
-					onAlwaysAllow={dialogs.handleAlwaysAllow}
-				/>
-			)}
-
-			{dialogs.pendingQuestion && (
-				<AskQuestionDialog
-					questionId={dialogs.pendingQuestion.questionId}
-					question={dialogs.pendingQuestion.question}
-					options={dialogs.pendingQuestion.options}
-					onRespond={dialogs.handleQuestionResponse}
-				/>
-			)}
-
-			{dialogs.pendingPlan && (
-				<PlanApproval
-					planId={dialogs.pendingPlan.planId}
-					title={dialogs.pendingPlan.title}
-					plan={dialogs.pendingPlan.plan}
-					onRespond={dialogs.handlePlanResponse}
-				/>
-			)}
-
-			{/* Clone modal */}
-			{project.showCloneModal && (
-				<div
-					style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-					onClick={(e) => { if (e.target === e.currentTarget && !project.cloning) { project.setShowCloneModal(false) } }}
-				>
-					<div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 24, width: 480, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 16 }}>
-						<div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>Clone from URL</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-							<label style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)" }}>Git URL</label>
-							<input type="text" value={project.cloneUrl} onChange={(e) => project.setCloneUrl(e.target.value)} placeholder="https://github.com/user/repo.git" autoFocus disabled={project.cloning}
-								style={{ padding: "10px 12px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-						</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-							<label style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)" }}>Clone location</label>
-							<div style={{ display: "flex", gap: 8 }}>
-								<input type="text" value={project.cloneDest} onChange={(e) => project.setCloneDest(e.target.value)} placeholder="/path/to/directory" disabled={project.cloning}
-									style={{ flex: 1, padding: "10px 12px", background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-								<button onClick={project.handleBrowseCloneDest} disabled={project.cloning}
-									style={{ padding: "10px 16px", background: "var(--bg-elevated)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
-									Browse...
-								</button>
-							</div>
-						</div>
-						<div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
-							<button onClick={() => { project.setShowCloneModal(false); project.setCloneUrl(""); project.setCloneDest("") }} disabled={project.cloning}
-								style={{ padding: "8px 16px", background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-								Cancel
-							</button>
-							<button onClick={project.handleCloneSubmit} disabled={!project.cloneUrl.trim() || !project.cloneDest.trim() || project.cloning}
-								style={{ padding: "8px 20px", background: project.cloneUrl.trim() && project.cloneDest.trim() ? "var(--accent)" : "var(--bg-elevated)", color: project.cloneUrl.trim() && project.cloneDest.trim() ? "#fff" : "var(--dim)", border: "none", borderRadius: 8, cursor: project.cloneUrl.trim() && project.cloneDest.trim() && !project.cloning ? "pointer" : "default", fontSize: 13, fontWeight: 600, opacity: project.cloning ? 0.6 : 1 }}>
-								{project.cloning ? "Cloning..." : "Clone repository"}
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{dialogs.showModelSelector && (
-				<ModelSelector
-					currentModelId={currentThreadModelId}
-					onSelect={(newModelId) => {
-						handleSelectThreadModel(newModelId)
-						dialogs.setShowModelSelector(false)
-					}}
-					onClose={() => dialogs.setShowModelSelector(false)}
-				/>
-			)}
-
-			{dialogs.showCommandPalette && (
-				<CommandPalette
-					commands={commandPaletteItems}
-					onClose={() => dialogs.setShowCommandPalette(false)}
-				/>
-			)}
-
-			{dialogs.showQuickFileOpen && (
-				<QuickFileOpen
-					onSelect={(filePath) => {
-						tabs.handleFileClick(filePath)
-						dialogs.setShowQuickFileOpen(false)
-					}}
-					onClose={() => dialogs.setShowQuickFileOpen(false)}
-				/>
-			)}
-
-			{tabs.pendingCloseTab && (
-				<div
-					style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0, 0, 0, 0.5)" }}
-					onClick={() => tabs.setPendingCloseTab(null)}
-				>
-					<div
-						onClick={(e) => e.stopPropagation()}
-						style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "20px 24px", maxWidth: 360, width: "100%", display: "flex", flexDirection: "column", gap: 16 }}
-					>
-						<div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Unsaved Changes</div>
-						<div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
-							This file has unsaved changes. Do you want to save before closing?
-						</div>
-						<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-							<button
-								onClick={() => { const tabId = tabs.pendingCloseTab!; tabs.setPendingCloseTab(null); tabs.forceCloseTab(tabId) }}
-								style={{ fontSize: 12, padding: "6px 14px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", color: "var(--error)", cursor: "pointer", fontWeight: 500 }}
-							>
-								Discard
-							</button>
-							<button
-								onClick={() => tabs.setPendingCloseTab(null)}
-								style={{ fontSize: 12, padding: "6px 14px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", color: "var(--muted)", cursor: "pointer", fontWeight: 500 }}
-							>
-								Cancel
-							</button>
-							<button
-								onClick={async () => { const tabId = tabs.pendingCloseTab!; tabs.setPendingCloseTab(null); await tabs.fileEditorRef.current?.save(); tabs.forceCloseTab(tabId) }}
-								style={{ fontSize: 12, padding: "6px 14px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--accent)", color: "var(--bg)", cursor: "pointer", fontWeight: 500 }}
-							>
-								Save & Close
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{auth.loginState && (
-				<LoginDialog
-					providerId={auth.loginState.providerId}
-					stage={auth.loginState.stage}
-					url={auth.loginState.url}
-					instructions={auth.loginState.instructions}
-					promptMessage={auth.loginState.promptMessage}
-					promptPlaceholder={auth.loginState.promptPlaceholder}
-					progressMessage={auth.loginState.progressMessage}
-					errorMessage={auth.loginState.errorMessage}
-					onSubmitCode={auth.handleLoginSubmitCode}
-					onCancel={auth.handleLoginCancel}
-					onClose={auth.handleLoginClose}
-				/>
-			)}
+			<AppModals
+				dialogs={dialogs}
+				auth={auth}
+				tabs={tabs}
+				project={project}
+				currentModelId={currentThreadModelId}
+				onSelectModel={handleSelectThreadModel}
+				commandPaletteItems={commandPaletteItems}
+			/>
 		</div>
 	)
 }

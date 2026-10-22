@@ -3,6 +3,7 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { Message } from "../types/ipc"
 import { extractMessageDetails } from "../utils/messageParser"
+import { ImagePreviewModal } from "./ImagePreviewModal"
 
 interface AssistantMessageProps {
 	message: Message & { isStreaming?: boolean }
@@ -143,9 +144,10 @@ function CodeBlock({ children, className }: CodeBlockProps) {
 	)
 }
 
-export function AssistantMessage({ message }: AssistantMessageProps) {
+export const AssistantMessage = React.memo(function AssistantMessage({ message }: AssistantMessageProps) {
 	const [showThinking, setShowThinking] = useState(false)
 	const [copiedAnswer, setCopiedAnswer] = useState(false)
+	const [previewImage, setPreviewImage] = useState<string | null>(null)
 
 	const { text, thinking, isStreamingThinking, hasRedactedThinking } =
 		extractMessageDetails(message.content, (message as any).text)
@@ -312,6 +314,32 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 									)
 								}
 								return <pre>{children}</pre>
+							},
+							img({ src, alt }) {
+								if (!src) return null
+								return (
+									<img
+										src={src}
+										alt={alt || "Image"}
+										title="Click to preview"
+										onClick={() => setPreviewImage(src)}
+										style={{
+											maxWidth: "100%",
+											maxHeight: 360,
+											borderRadius: 8,
+											border: "1px solid var(--border-muted)",
+											cursor: "pointer",
+											margin: "8px 0",
+											transition: "opacity 0.15s",
+										}}
+										onMouseEnter={(e) => {
+											e.currentTarget.style.opacity = "0.9"
+										}}
+										onMouseLeave={(e) => {
+											e.currentTarget.style.opacity = "1"
+										}}
+									/>
+								)
 							},
 						}}
 					>
@@ -504,6 +532,11 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
 						(text ? null : "An error occurred during generation")}
 				</div>
 			)}
+
+			<ImagePreviewModal
+				src={previewImage}
+				onClose={() => setPreviewImage(null)}
+			/>
 		</div>
 	)
-}
+})

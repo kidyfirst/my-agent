@@ -12,6 +12,8 @@ interface LoginState {
 	errorMessage?: string
 }
 
+export type AuthManager = ReturnType<typeof useAuthManager>
+
 export function useAuthManager() {
 	const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 	const [loggedInProviders, setLoggedInProviders] = useState<Set<string>>(

@@ -20,6 +20,8 @@ interface PendingPlan {
 	plan: string
 }
 
+export type DialogManager = ReturnType<typeof useDialogManager>
+
 export function useDialogManager() {
 	const [pendingApproval, setPendingApproval] =
 		useState<PendingApproval | null>(null)

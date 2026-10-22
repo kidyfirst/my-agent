@@ -74,7 +74,7 @@ function isUsableChatModel(modelId: string): boolean {
 
 function modelSupportsVision(modelId: string): boolean {
 	const id = (modelId || "").toLowerCase()
-	if (id.includes("deepseek")) return false
+	// DeepSeek models (deepseek-flash, deepseek-v4-pro) support multimodal vision
 	if (id.includes("o3-mini") || id.includes("o1-mini")) return false
 	if (id.includes("qwen-") && !id.includes("vl")) return false
 	if (id.includes("llama-") && !id.includes("vision")) return false
@@ -389,6 +389,16 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 			for (const m of rawModels ?? []) {
 				if (!m.id || !isUsableChatModel(m.id)) continue
+				const idLower = m.id.toLowerCase()
+				if (
+					idLower.includes("deepseek") &&
+					!idLower.endsWith("/deepseek-flash") &&
+					!idLower.endsWith("/deepseek-v4-pro") &&
+					idLower !== "deepseek-flash" &&
+					idLower !== "deepseek-v4-pro"
+				) {
+					continue
+				}
 				if (!modelMap.has(m.id)) {
 					const provider = m.provider || (m.id ? m.id.split("/")[0] : "other")
 					const authId = provider === "openai" ? "openai-codex" : provider

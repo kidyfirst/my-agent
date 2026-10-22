@@ -5,11 +5,16 @@ import {
 } from "./SlashCommandAutocomplete"
 import { MessageQueueBar } from "./MessageQueueBar"
 import { useAvailableModels, type ModelInfo } from "./ModelSelector"
+import { ImagePreviewModal } from "./ImagePreviewModal"
+import { upgradeDeprecatedModel } from "../../constants/models"
 import type { AttachedFile, QueuedMessage } from "../types/chat"
 
 export type { AttachedFile }
 
 export type PermissionMode = "default" | "auto-approve" | "read-only"
+
+// DeepSeek only exposes these two chat models; hide any other discovered ids.
+const DEEPSEEK_MODELS = ["deepseek/deepseek-flash", "deepseek/deepseek-v4-pro"]
 
 interface EditorInputProps {
 	onSend: (content: string, files?: AttachedFile[]) => void
@@ -36,22 +41,35 @@ function formatModelDisplayName(
 	models?: ModelInfo[],
 ): string {
 	if (!modelId) return "Select Model"
-	const matched = models?.find((m) => m.id === modelId)
+	const upgradedId = upgradeDeprecatedModel(modelId)
+	const lower = upgradedId.toLowerCase()
+	if (
+		lower === "deepseek/deepseek-flash" ||
+		lower === "deepseek-flash"
+	) {
+		return "deepseek-flash"
+	}
+	if (
+		lower === "deepseek/deepseek-v4-pro" ||
+		lower === "deepseek-v4-pro"
+	) {
+		return "deepseek-v4-pro"
+	}
+	const matched = models?.find(
+		(m) => m.id === upgradedId || m.id === modelId,
+	)
 	if (matched?.name) return matched.name
-	const id = modelId.toLowerCase()
-	if (id.includes("claude-3-7-sonnet")) return "Claude 3.7 Sonnet"
-	if (id.includes("claude-3-5-sonnet")) return "Claude 3.5 Sonnet"
-	if (id.includes("claude-3-5-haiku")) return "Claude 3.5 Haiku"
-	if (id.includes("deepseek-reasoner")) return "DeepSeek R1"
-	if (id.includes("deepseek-chat")) return "DeepSeek V3"
-	if (id.includes("gemini-3.8-flash")) return "Gemini 3.8 Flash High"
-	if (id.includes("gemini-2.5-pro")) return "Gemini 2.5 Pro"
-	if (id.includes("gemini-2.5-flash")) return "Gemini 2.5 Flash"
-	if (id.includes("gpt-4o-mini")) return "GPT-4o Mini"
-	if (id.includes("gpt-4o")) return "GPT-4o"
-	if (id.includes("o3-mini")) return "o3-mini"
-	if (id.includes("o1")) return "o1"
-	const raw = modelId.includes("/") ? modelId.split("/")[1] : modelId
+	if (lower.includes("claude-3-7-sonnet")) return "Claude 3.7 Sonnet"
+	if (lower.includes("claude-3-5-sonnet")) return "Claude 3.5 Sonnet"
+	if (lower.includes("claude-3-5-haiku")) return "Claude 3.5 Haiku"
+	if (lower.includes("gemini-3.8-flash")) return "Gemini 3.8 Flash High"
+	if (lower.includes("gemini-2.5-pro")) return "Gemini 2.5 Pro"
+	if (lower.includes("gemini-2.5-flash")) return "Gemini 2.5 Flash"
+	if (lower.includes("gpt-4o-mini")) return "GPT-4o Mini"
+	if (lower.includes("gpt-4o")) return "GPT-4o"
+	if (lower.includes("o3-mini")) return "o3-mini"
+	if (lower.includes("o1")) return "o1"
+	const raw = upgradedId.includes("/") ? upgradedId.split("/")[1] : upgradedId
 	return raw.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -102,6 +120,8 @@ export function EditorInput({
 	const permissionMenuRef = useRef<HTMLDivElement>(null)
 	const composerRef = useRef<HTMLDivElement>(null)
 
+	const isComposingRef = useRef(false)
+	const isSubmittingRef = useRef(false)
 	const [value, setValue] = useState("")
 	const [showSlashMenu, setShowSlashMenu] = useState(false)
 	const [slashFilter, setSlashFilter] = useState("")
@@ -113,6 +133,7 @@ export function EditorInput({
 	const [isHoveringAction, setIsHoveringAction] = useState(false)
 	const [isFocused, setIsFocused] = useState(false)
 	const [isDraggingOver, setIsDraggingOver] = useState(false)
+	const [previewImage, setPreviewImage] = useState<string | null>(null)
 
 	const { models } = useAvailableModels()
 
@@ -332,8 +353,14 @@ export function EditorInput({
 	)
 
 	const handleSubmit = useCallback(() => {
+		if (isSubmittingRef.current) return
 		const trimmed = value.trim()
 		if (!trimmed && !activeCommand && attachedFiles.length === 0) return
+
+		isSubmittingRef.current = true
+		setTimeout(() => {
+			isSubmittingRef.current = false
+		}, 150)
 
 		let fullContent = trimmed
 		if (activeCommand) {
@@ -368,6 +395,13 @@ export function EditorInput({
 			}
 
 			if (e.key === "Enter" && !e.shiftKey) {
+				if (
+					e.nativeEvent.isComposing ||
+					isComposingRef.current ||
+					e.keyCode === 229
+				) {
+					return
+				}
 				e.preventDefault()
 				handleSubmit()
 			}
@@ -422,7 +456,38 @@ export function EditorInput({
 	}, [permissionMode])
 
 	const connectedModels = useMemo(() => {
-		return models.filter((m) => m.hasAuth)
+		return models
+			.filter((m) => {
+				if (!m.hasAuth) return false
+				const idLower = m.id.toLowerCase()
+				const isDeepSeek =
+					m.provider === "deepseek" || idLower.includes("deepseek")
+				if (isDeepSeek) {
+					return (
+						idLower === "deepseek/deepseek-flash" ||
+						idLower === "deepseek/deepseek-v4-pro" ||
+						idLower === "deepseek-flash" ||
+						idLower === "deepseek-v4-pro"
+					)
+				}
+				return true
+			})
+			.map((m) => {
+				const idLower = m.id.toLowerCase()
+				if (
+					idLower === "deepseek/deepseek-flash" ||
+					idLower === "deepseek-flash"
+				) {
+					return { ...m, name: "deepseek-flash" }
+				}
+				if (
+					idLower === "deepseek/deepseek-v4-pro" ||
+					idLower === "deepseek-v4-pro"
+				) {
+					return { ...m, name: "deepseek-v4-pro" }
+				}
+				return m
+			})
 	}, [models])
 
 	const filteredModels = useMemo(() => {
@@ -476,19 +541,19 @@ export function EditorInput({
 			<div
 				style={{
 					position: "relative",
-					background: "var(--bg-surface)",
+					background: "var(--bg)",
 					border: isDraggingOver
 						? "1px dashed var(--accent)"
 						: isFocused
-						? "1px solid var(--accent)"
-						: "1px solid var(--border)",
+							? "1px solid var(--accent)"
+							: "1px solid var(--border)",
 					borderRadius: 16,
 					padding: "12px 14px 10px",
 					boxShadow: isDraggingOver
 						? "0 0 12px rgba(109, 40, 217, 0.2)"
 						: isFocused
-						? "0 2px 8px rgba(109, 40, 217, 0.08)"
-						: "0 1px 4px rgba(0, 0, 0, 0.04)",
+							? "0 2px 8px rgba(109, 40, 217, 0.08)"
+							: "0 1px 4px rgba(0, 0, 0, 0.04)",
 					display: "flex",
 					flexDirection: "column",
 					gap: 8,
@@ -529,12 +594,22 @@ export function EditorInput({
 									<img
 										src={file.preview}
 										alt={file.name}
+										title="Click to preview"
+										onClick={() => setPreviewImage(file.preview)}
 										style={{
 											height: 52,
 											maxWidth: 100,
 											objectFit: "cover",
 											borderRadius: 8,
 											border: "1px solid var(--border-muted)",
+											cursor: "pointer",
+											transition: "opacity 0.15s",
+										}}
+										onMouseEnter={(e) => {
+											e.currentTarget.style.opacity = "0.85"
+										}}
+										onMouseLeave={(e) => {
+											e.currentTarget.style.opacity = "1"
 										}}
 									/>
 								) : (
@@ -649,6 +724,14 @@ export function EditorInput({
 					value={value}
 					onChange={handleChange}
 					onKeyDown={handleKeyDown}
+					onCompositionStart={() => {
+						isComposingRef.current = true
+					}}
+					onCompositionEnd={() => {
+						setTimeout(() => {
+							isComposingRef.current = false
+						}, 20)
+					}}
 					onPaste={handlePaste}
 					placeholder="Ask anything, / for actions"
 					rows={1}
@@ -1358,6 +1441,11 @@ export function EditorInput({
 					</div>
 				</div>
 			</div>
+
+			<ImagePreviewModal
+				src={previewImage}
+				onClose={() => setPreviewImage(null)}
+			/>
 		</div>
 	)
 }

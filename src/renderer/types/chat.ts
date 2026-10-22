@@ -1,4 +1,134 @@
 import type { Message } from "./ipc"
+import { normalizeMessageContent } from "../utils/messageParser"
+
+export function isUserMessage(
+	msg:
+		| Message
+		| {
+				role?: string
+				type?: string
+				content?: unknown
+				[key: string]: unknown
+		  }
+		| undefined,
+): boolean {
+	if (!msg) return false
+	if (msg.role === "user") return true
+	if ((msg.role as string) === "signal") {
+		const type = (msg as any).type
+		if (type === "user" || type === "data-user-message") return true
+		const rawContent = msg.content
+		if (typeof rawContent === "object" && rawContent !== null) {
+			const signalType = (rawContent as any)?.metadata?.signal?.type
+			if (signalType === "user" || signalType === "data-user-message")
+				return true
+		}
+		if (typeof rawContent === "string") {
+			if (
+				rawContent.includes('"type":"user"') ||
+				rawContent.includes('"data-user-message"')
+			) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+export function getMessageText(
+	msg:
+		| Message
+		| { content?: unknown; text?: unknown; [key: string]: unknown }
+		| undefined,
+): string {
+	if (!msg) return ""
+	if (typeof (msg as any).text === "string" && (msg as any).text) {
+		return (msg as any).text.trim()
+	}
+	const content = msg.content
+	if (typeof content === "string") {
+		const trimmed = content.trim()
+		if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+			return trimmed
+		}
+	}
+	if (Array.isArray(content) && content.length > 0) {
+		let fastText = ""
+		let isSimple = true
+		for (const c of content) {
+			if (typeof c === "string") {
+				fastText += c
+			} else if (
+				c &&
+				typeof c === "object" &&
+				(c as any).type === "text" &&
+				typeof (c as any).text === "string"
+			) {
+				fastText += (c as any).text
+			} else {
+				isSimple = false
+				break
+			}
+		}
+		if (isSimple) return fastText.trim()
+	}
+	const blocks = normalizeMessageContent(msg.content, (msg as any).text)
+	const textParts = blocks.filter((b) => !b.type || b.type === "text")
+	if (textParts.length > 0) {
+		return textParts
+			.map(
+				(c) =>
+					(c as unknown as { text?: string; content?: string }).text ??
+					(c as unknown as { content?: string }).content ??
+					"",
+			)
+			.join("")
+			.trim()
+	}
+	return ""
+}
+
+function findMatchingMessageIndex(
+	messages: Message[],
+	incoming: Message,
+): number {
+	// 1. Exact ID match
+	const exactIdx = messages.findIndex((m) => m.id === incoming.id)
+	if (exactIdx !== -1) return exactIdx
+
+	// 2. ONLY server messages (!id.startsWith("user-")) should ever reconcile with an existing optimistic message
+	if (isUserMessage(incoming) && !incoming.id.startsWith("user-")) {
+		const incomingText = getMessageText(incoming)
+		// Check from the end towards the beginning (most recent messages first)
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const m = messages[i]
+			// Stop scanning if we hit a completed turn's assistant message
+			if (
+				m.role === "assistant" &&
+				Array.isArray(m.content) &&
+				m.content.length > 0
+			) {
+				break
+			}
+			if (isUserMessage(m)) {
+				// Reconcile if optimistic ID ("user-") and text matches or matches turn
+				if (m.id.startsWith("user-")) {
+					const existingText = getMessageText(m)
+					if (!existingText || !incomingText || existingText === incomingText) {
+						return i
+					}
+				}
+				// Or if text content is identical
+				const existingText = getMessageText(m)
+				if (existingText && incomingText && existingText === incomingText) {
+					return i
+				}
+			}
+		}
+	}
+
+	return -1
+}
 
 export type ToolState = {
 	id: string
@@ -58,7 +188,12 @@ export type ChatState = {
 
 export type ChatAction =
 	| { type: "AGENT_START" }
-	| { type: "AGENT_END" }
+	| { type: "AGENT_END"; changedFiles?: Message["changedFiles"] }
+	| {
+			type: "SET_MESSAGE_CHANGED_FILES"
+			messageId: string
+			files: Message["changedFiles"]
+	  }
 	| { type: "MESSAGE_START"; message: Message }
 	| { type: "MESSAGE_UPDATE"; message: Message }
 	| { type: "MESSAGE_END"; message: Message }
@@ -121,13 +256,25 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 	switch (action.type) {
 		case "AGENT_START":
 			return { ...state, isAgentActive: true, agentStartedAt: Date.now() }
+		case "SET_MESSAGE_CHANGED_FILES": {
+			return {
+				...state,
+				messages: state.messages.map((m) =>
+					m.id === action.messageId ? { ...m, changedFiles: action.files } : m,
+				),
+			}
+		}
 		case "AGENT_END": {
 			const durationMs = state.agentStartedAt
 				? Date.now() - state.agentStartedAt
 				: undefined
 			const msgs = state.messages.map((m, idx) => {
 				if (idx === state.messages.length - 1 && m.role === "assistant") {
-					return { ...m, durationMs: m.durationMs ?? durationMs }
+					return {
+						...m,
+						durationMs: m.durationMs ?? durationMs,
+						changedFiles: action.changedFiles ?? m.changedFiles,
+					}
 				}
 				return m
 			})
@@ -140,54 +287,106 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 		}
 		case "MESSAGE_START": {
 			if (!action.message?.id) return state
-			if (action.message.role === "user") {
-				const lastMsg = state.messages[state.messages.length - 1]
-				if (lastMsg?.role === "user") {
-					return state
-				}
-			}
-			if (state.messages.some((m) => m.id === action.message.id)) {
+			const incoming = action.message
+
+			// 1. Optimistic messages dispatched locally by handleSend (id: "user-*")
+			// ALWAYS append immediately to state.messages for instant UI display
+			if (incoming.id.startsWith("user-")) {
 				return {
 					...state,
-					messages: state.messages.map((m) =>
-						m.id === action.message.id ? action.message : m,
-					),
-					streamingMessageId:
-						action.message.role === "assistant" ? action.message.id : null,
+					messages: [...state.messages, incoming],
+					streamingMessageId: null,
 				}
 			}
+
+			// 2. Server incoming message: check if it reconciles an existing message (or optimistic message)
+			const matchIdx = findMatchingMessageIndex(state.messages, incoming)
+
+			if (matchIdx !== -1) {
+				const existing = state.messages[matchIdx]
+				const merged: Message = {
+					...existing,
+					...incoming,
+					id: incoming.id,
+					role: incoming.role || existing.role,
+					attachments: existing.attachments || incoming.attachments,
+					createdAt: existing.createdAt || incoming.createdAt,
+				}
+				const newMessages = [...state.messages]
+				newMessages[matchIdx] = merged
+				return {
+					...state,
+					messages: newMessages,
+					streamingMessageId:
+						incoming.role === "assistant"
+							? incoming.id
+							: state.streamingMessageId,
+				}
+			}
+
+			// 3. For server user messages, avoid duplicate bubble if the last message is already identical
+			if (isUserMessage(incoming)) {
+				const lastMsg = state.messages[state.messages.length - 1]
+				if (lastMsg && isUserMessage(lastMsg)) {
+					const lastText = getMessageText(lastMsg)
+					const incomingText = getMessageText(incoming)
+					if (lastText && incomingText && lastText === incomingText) {
+						return state
+					}
+				}
+			}
+
 			return {
 				...state,
-				messages: [...state.messages, action.message],
-				streamingMessageId:
-					action.message.role === "assistant" ? action.message.id : null,
+				messages: [...state.messages, incoming],
+				streamingMessageId: incoming.role === "assistant" ? incoming.id : null,
 			}
 		}
 		case "MESSAGE_UPDATE": {
 			if (!action.message?.id) return state
-			const exists = state.messages.some((m) => m.id === action.message.id)
-			const msgs = exists
-				? state.messages.map((m) => {
-						if (m.id !== action.message.id) return m
-						const newContent =
-							action.message.content && action.message.content.length > 0
-								? action.message.content
-								: m.content
-						return {
-							...m,
-							...action.message,
-							role: m.role || action.message.role,
-							content: newContent,
-							durationMs: m.durationMs ?? (action.message as any).durationMs,
-						}
-					})
-				: [...state.messages, action.message]
+			const incoming = action.message
+			const matchIdx = findMatchingMessageIndex(state.messages, incoming)
+
+			if (matchIdx !== -1) {
+				const existing = state.messages[matchIdx]
+				const newContent =
+					incoming.content && incoming.content.length > 0
+						? incoming.content
+						: existing.content
+				const merged: Message = {
+					...existing,
+					...incoming,
+					id: incoming.id,
+					role: existing.role || incoming.role,
+					content: newContent,
+					durationMs: existing.durationMs ?? (incoming as any).durationMs,
+					attachments: existing.attachments || incoming.attachments,
+				}
+				const newMessages = [...state.messages]
+				newMessages[matchIdx] = merged
+				return {
+					...state,
+					messages: newMessages,
+					streamingMessageId:
+						incoming.role === "assistant"
+							? incoming.id
+							: state.streamingMessageId,
+				}
+			}
+
+			if (isUserMessage(incoming)) {
+				const lastMsg = state.messages[state.messages.length - 1]
+				if (lastMsg && isUserMessage(lastMsg)) {
+					return state
+				}
+			}
+
 			return {
 				...state,
-				messages: msgs,
+				messages: [...state.messages, incoming],
 				streamingMessageId:
-					action.message.role === "assistant"
-						? action.message.id
+					incoming.role === "assistant"
+						? incoming.id
 						: state.streamingMessageId,
 			}
 		}
@@ -195,24 +394,41 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 			if (!action.message?.id) {
 				return { ...state, streamingMessageId: null }
 			}
-			const exists = state.messages.some((m) => m.id === action.message.id)
-			const msgs = exists
-				? state.messages.map((m) => {
-						if (m.id !== action.message.id) return m
-						const newContent =
-							action.message.content && action.message.content.length > 0
-								? action.message.content
-								: m.content
-						return {
-							...m,
-							...action.message,
-							role: m.role || action.message.role,
-							content: newContent,
-							durationMs: m.durationMs ?? (action.message as any).durationMs,
-						}
-					})
-				: [...state.messages, action.message]
-			return { ...state, messages: msgs, streamingMessageId: null }
+			const incoming = action.message
+			const matchIdx = findMatchingMessageIndex(state.messages, incoming)
+
+			if (matchIdx !== -1) {
+				const existing = state.messages[matchIdx]
+				const newContent =
+					incoming.content && incoming.content.length > 0
+						? incoming.content
+						: existing.content
+				const merged: Message = {
+					...existing,
+					...incoming,
+					id: incoming.id,
+					role: existing.role || incoming.role,
+					content: newContent,
+					durationMs: existing.durationMs ?? (incoming as any).durationMs,
+					attachments: existing.attachments || incoming.attachments,
+				}
+				const newMessages = [...state.messages]
+				newMessages[matchIdx] = merged
+				return { ...state, messages: newMessages, streamingMessageId: null }
+			}
+
+			if (isUserMessage(incoming)) {
+				const lastMsg = state.messages[state.messages.length - 1]
+				if (lastMsg && isUserMessage(lastMsg)) {
+					return { ...state, streamingMessageId: null }
+				}
+			}
+
+			return {
+				...state,
+				messages: [...state.messages, incoming],
+				streamingMessageId: null,
+			}
 		}
 		case "TOOL_START": {
 			const tools = new Map(state.tools)
@@ -323,11 +539,27 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 			const hasPendingError =
 				lastCurrent?.stopReason === "error" &&
 				!action.messages.some((m) => m.id === lastCurrent.id)
+
+			const cleanedMessages: Message[] = []
+			for (const m of action.messages) {
+				if (isUserMessage(m) && cleanedMessages.length > 0) {
+					const prev = cleanedMessages[cleanedMessages.length - 1]
+					if (isUserMessage(prev)) {
+						const prevText = getMessageText(prev)
+						const currText = getMessageText(m)
+						if (prevText && currText && prevText === currText) {
+							continue
+						}
+					}
+				}
+				cleanedMessages.push(m)
+			}
+
 			return {
 				...state,
 				messages: hasPendingError
-					? [...action.messages, lastCurrent]
-					: action.messages,
+					? [...cleanedMessages, lastCurrent]
+					: cleanedMessages,
 				tools: new Map(),
 				subagents: new Map(),
 			}

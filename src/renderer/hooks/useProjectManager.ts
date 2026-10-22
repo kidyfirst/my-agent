@@ -3,6 +3,18 @@ import type { EnrichedProject } from "../types/project-list"
 import type { ProjectInfo } from "../types/project"
 import type { ChatAction } from "../types/chat"
 
+export interface PRStatus {
+	exists: boolean
+	number?: number
+	title?: string
+	state?: string
+	url?: string
+	isDraft?: boolean
+	checks?: "pending" | "passing" | "failing" | "none"
+}
+
+export type ProjectManager = ReturnType<typeof useProjectManager>
+
 export function useProjectManager(
 	dispatch: React.Dispatch<ChatAction>,
 	tabSetters: {
@@ -20,15 +32,7 @@ export function useProjectManager(
 	const [unreadWorktrees, setUnreadWorktrees] = useState<Set<string>>(new Set())
 	const [activeWorktrees, setActiveWorktrees] = useState<Set<string>>(new Set())
 	const [projectSwitching, setProjectSwitching] = useState(false)
-	const [prStatus, setPrStatus] = useState<{
-		exists: boolean
-		number?: number
-		title?: string
-		state?: string
-		url?: string
-		isDraft?: boolean
-		checks?: "pending" | "passing" | "failing" | "none"
-	} | null>(null)
+	const [prStatus, setPrStatus] = useState<PRStatus | null>(null)
 	const [worktreeStatuses, setWorktreeStatuses] = useState<
 		Map<string, "in_progress" | "in_review" | "done" | "archived">
 	>(new Map())

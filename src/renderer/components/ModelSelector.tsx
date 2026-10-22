@@ -26,7 +26,37 @@ export function ModelList({
 	onSelect,
 	onlyConnected,
 }: ModelListProps) {
-	const baseModels = onlyConnected ? models.filter((m) => m.hasAuth) : models
+	const baseModels = (onlyConnected ? models.filter((m) => m.hasAuth) : models)
+		.filter((m) => {
+			const idLower = m.id.toLowerCase()
+			const isDeepSeek =
+				m.provider === "deepseek" || idLower.includes("deepseek")
+			if (isDeepSeek) {
+				return (
+					idLower === "deepseek/deepseek-flash" ||
+					idLower === "deepseek/deepseek-v4-pro" ||
+					idLower === "deepseek-flash" ||
+					idLower === "deepseek-v4-pro"
+				)
+			}
+			return true
+		})
+		.map((m) => {
+			const idLower = m.id.toLowerCase()
+			if (
+				idLower === "deepseek/deepseek-flash" ||
+				idLower === "deepseek-flash"
+			) {
+				return { ...m, name: "deepseek-flash" }
+			}
+			if (
+				idLower === "deepseek/deepseek-v4-pro" ||
+				idLower === "deepseek-v4-pro"
+			) {
+				return { ...m, name: "deepseek-v4-pro" }
+			}
+			return m
+		})
 	const filtered = baseModels.filter((m) =>
 		m.id.toLowerCase().includes(filter.toLowerCase()),
 	)

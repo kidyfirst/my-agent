@@ -140,6 +140,13 @@ export interface Message {
 	errorMessage?: string
 	durationMs?: number
 	attachments?: AttachedFile[]
+	/** Files changed by this task, resolved when the task ends. */
+	changedFiles?: Array<{
+		path: string
+		added: number
+		deleted: number
+		status: "added" | "modified" | "deleted"
+	}>
 }
 
 export interface ThreadInfo {

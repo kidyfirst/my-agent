@@ -44,7 +44,7 @@ export const accountProviders = [
 	{
 		id: "deepseek",
 		name: "DeepSeek",
-		description: "DeepSeek models (V3, R1) via API key",
+		description: "DeepSeek Flash / V4 Pro via API key",
 		hasOAuth: false,
 		apiKeyPlaceholder: "sk-...",
 	},

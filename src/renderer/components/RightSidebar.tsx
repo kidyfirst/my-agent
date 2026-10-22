@@ -1,9 +1,11 @@
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { FileTree } from "./FileTree"
 import { GitPanel } from "./GitPanel"
 import { ContextPanel } from "./ContextPanel"
 import { TerminalPanel } from "./TerminalPanel"
 import { ResizeHandle } from "./ResizeHandle"
+import type { TokenUsage, Message } from "../types/ipc"
+import type { ToolState } from "../types/chat"
 
 export type RightSidebarTab = "files" | "git" | "context"
 
@@ -19,12 +21,28 @@ interface RightSidebarProps {
 	onTabChange: (tab: RightSidebarTab) => void
 	projectName: string
 	projectPath?: string | null
+	gitBranch?: string
 	onFileClick: (filePath: string) => void
 	onDiffClick: (filePath: string) => void
 	activeFilePath?: string | null
 	activeDiffPath?: string | null
 	loading?: boolean
 	onOpenBrowser?: (url: string) => void
+	// Session context props
+	currentThreadId?: string | null
+	threadTitle?: string
+	currentThreadModelId?: string
+	currentThreadPermission?: string
+	modeId?: string
+	tokenUsage?: TokenUsage
+	messages?: Message[]
+	tools?: Map<string, ToolState>
+	openFiles?: string[]
+	tasks?: Array<{
+		content: string
+		status: "pending" | "in_progress" | "completed"
+		activeForm: string
+	}>
 }
 
 export function RightSidebar({
@@ -33,16 +51,44 @@ export function RightSidebar({
 	onTabChange,
 	projectName,
 	projectPath,
+	gitBranch,
 	onFileClick,
 	onDiffClick,
 	activeFilePath,
 	activeDiffPath,
 	loading,
 	onOpenBrowser,
+	currentThreadId,
+	threadTitle,
+	currentThreadModelId,
+	currentThreadPermission,
+	modeId,
+	tokenUsage,
+	messages,
+	tools,
+	openFiles,
+	tasks,
 }: RightSidebarProps) {
 	const [terminalHeight, setTerminalHeight] = useState(350)
-	const [width, setWidth] = useState(380)
+	// Ensure center chat panel + left sidebar have at least 700px combined width
+	const [width, setWidth] = useState(() => {
+		const initial = 380
+		if (typeof window !== "undefined") {
+			const maxAllowed = Math.max(100, window.innerWidth - 700)
+			return Math.min(initial, maxAllowed)
+		}
+		return initial
+	})
 	const dragStartX = useRef(0)
+
+	useEffect(() => {
+		const handleWindowResize = () => {
+			const maxAllowed = Math.max(100, window.innerWidth - 700)
+			setWidth((w) => (w > maxAllowed ? maxAllowed : w))
+		}
+		window.addEventListener("resize", handleWindowResize)
+		return () => window.removeEventListener("resize", handleWindowResize)
+	}, [])
 
 	const handleTerminalResize = useCallback((deltaY: number) => {
 		setTerminalHeight((h) => Math.max(100, Math.min(600, h + deltaY)))
@@ -55,7 +101,10 @@ export function RightSidebar({
 		const onMouseMove = (ev: MouseEvent) => {
 			const delta = dragStartX.current - ev.clientX
 			dragStartX.current = ev.clientX
-			setWidth((w) => Math.max(200, Math.min(600, w + delta)))
+			// Center chat panel + left sidebar must remain at least 700px wide
+			const maxAllowed = Math.max(100, window.innerWidth - 700)
+			const minAllowed = Math.min(200, maxAllowed)
+			setWidth((w) => Math.max(minAllowed, Math.min(maxAllowed, w + delta)))
 		}
 
 		const onMouseUp = () => {
@@ -189,7 +238,24 @@ export function RightSidebar({
 							<FileTree projectName={projectName} projectPath={projectPath} onFileClick={onFileClick} activeFilePath={activeFilePath} />
 						)}
 						{activeTab === "git" && <GitPanel onFileClick={onDiffClick} activeFilePath={activeDiffPath} />}
-						{activeTab === "context" && <ContextPanel onFileClick={onFileClick} />}
+						{activeTab === "context" && (
+							<ContextPanel
+								onFileClick={onFileClick}
+								projectName={projectName}
+								projectPath={projectPath}
+								gitBranch={gitBranch}
+								currentThreadId={currentThreadId}
+								threadTitle={threadTitle}
+								currentThreadModelId={currentThreadModelId}
+								currentThreadPermission={currentThreadPermission}
+								modeId={modeId}
+								tokenUsage={tokenUsage}
+								messages={messages}
+								tools={tools}
+								openFiles={openFiles}
+								tasks={tasks}
+							/>
+						)}
 					</div>
 
 					{/* Terminal pinned to bottom */}

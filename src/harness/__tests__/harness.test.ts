@@ -121,7 +121,7 @@ describe("createMastraCode (native @mastra/core implementation)", () => {
 		expect(normalized.content.parts[0].text).toBe("test user input")
 	})
 
-	it("resolves DeepSeek chat and reasoner models with API key", async () => {
+	it("resolves DeepSeek flash and v4-pro models with API key", async () => {
 		const { createModelResolver } = await import("../model-resolver.js")
 		const { AuthStorage } = await import("../../auth/storage.js")
 
@@ -132,12 +132,41 @@ describe("createMastraCode (native @mastra/core implementation)", () => {
 		})
 		const resolveModel = createModelResolver(authStorage)
 
-		const chatModel = resolveModel("deepseek/deepseek-chat")
+		const chatModel = resolveModel("deepseek/deepseek-flash")
 		expect(chatModel).toBeDefined()
-		expect(chatModel.modelId).toBe("deepseek-chat")
+		expect(chatModel.modelId).toBe("deepseek-flash")
 
-		const reasonerModel = resolveModel("deepseek/deepseek-reasoner")
+		const reasonerModel = resolveModel("deepseek/deepseek-v4-pro")
 		expect(reasonerModel).toBeDefined()
-		expect(reasonerModel.modelId).toBe("deepseek-reasoner")
+		expect(reasonerModel.modelId).toBe("deepseek-v4-pro")
+
+		// Legacy deepseek-v4-flash should automatically resolve to deepseek-flash
+		const legacyFlashModel = resolveModel("deepseek/deepseek-v4-flash")
+		expect(legacyFlashModel).toBeDefined()
+		expect(legacyFlashModel.modelId).toBe("deepseek-flash")
+	})
+
+	it("upgrades deprecated DeepSeek model names properly", async () => {
+		const { upgradeDeprecatedModel, isDeprecatedModel } =
+			await import("../../constants/models.js")
+		expect(isDeprecatedModel("deepseek/deepseek-v4-flash")).toBe(true)
+		expect(isDeprecatedModel("deepseek-v4-flash")).toBe(true)
+		expect(isDeprecatedModel("deepseek/deepseek-chat")).toBe(true)
+		expect(isDeprecatedModel("deepseek-chat")).toBe(true)
+		expect(isDeprecatedModel("deepseek/deepseek-flash")).toBe(false)
+		expect(isDeprecatedModel("deepseek/deepseek-v4-pro")).toBe(false)
+
+		expect(upgradeDeprecatedModel("deepseek/deepseek-v4-flash")).toBe(
+			"deepseek/deepseek-flash",
+		)
+		expect(upgradeDeprecatedModel("deepseek-v4-flash")).toBe(
+			"deepseek/deepseek-flash",
+		)
+		expect(upgradeDeprecatedModel("deepseek/deepseek-chat")).toBe(
+			"deepseek/deepseek-flash",
+		)
+		expect(upgradeDeprecatedModel("deepseek/deepseek-reasoner")).toBe(
+			"deepseek/deepseek-v4-pro",
+		)
 	})
 })

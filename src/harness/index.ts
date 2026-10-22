@@ -113,14 +113,15 @@ export function normalizeControllerMessage(
 			signal?.tagName === "user" ||
 			signal?.type === "data-user-message" ||
 			signal?.type === "text" ||
-			type === "user"
+			type === "user" ||
+			type === "data-user-message"
 		) {
 			role = "user"
 		}
 	}
 
 	if (role === "signal") {
-		if (type === "user") {
+		if (type === "user" || type === "data-user-message") {
 			role = "user"
 		} else if (type === "system") {
 			role = "system"

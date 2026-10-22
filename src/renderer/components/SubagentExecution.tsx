@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, memo } from "react"
 
 interface SubagentExecutionProps {
 	subagent: {
@@ -19,7 +19,7 @@ interface SubagentExecutionProps {
 	}
 }
 
-export function SubagentExecution({ subagent }: SubagentExecutionProps) {
+export const SubagentExecution = memo(function SubagentExecution({ subagent }: SubagentExecutionProps) {
 	const [expanded, setExpanded] = useState(false)
 	const isDone = subagent.status === "complete"
 
@@ -167,4 +167,4 @@ export function SubagentExecution({ subagent }: SubagentExecutionProps) {
 			)}
 		</div>
 	)
-}
+})
