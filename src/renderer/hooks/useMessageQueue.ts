@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useEffect, useCallback, useRef } from "react"
 import type { ChatState, QueuedMessage, AttachedFile } from "../types/chat"
 
 /**
@@ -11,7 +11,8 @@ export function useMessageQueue(
 	currentThreadId: string | null,
 	handleSend: (content: string, files?: AttachedFile[]) => Promise<void>,
 ) {
-	const [prevIsAgentActive, setPrevIsAgentActive] = useState(chat.isAgentActive)
+	/** Head of the queue we already handed to handleSend, so a stale drain can't resend it. */
+	const lastSentIdRef = useRef<string | null>(null)
 
 	const queueFor = (threadId: string) => chat.queuesByThread[threadId] || []
 
@@ -72,6 +73,8 @@ export function useMessageQueue(
 		(threadId: string, queue: QueuedMessage[]) => {
 			if (queue.length === 0) return
 			const [next, ...remaining] = queue
+			if (lastSentIdRef.current === next.id) return
+			lastSentIdRef.current = next.id
 			dispatch({ type: "DEQUEUE_MESSAGE", threadId, id: next.id })
 			// Start synchronously so subsequent renders already see isAgentActive
 			dispatch({ type: "AGENT_START" })
@@ -82,12 +85,10 @@ export function useMessageQueue(
 	)
 
 	const handleResumeQueue = useCallback(() => {
+		// Unpausing is enough: the drain effect below picks the queue back up
+		// once the agent is idle.
 		dispatch({ type: "SET_QUEUE_PAUSED", paused: false })
-		if (!chat.isAgentActive) {
-			const targetThreadId = currentThreadId || "default"
-			sendNext(targetThreadId, queueFor(targetThreadId))
-		}
-	}, [chat.isAgentActive, currentThreadId, chat.queuesByThread, sendNext])
+	}, [])
 
 	const handleQueue = useCallback(
 		async (content: string, files?: AttachedFile[]) => {
@@ -156,21 +157,38 @@ export function useMessageQueue(
 		persist([])
 	}, [currentThreadId, persist])
 
-	// Auto-dequeue the next message ONLY when the agent goes active -> idle
+	// Drain the queue whenever it holds work and the agent looks idle. This is
+	// level-triggered rather than edge-triggered on active -> idle: a queue
+	// restored from disk, or one left behind after a stuck isAgentActive flag,
+	// must still get sent. `isRunning` guards against a stale renderer flag.
 	useEffect(() => {
-		const wasActive = prevIsAgentActive
-		setPrevIsAgentActive(chat.isAgentActive)
-		if (!wasActive || chat.isAgentActive || chat.isQueuePaused) return
-		sendNext(
-			currentThreadId || "default",
-			queueFor(currentThreadId || "default"),
-		)
+		const threadId = currentThreadId || "default"
+		const queue = chat.queuesByThread[threadId] || []
+		if (queue.length === 0 || chat.isAgentActive || chat.isQueuePaused) return
+		let cancelled = false
+		const drain = async () => {
+			let running = false
+			try {
+				running = (await window.api.invoke({ type: "isRunning" })) === true
+			} catch {
+				// Fall through and trust the renderer state.
+			}
+			if (cancelled) return
+			if (running) {
+				dispatch({ type: "AGENT_START" })
+				return
+			}
+			sendNext(threadId, queue)
+		}
+		drain()
+		return () => {
+			cancelled = true
+		}
 	}, [
 		chat.isAgentActive,
 		chat.isQueuePaused,
 		chat.queuesByThread,
 		currentThreadId,
-		prevIsAgentActive,
 		sendNext,
 	])
 

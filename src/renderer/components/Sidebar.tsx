@@ -630,7 +630,7 @@ export function Sidebar({
 								strokeWidth="2"
 								strokeLinecap="round"
 								strokeLinejoin="round"
-								style={{ flexShrink: 0, marginLeft: "auto" }}
+								style={{ flexShrink: 0 }}
 							>
 								<polyline points="9 18 15 12 9 6" />
 							</svg>

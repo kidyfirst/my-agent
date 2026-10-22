@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Sidebar } from "./components/Sidebar"
 import { AppModals } from "./components/AppModals"
 import { MainContent } from "./components/MainContent"
@@ -501,6 +501,33 @@ export function App() {
 		dispatch({ type: "SET_QUEUE_PAUSED", paused: true })
 		await window.api.invoke({ type: "abort" })
 	}, [])
+
+	// A dropped agent_end (renderer reload, harness crash) leaves isAgentActive
+	// stuck, which keeps the stop button up and stalls the message queue. While
+	// a run is marked active, ask the harness whether it really is. Two
+	// consecutive idle readings, so a slow model/auth resolution isn't cut off.
+	useEffect(() => {
+		if (!chat.isAgentActive) return
+		let cancelled = false
+		let idleReads = 0
+		const reconcile = async () => {
+			try {
+				const running = await window.api.invoke({ type: "isRunning" })
+				if (cancelled) return
+				if (running !== false) {
+					idleReads = 0
+					return
+				}
+				idleReads += 1
+				if (idleReads >= 2) dispatch({ type: "AGENT_END" })
+			} catch {}
+		}
+		const interval = setInterval(reconcile, 4000)
+		return () => {
+			cancelled = true
+			clearInterval(interval)
+		}
+	}, [chat.isAgentActive])
 
 	const {
 		handleResumeQueue,

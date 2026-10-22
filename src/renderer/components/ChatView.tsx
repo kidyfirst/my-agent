@@ -131,10 +131,9 @@ export function ChatView({
 		isAutoScroll.current = scrollHeight - scrollTop - clientHeight < 100
 	}
 
-	// Build a structured list of renderable items in Antigravity style:
-	// - An Assistant turn groups thinking and tool executions into an ExecutionBlock
-	//   showing: "Thinking ˅", each thinking step with its duration ("Thought for 57s ›"),
-	//   and tool items with checkmarks ("Analyzed ⚛️ ChatView.tsx#L140-250").
+	// Build a structured list of renderable items:
+	// - A turn's thinking and tool calls fold into one ExecutionBlock per turn,
+	//   labelled "Thinking for 12.3s" while running and "Worked for 1m 6s" once done.
 	// - The assistant's markdown answer appears below the execution block.
 	const cleanedItems = useMemo(() => {
 		const items: RenderItem[] = []

@@ -63,7 +63,9 @@ export function ContextPanel({
 	const [expandedFile, setExpandedFile] = useState<string | null>(null)
 	const [editingPath, setEditingPath] = useState<string | null>(null)
 	const [editContent, setEditContent] = useState("")
-	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
+		"idle",
+	)
 
 	// Dynamic prompt preview
 	const [activePrompt, setActivePrompt] = useState<string>("")
@@ -329,12 +331,9 @@ export function ContextPanel({
 								cursor: "pointer",
 								background:
 									filter === tab.id ? "var(--bg-surface)" : "transparent",
-								color:
-									filter === tab.id ? "var(--text)" : "var(--muted)",
+								color: filter === tab.id ? "var(--text)" : "var(--muted)",
 								boxShadow:
-									filter === tab.id
-										? "0 1px 2px rgba(0,0,0,0.1)"
-										: "none",
+									filter === tab.id ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
 								transition: "all 0.15s ease",
 							}}
 						>
@@ -387,6 +386,7 @@ export function ContextPanel({
 							border: "1px solid var(--border-muted)",
 							borderRadius: 6,
 							overflow: "hidden",
+							flexShrink: 0,
 						}}
 					>
 						<div
@@ -726,6 +726,7 @@ export function ContextPanel({
 							border: "1px solid var(--border-muted)",
 							borderRadius: 6,
 							overflow: "hidden",
+							flexShrink: 0,
 						}}
 					>
 						<div
@@ -867,8 +868,7 @@ export function ContextPanel({
 													transition: "background 0.15s ease",
 												}}
 												onMouseEnter={(e) => {
-													e.currentTarget.style.background =
-														"var(--bg-surface)"
+													e.currentTarget.style.background = "var(--bg-surface)"
 												}}
 												onMouseLeave={(e) => {
 													e.currentTarget.style.background = "transparent"
@@ -937,122 +937,125 @@ export function ContextPanel({
 				{/* ======================================================== */}
 				{/* 3. ACTIVE TASKS / PLAN CONTEXT                            */}
 				{/* ======================================================== */}
-				{tasks && tasks.length > 0 && (filter === "all" || filter === "session") && (
-					<div
-						style={{
-							background: "var(--bg-elevated)",
-							border: "1px solid var(--border-muted)",
-							borderRadius: 6,
-							overflow: "hidden",
-						}}
-					>
+				{tasks &&
+					tasks.length > 0 &&
+					(filter === "all" || filter === "session") && (
 						<div
-							onClick={() => toggleSection("tasks")}
 							style={{
-								padding: openSections.tasks ? "9px 10px" : "10px 10px 12px",
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "space-between",
-								cursor: "pointer",
-								userSelect: "none",
-								borderBottom: openSections.tasks
-									? "1px solid var(--border-muted)"
-									: "none",
+								background: "var(--bg-elevated)",
+								border: "1px solid var(--border-muted)",
+								borderRadius: 6,
+								overflow: "hidden",
+								flexShrink: 0,
 							}}
 						>
-							<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+							<div
+								onClick={() => toggleSection("tasks")}
+								style={{
+									padding: openSections.tasks ? "9px 10px" : "10px 10px 12px",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+									cursor: "pointer",
+									userSelect: "none",
+									borderBottom: openSections.tasks
+										? "1px solid var(--border-muted)"
+										: "none",
+								}}
+							>
+								<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+									<span
+										style={{
+											fontSize: 8,
+											color: "var(--dim)",
+											display: "inline-flex",
+											alignItems: "center",
+											justifyContent: "center",
+											lineHeight: 1,
+											transform: openSections.tasks
+												? "rotate(90deg)"
+												: "rotate(0deg)",
+											transition: "transform 0.15s ease",
+										}}
+									>
+										&#9654;
+									</span>
+									<span
+										style={{
+											fontSize: 10,
+											fontWeight: 600,
+											color: "var(--text)",
+											textTransform: "uppercase",
+											letterSpacing: "0.5px",
+											lineHeight: 1,
+										}}
+									>
+										Active Tasks & Plan
+									</span>
+								</div>
 								<span
 									style={{
-										fontSize: 8,
-										color: "var(--dim)",
-										display: "inline-flex",
-										alignItems: "center",
-										justifyContent: "center",
-										lineHeight: 1,
-										transform: openSections.tasks
-											? "rotate(90deg)"
-											: "rotate(0deg)",
-										transition: "transform 0.15s ease",
+										fontSize: 9,
+										fontWeight: 500,
+										color: "var(--muted)",
+										background: "var(--bg-surface)",
+										padding: "1px 6px",
+										borderRadius: 10,
+										border: "1px solid var(--border-muted)",
 									}}
 								>
-									&#9654;
-								</span>
-								<span
-									style={{
-										fontSize: 10,
-										fontWeight: 600,
-										color: "var(--text)",
-										textTransform: "uppercase",
-										letterSpacing: "0.5px",
-										lineHeight: 1,
-									}}
-								>
-									Active Tasks & Plan
+									{tasks.length}
 								</span>
 							</div>
-							<span
-								style={{
-									fontSize: 9,
-									fontWeight: 500,
-									color: "var(--muted)",
-									background: "var(--bg-surface)",
-									padding: "1px 6px",
-									borderRadius: 10,
-									border: "1px solid var(--border-muted)",
-								}}
-							>
-								{tasks.length}
-							</span>
-						</div>
 
-						{openSections.tasks && (
-							<div
-								style={{
-									padding: "6px 10px",
-									display: "flex",
-									flexDirection: "column",
-									gap: 4,
-								}}
-							>
-								{tasks.map((task, idx) => {
-									const isDone = task.status === "completed"
-									const isInProgress = task.status === "in_progress"
-									return (
-										<div
-											key={idx}
-											style={{
-												display: "flex",
-												alignItems: "flex-start",
-												gap: 6,
-												fontSize: 10,
-												color: isDone ? "var(--muted)" : "var(--text)",
-												textDecoration: isDone ? "line-through" : "none",
-												padding: "3px 0",
-											}}
-										>
-											<span
+							{openSections.tasks && (
+								<div
+									style={{
+										padding: "6px 10px",
+										display: "flex",
+										flexDirection: "column",
+										gap: 4,
+									}}
+								>
+									{tasks.map((task, idx) => {
+										const isDone = task.status === "completed"
+										const isInProgress = task.status === "in_progress"
+										return (
+											<div
+												key={idx}
 												style={{
-													color: isDone
-														? "var(--success)"
-														: isInProgress
-															? "var(--accent)"
-															: "var(--dim)",
-													fontWeight: "bold",
-													flexShrink: 0,
+													display: "flex",
+													alignItems: "flex-start",
+													gap: 6,
+													fontSize: 10,
+													color: isDone ? "var(--muted)" : "var(--text)",
+													textDecoration: isDone ? "line-through" : "none",
+													padding: "3px 0",
 												}}
 											>
-												{isDone ? "✓" : isInProgress ? "▸" : "○"}
-											</span>
-											<span style={{ flex: 1, wordBreak: "break-word" }}>
-												{task.content}
-											</span>
-										</div>
-									)
-								})}
-							</div>
-						)}
-					</div>
-				)}
+												<span
+													style={{
+														color: isDone
+															? "var(--success)"
+															: isInProgress
+																? "var(--accent)"
+																: "var(--dim)",
+														fontWeight: "bold",
+														flexShrink: 0,
+													}}
+												>
+													{isDone ? "✓" : isInProgress ? "▸" : "○"}
+												</span>
+												<span style={{ flex: 1, wordBreak: "break-word" }}>
+													{task.content}
+												</span>
+											</div>
+										)
+									})}
+								</div>
+							)}
+						</div>
+					)}
 
 				{/* ======================================================== */}
 				{/* 4. INSTRUCTION FILES (AGENT.MD / CLAUDE.MD)               */}
@@ -1064,6 +1067,7 @@ export function ContextPanel({
 							border: "1px solid var(--border-muted)",
 							borderRadius: 6,
 							overflow: "hidden",
+							flexShrink: 0,
 						}}
 					>
 						<div
@@ -1154,8 +1158,9 @@ export function ContextPanel({
 											No instruction files found.
 										</div>
 										<div style={{ color: "var(--muted)" }}>
-											Add an <code>AGENT.md</code> or <code>CLAUDE.md</code> file in
-											your project root or home directory to provide persistent instructions.
+											Add an <code>AGENT.md</code> or <code>CLAUDE.md</code>{" "}
+											file in your project root or home directory to provide
+											persistent instructions.
 										</div>
 									</div>
 								) : (
@@ -1303,8 +1308,7 @@ export function ContextPanel({
 																			background: "var(--bg-surface)",
 																			color: "var(--muted)",
 																			borderRadius: 4,
-																			border:
-																				"1px solid var(--border-muted)",
+																			border: "1px solid var(--border-muted)",
 																			cursor: "pointer",
 																		}}
 																	>
@@ -1321,8 +1325,7 @@ export function ContextPanel({
 																		background: "var(--bg-elevated)",
 																		padding: "8px 10px 24px",
 																		borderRadius: 4,
-																		border:
-																			"1px solid var(--border-muted)",
+																		border: "1px solid var(--border-muted)",
 																		overflow: "auto",
 																		maxHeight: 300,
 																		lineHeight: 1.5,
@@ -1358,17 +1361,14 @@ export function ContextPanel({
 																	</button>
 																	{onFileClick && (
 																		<button
-																			onClick={() =>
-																				onFileClick(file.path)
-																			}
+																			onClick={() => onFileClick(file.path)}
 																			style={{
 																				padding: "3px 8px",
 																				fontSize: 10,
 																				background: "var(--bg-surface)",
 																				color: "var(--muted)",
 																				borderRadius: 4,
-																				border:
-																					"1px solid var(--border-muted)",
+																				border: "1px solid var(--border-muted)",
 																				cursor: "pointer",
 																			}}
 																		>
@@ -1406,7 +1406,7 @@ export function ContextPanel({
 										flexDirection: "column",
 										minHeight: 0,
 									}
-								: {}),
+								: { flexShrink: 0 }),
 						}}
 					>
 						<div
@@ -1475,9 +1475,7 @@ export function ContextPanel({
 										onClick={handleCopyPrompt}
 										style={{
 											fontSize: 9,
-											color: promptCopied
-												? "var(--success)"
-												: "var(--muted)",
+											color: promptCopied ? "var(--success)" : "var(--muted)",
 											background: "var(--bg-surface)",
 											padding: "2px 6px",
 											borderRadius: 3,
@@ -1555,9 +1553,7 @@ export function ContextPanel({
 											</span>
 											<span>
 												Estimated tokens: ~
-												{Math.round(
-													activePrompt.length / 4,
-												).toLocaleString()}
+												{Math.round(activePrompt.length / 4).toLocaleString()}
 											</span>
 										</div>
 										<pre
