@@ -7,6 +7,7 @@ import { openaiCodexProvider } from "../providers/openai-codex.js"
 import { AuthStorage } from "../auth/storage.js"
 import { loadSettings, getCustomProviderId } from "./settings.js"
 import { DEFAULT_OM_MODEL_ID } from "./state.js"
+import { withThinkingOptions } from "./thinking.js"
 import { PROVIDER_DEFAULT_MODELS } from "../constants/models.js"
 
 export interface ResolveModelOptions {
@@ -91,6 +92,7 @@ export function createModelResolver(authStorage: AuthStorage) {
 					: String(modelIdInput || "")
 		const [providerId, modelName] = modelId.split("/", 2)
 		const settings = loadSettings()
+		const thinkingLevel = options?.thinkingLevel
 
 		// 1. Custom providers configured by user
 		const customProvider = settings.customProviders?.find((p) => {
@@ -127,31 +129,36 @@ export function createModelResolver(authStorage: AuthStorage) {
 		// 3. Anthropic
 		if (modelId.startsWith("anthropic/")) {
 			const bareModelId = modelId.substring("anthropic/".length)
+			let model: any
 			if (authStorage.isLoggedIn("anthropic")) {
-				return opencodeClaudeMaxProvider(bareModelId)
+				model = opencodeClaudeMaxProvider(bareModelId)
+			} else {
+				const apiKey =
+					authStorage.getApiKeySync("anthropic") ||
+					process.env.ANTHROPIC_API_KEY
+				model = apiKey
+					? createAnthropic({ apiKey })(bareModelId)
+					: opencodeClaudeMaxProvider(bareModelId)
 			}
-			const apiKey =
-				authStorage.getApiKeySync("anthropic") || process.env.ANTHROPIC_API_KEY
-			if (apiKey) {
-				return createAnthropic({ apiKey })(bareModelId)
-			}
-			return opencodeClaudeMaxProvider(bareModelId)
+			return withThinkingOptions(model, "anthropic", thinkingLevel)
 		}
 
 		// 4. OpenAI
 		if (modelId.startsWith("openai/")) {
 			const bareModelId = modelId.substring("openai/".length)
+			let model: any
 			if (authStorage.isLoggedIn("openai-codex")) {
-				return openaiCodexProvider(bareModelId)
+				model = openaiCodexProvider(bareModelId)
+			} else {
+				const apiKey =
+					authStorage.getApiKeySync("openai") ||
+					authStorage.getApiKeySync("openai-codex") ||
+					process.env.OPENAI_API_KEY
+				model = apiKey
+					? createOpenAI({ apiKey })(bareModelId)
+					: new ModelRouterLanguageModel(modelId as any)
 			}
-			const apiKey =
-				authStorage.getApiKeySync("openai") ||
-				authStorage.getApiKeySync("openai-codex") ||
-				process.env.OPENAI_API_KEY
-			if (apiKey) {
-				return createOpenAI({ apiKey })(bareModelId)
-			}
-			return new ModelRouterLanguageModel(modelId as any)
+			return withThinkingOptions(model, "openai", thinkingLevel)
 		}
 
 		// 5. Google
@@ -212,10 +219,14 @@ export function createModelResolver(authStorage: AuthStorage) {
 				) {
 					bareModelId = "deepseek-flash"
 				}
-				return createOpenAI({
-					apiKey,
-					baseURL,
-				}).chat(bareModelId)
+				return withThinkingOptions(
+					createOpenAI({
+						apiKey,
+						baseURL,
+					}).chat(bareModelId),
+					"deepseek",
+					thinkingLevel,
+				)
 			}
 			return new ModelRouterLanguageModel(
 				(modelId.includes("/") ? modelId : `deepseek/${modelId}`) as any,
