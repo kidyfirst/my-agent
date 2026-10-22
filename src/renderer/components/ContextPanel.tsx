@@ -392,7 +392,7 @@ export function ContextPanel({
 						<div
 							onClick={() => toggleSection("session")}
 							style={{
-								padding: "8px 10px",
+								padding: openSections.session ? "9px 10px" : "10px 10px 12px",
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "space-between",
@@ -408,7 +408,10 @@ export function ContextPanel({
 									style={{
 										fontSize: 8,
 										color: "var(--dim)",
-										display: "inline-block",
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										lineHeight: 1,
 										transform: openSections.session
 											? "rotate(90deg)"
 											: "rotate(0deg)",
@@ -424,6 +427,7 @@ export function ContextPanel({
 										color: "var(--text)",
 										textTransform: "uppercase",
 										letterSpacing: "0.5px",
+										lineHeight: 1,
 									}}
 								>
 									Session Overview
@@ -727,7 +731,7 @@ export function ContextPanel({
 						<div
 							onClick={() => toggleSection("files")}
 							style={{
-								padding: "8px 10px",
+								padding: openSections.files ? "9px 10px" : "10px 10px 12px",
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "space-between",
@@ -743,7 +747,10 @@ export function ContextPanel({
 									style={{
 										fontSize: 8,
 										color: "var(--dim)",
-										display: "inline-block",
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										lineHeight: 1,
 										transform: openSections.files
 											? "rotate(90deg)"
 											: "rotate(0deg)",
@@ -759,6 +766,7 @@ export function ContextPanel({
 										color: "var(--text)",
 										textTransform: "uppercase",
 										letterSpacing: "0.5px",
+										lineHeight: 1,
 									}}
 								>
 									Files In Context
@@ -941,7 +949,7 @@ export function ContextPanel({
 						<div
 							onClick={() => toggleSection("tasks")}
 							style={{
-								padding: "8px 10px",
+								padding: openSections.tasks ? "9px 10px" : "10px 10px 12px",
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "space-between",
@@ -957,7 +965,10 @@ export function ContextPanel({
 									style={{
 										fontSize: 8,
 										color: "var(--dim)",
-										display: "inline-block",
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										lineHeight: 1,
 										transform: openSections.tasks
 											? "rotate(90deg)"
 											: "rotate(0deg)",
@@ -973,6 +984,7 @@ export function ContextPanel({
 										color: "var(--text)",
 										textTransform: "uppercase",
 										letterSpacing: "0.5px",
+										lineHeight: 1,
 									}}
 								>
 									Active Tasks & Plan
@@ -1057,7 +1069,9 @@ export function ContextPanel({
 						<div
 							onClick={() => toggleSection("instructions")}
 							style={{
-								padding: "8px 10px",
+								padding: openSections.instructions
+									? "9px 10px"
+									: "10px 10px 12px",
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "space-between",
@@ -1073,7 +1087,10 @@ export function ContextPanel({
 									style={{
 										fontSize: 8,
 										color: "var(--dim)",
-										display: "inline-block",
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										lineHeight: 1,
 										transform: openSections.instructions
 											? "rotate(90deg)"
 											: "rotate(0deg)",
@@ -1089,6 +1106,7 @@ export function ContextPanel({
 										color: "var(--text)",
 										textTransform: "uppercase",
 										letterSpacing: "0.5px",
+										lineHeight: 1,
 									}}
 								>
 									Agent Instructions
@@ -1157,7 +1175,7 @@ export function ContextPanel({
 														display: "flex",
 														alignItems: "center",
 														gap: 6,
-														padding: "6px 10px",
+														padding: isExpanded ? "6px 10px" : "7px 10px 8px",
 														cursor: "pointer",
 													}}
 													onClick={() =>
@@ -1168,7 +1186,10 @@ export function ContextPanel({
 														style={{
 															fontSize: 8,
 															color: "var(--dim)",
-															display: "inline-block",
+															display: "inline-flex",
+															alignItems: "center",
+															justifyContent: "center",
+															lineHeight: 1,
 															transition: "transform 0.15s ease",
 															transform: isExpanded
 																? "rotate(90deg)"
@@ -1397,7 +1418,10 @@ export function ContextPanel({
 								}
 							}}
 							style={{
-								padding: "8px 10px",
+								padding:
+									filter === "prompt" || openSections.prompt
+										? "9px 10px"
+										: "10px 10px 12px",
 								display: "flex",
 								alignItems: "center",
 								justifyContent: "space-between",
@@ -1415,7 +1439,10 @@ export function ContextPanel({
 									style={{
 										fontSize: 8,
 										color: "var(--dim)",
-										display: "inline-block",
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										lineHeight: 1,
 										transform:
 											filter === "prompt" || openSections.prompt
 												? "rotate(90deg)"
@@ -1432,6 +1459,7 @@ export function ContextPanel({
 										color: "var(--text)",
 										textTransform: "uppercase",
 										letterSpacing: "0.5px",
+										lineHeight: 1,
 									}}
 								>
 									Live System Prompt
