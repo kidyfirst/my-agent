@@ -257,12 +257,34 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 		case "AGENT_START":
 			return { ...state, isAgentActive: true, agentStartedAt: Date.now() }
 		case "SET_MESSAGE_CHANGED_FILES": {
-			return {
-				...state,
-				messages: state.messages.map((m) =>
-					m.id === action.messageId ? { ...m, changedFiles: action.files } : m,
-				),
+			const hasMatch = state.messages.some((m) => m.id === action.messageId)
+			if (hasMatch) {
+				return {
+					...state,
+					messages: state.messages.map((m) =>
+						m.id === action.messageId
+							? { ...m, changedFiles: action.files }
+							: m,
+					),
+				}
 			}
+			// Fallback: attach to the last assistant message if ID didn't match
+			let lastAssistantIdx = -1
+			for (let i = state.messages.length - 1; i >= 0; i--) {
+				if (state.messages[i].role === "assistant") {
+					lastAssistantIdx = i
+					break
+				}
+			}
+			if (lastAssistantIdx !== -1) {
+				const nextMessages = [...state.messages]
+				nextMessages[lastAssistantIdx] = {
+					...nextMessages[lastAssistantIdx],
+					changedFiles: action.files,
+				}
+				return { ...state, messages: nextMessages }
+			}
+			return state
 		}
 		case "AGENT_END": {
 			const durationMs = state.agentStartedAt
@@ -311,6 +333,15 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 					role: incoming.role || existing.role,
 					attachments: existing.attachments || incoming.attachments,
 					createdAt: existing.createdAt || incoming.createdAt,
+				}
+				// Never let a text-less server update wipe the optimistic user text
+				// (e.g. signal messages carrying only attachments).
+				if (
+					isUserMessage(merged) &&
+					!getMessageText(incoming) &&
+					getMessageText(existing)
+				) {
+					merged.content = existing.content
 				}
 				const newMessages = [...state.messages]
 				newMessages[matchIdx] = merged
@@ -540,6 +571,22 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				lastCurrent?.stopReason === "error" &&
 				!action.messages.some((m) => m.id === lastCurrent.id)
 
+			// Preserve ephemeral changedFiles across message reload
+			const existingChangedFilesById = new Map<
+				string,
+				Message["changedFiles"]
+			>()
+			let lastAssistantChangedFiles: Message["changedFiles"] | undefined
+
+			for (const m of state.messages) {
+				if (m.changedFiles && m.changedFiles.length > 0) {
+					if (m.id) existingChangedFilesById.set(m.id, m.changedFiles)
+					if (m.role === "assistant") {
+						lastAssistantChangedFiles = m.changedFiles
+					}
+				}
+			}
+
 			const cleanedMessages: Message[] = []
 			for (const m of action.messages) {
 				if (isUserMessage(m) && cleanedMessages.length > 0) {
@@ -552,7 +599,30 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 						}
 					}
 				}
-				cleanedMessages.push(m)
+				const preservedFiles =
+					m.changedFiles || existingChangedFilesById.get(m.id)
+				cleanedMessages.push(
+					preservedFiles ? { ...m, changedFiles: preservedFiles } : m,
+				)
+			}
+
+			// If no message in the new list has changedFiles, but the previous state had them on the last assistant message,
+			// restore them to the new last assistant message
+			if (
+				lastAssistantChangedFiles &&
+				!cleanedMessages.some(
+					(m) => m.changedFiles && m.changedFiles.length > 0,
+				)
+			) {
+				for (let i = cleanedMessages.length - 1; i >= 0; i--) {
+					if (cleanedMessages[i].role === "assistant") {
+						cleanedMessages[i] = {
+							...cleanedMessages[i],
+							changedFiles: lastAssistantChangedFiles,
+						}
+						break
+					}
+				}
 			}
 
 			return {

@@ -18,6 +18,7 @@ interface TabBarProps {
 	onSwitchThread: (threadId: string) => Promise<void>
 	onNewThread: () => void
 	onToggleRightSidebar: () => void
+	onToggleSidebar?: () => void
 	onCreatePR: () => void
 	projectRootPath: string | null
 }
@@ -89,9 +90,60 @@ export function TabBar(props: TabBarProps) {
 				alignItems: "stretch",
 				background: "var(--bg-surface)",
 				flexShrink: 0,
-				paddingLeft: props.sidebarVisible ? 0 : 78,
+				paddingLeft: props.sidebarVisible ? 0 : 116,
+				position: "relative",
 			}}
 		>
+			{!props.sidebarVisible && props.onToggleSidebar && (
+				<button
+					type="button"
+					className="titlebar-no-drag"
+					onClick={props.onToggleSidebar}
+					title="Toggle Sidebar (Cmd+B)"
+					style={{
+						position: "absolute",
+						top: 0,
+						left: 78,
+						height: 38,
+						width: 32,
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						color: "var(--muted)",
+						background: "none",
+						border: "none",
+						cursor: "pointer",
+						transition: "color 0.15s, opacity 0.15s",
+						zIndex: 10,
+					}}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.color = "var(--text)"
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.color = "var(--muted)"
+					}}
+				>
+					<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+						<rect
+							x="1"
+							y="2"
+							width="14"
+							height="12"
+							rx="1.5"
+							stroke="currentColor"
+							strokeWidth="1.2"
+						/>
+						<line
+							x1="6"
+							y1="2"
+							x2="6"
+							y2="14"
+							stroke="currentColor"
+							strokeWidth="1.2"
+						/>
+					</svg>
+				</button>
+			)}
 			{props.openThreadTabs.length === 0 ? (
 				<button
 					className="titlebar-no-drag"

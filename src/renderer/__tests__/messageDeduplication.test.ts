@@ -249,4 +249,72 @@ describe("Message Deduplication and Reconciliation in chatReducer", () => {
 		expect(isUserMessage({ role: "system" })).toBe(false)
 		expect(isUserMessage(undefined)).toBe(false)
 	})
+
+	it("preserves changedFiles across SET_MESSAGES reload and ID fallback", () => {
+		const assistantMsg: Message = {
+			id: "assistant-temp-1",
+			role: "assistant",
+			content: [{ type: "text", text: "Done editing files" }],
+		}
+
+		let state = chatReducer(initialChatState, {
+			type: "MESSAGE_START",
+			message: assistantMsg,
+		})
+
+		// Dispatch SET_MESSAGE_CHANGED_FILES
+		state = chatReducer(state, {
+			type: "SET_MESSAGE_CHANGED_FILES",
+			messageId: "assistant-temp-1",
+			files: [
+				{
+					path: "src/electron/ipc/harness-handlers.ts",
+					added: 53,
+					deleted: 13,
+					status: "modified",
+				},
+			],
+		})
+
+		expect(state.messages[0].changedFiles).toHaveLength(1)
+		expect(state.messages[0].changedFiles![0].added).toBe(53)
+
+		// Simulate SET_MESSAGES coming from database without changedFiles
+		const reloadedFromDb: Message[] = [
+			{
+				id: "assistant-temp-1",
+				role: "assistant",
+				content: [{ type: "text", text: "Done editing files" }],
+			},
+		]
+
+		state = chatReducer(state, {
+			type: "SET_MESSAGES",
+			messages: reloadedFromDb,
+		})
+
+		// Must preserve changedFiles
+		expect(state.messages[0].changedFiles).toHaveLength(1)
+		expect(state.messages[0].changedFiles![0].path).toBe(
+			"src/electron/ipc/harness-handlers.ts",
+		)
+
+		// Also test fallback when messageId differs (e.g. server UUID)
+		state = chatReducer(state, {
+			type: "SET_MESSAGE_CHANGED_FILES",
+			messageId: "unknown-different-id",
+			files: [
+				{
+					path: "src/renderer/App.tsx",
+					added: 10,
+					deleted: 2,
+					status: "modified",
+				},
+			],
+		})
+
+		// Should fall back to the last assistant message
+		expect(state.messages[0].changedFiles).toHaveLength(1)
+		expect(state.messages[0].changedFiles![0].path).toBe("src/renderer/App.tsx")
+	})
 })

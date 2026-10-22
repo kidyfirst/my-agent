@@ -270,6 +270,7 @@ export function MainContent(props: MainContentProps) {
 					agentStartedAt={chat.agentStartedAt}
 					streamingMessageId={chat.streamingMessageId}
 					todos={props.tasks}
+					onOpenDiff={props.tabs.handleDiffClick}
 				/>
 				<EditorInput
 					onSend={props.onSend}

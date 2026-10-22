@@ -581,6 +581,7 @@ export function App() {
 				display: "flex",
 				height: "100vh",
 				overflow: "hidden",
+				position: "relative",
 			}}
 		>
 			{/* Left sidebar */}
@@ -591,6 +592,7 @@ export function App() {
 				loggedInProviders={auth.loggedInProviders}
 				projectName={project.projectInfo?.name ?? ""}
 				sidebarVisible={sidebarVisible}
+				onToggleSidebar={() => setSidebarVisible((v) => !v)}
 				enrichedProjects={project.enrichedProjects}
 				activeProjectPath={project.projectInfo?.rootPath ?? null}
 				isAgentActive={chat.isAgentActive}
@@ -647,6 +649,7 @@ export function App() {
 					onCloseTab={tabs.handleCloseTab}
 					onSwitchThread={handleSwitchThread}
 					onNewThread={handleNewThread}
+					onToggleSidebar={() => setSidebarVisible((v) => !v)}
 					onToggleRightSidebar={() => setRightSidebarVisible((v) => !v)}
 					onCreatePR={() =>
 						handleSend(

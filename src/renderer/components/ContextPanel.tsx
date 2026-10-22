@@ -368,10 +368,10 @@ export function ContextPanel({
 			<div
 				style={{
 					flex: 1,
-					overflowY: "auto",
+					minHeight: 0,
+					overflowY: filter === "prompt" ? "hidden" : "auto",
 					overflowX: "hidden",
-					scrollbarWidth: "none",
-					padding: "8px 10px 24px",
+					padding: filter === "prompt" ? "8px 10px 10px" : "8px 10px 24px",
 					display: "flex",
 					flexDirection: "column",
 					gap: 10,
@@ -1298,13 +1298,13 @@ export function ContextPanel({
 																		fontSize: 10,
 																		color: "var(--text)",
 																		background: "var(--bg-elevated)",
-																		padding: "6px 8px",
+																		padding: "8px 10px 24px",
 																		borderRadius: 4,
 																		border:
 																			"1px solid var(--border-muted)",
 																		overflow: "auto",
-																		maxHeight: 220,
-																		lineHeight: 1.45,
+																		maxHeight: 300,
+																		lineHeight: 1.5,
 																		whiteSpace: "pre-wrap",
 																		wordBreak: "break-word",
 																		fontFamily:
@@ -1378,6 +1378,14 @@ export function ContextPanel({
 							border: "1px solid var(--border-muted)",
 							borderRadius: 6,
 							overflow: "hidden",
+							...(filter === "prompt"
+								? {
+										flex: 1,
+										display: "flex",
+										flexDirection: "column",
+										minHeight: 0,
+									}
+								: {}),
 						}}
 					>
 						<div
@@ -1395,6 +1403,7 @@ export function ContextPanel({
 								justifyContent: "space-between",
 								cursor: "pointer",
 								userSelect: "none",
+								flexShrink: 0,
 								borderBottom:
 									filter === "prompt" || openSections.prompt
 										? "1px solid var(--border-muted)"
@@ -1466,7 +1475,19 @@ export function ContextPanel({
 						</div>
 
 						{(filter === "prompt" || openSections.prompt) && (
-							<div style={{ padding: "8px 10px" }}>
+							<div
+								style={{
+									padding: "8px 10px 10px",
+									...(filter === "prompt"
+										? {
+												flex: 1,
+												display: "flex",
+												flexDirection: "column",
+												minHeight: 0,
+											}
+										: {}),
+								}}
+							>
 								{loadingPrompt ? (
 									<div
 										style={{
@@ -1479,7 +1500,18 @@ export function ContextPanel({
 										Loading system prompt...
 									</div>
 								) : activePrompt ? (
-									<div>
+									<div
+										style={{
+											display: "flex",
+											flexDirection: "column",
+											...(filter === "prompt"
+												? {
+														flex: 1,
+														minHeight: 0,
+													}
+												: {}),
+										}}
+									>
 										<div
 											style={{
 												fontSize: 9,
@@ -1487,6 +1519,7 @@ export function ContextPanel({
 												marginBottom: 6,
 												display: "flex",
 												justifyContent: "space-between",
+												flexShrink: 0,
 											}}
 										>
 											<span>
@@ -1504,17 +1537,24 @@ export function ContextPanel({
 												fontSize: 10,
 												color: "var(--muted)",
 												background: "var(--bg)",
-												padding: "8px 10px",
+												padding: "10px 12px 36px",
 												borderRadius: 4,
 												border: "1px solid var(--border-muted)",
-												overflow: "auto",
-												maxHeight: filter === "prompt" ? 500 : 260,
-												lineHeight: 1.45,
+												overflowY: "auto",
+												overflowX: "hidden",
+												lineHeight: 1.5,
 												whiteSpace: "pre-wrap",
 												wordBreak: "break-word",
 												fontFamily: "'SF Mono', 'Fira Code', monospace",
 												margin: 0,
-												scrollbarWidth: "none",
+												...(filter === "prompt"
+													? {
+															flex: 1,
+															minHeight: 0,
+														}
+													: {
+															maxHeight: 360,
+														}),
 											}}
 										>
 											{activePrompt}

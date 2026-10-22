@@ -3,7 +3,6 @@ import { AssistantMessage } from "./AssistantMessage"
 import { UserMessage } from "./UserMessage"
 import { ExecutionBlock, ExecutionStep, ExecutionTool } from "./ExecutionBlock"
 import { SubagentExecution } from "./SubagentExecution"
-import { FilesChangedBar } from "./FilesChangedBar"
 import { TodoProgress } from "./TodoProgress"
 import { AsciiLogo } from "./AsciiLogo"
 import type { Message, MessageContent } from "../types/ipc"
@@ -52,6 +51,7 @@ export interface ChatViewProps {
 		status: "pending" | "in_progress" | "completed"
 		activeForm: string
 	}>
+	onOpenDiff?: (path: string) => void
 }
 
 type RenderItem =
@@ -108,6 +108,7 @@ export function ChatView({
 	agentStartedAt,
 	streamingMessageId,
 	todos,
+	onOpenDiff,
 }: ChatViewProps) {
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const isAutoScroll = useRef(true)
@@ -398,6 +399,30 @@ export function ChatView({
 			// End of message: flush any remaining execution and text
 			flushExecution(true)
 			flushText(true)
+
+			// Ensure the last assistant block of this message receives changedFiles
+			if (msg.changedFiles && msg.changedFiles.length > 0) {
+				let foundAssistant = false
+				for (let i = items.length - 1; i >= 0; i--) {
+					if (items[i].type === "assistant" && (items[i].data as any).id === msg.id) {
+						;(items[i].data as any).changedFiles = msg.changedFiles
+						foundAssistant = true
+						break
+					}
+				}
+				if (!foundAssistant) {
+					items.push({
+						type: "assistant",
+						key: `msg-${msg.id}-files`,
+						data: {
+							...msg,
+							content: [],
+							changedFiles: msg.changedFiles,
+							isStreaming: false,
+						},
+					})
+				}
+			}
 		}
 	}
 
@@ -541,20 +566,20 @@ export function ChatView({
 									durationMs={item.data.durationMs}
 									startedAt={item.data.startedAt}
 								/>
-								{item.data.changedFiles &&
-									item.data.changedFiles.length > 0 && (
-										<FilesChangedBar
-											files={item.data.changedFiles}
-											isLive={Boolean(isAgentActive && item.data.isActive)}
-										/>
-									)}
 							</div>
 						)
 					case "assistant": {
 						const assistantMsg = item.data as Message & {
 							isStreaming: boolean
 						}
-						return <AssistantMessage key={item.key} message={assistantMsg} />
+						return (
+							<AssistantMessage
+								key={item.key}
+								message={assistantMsg}
+								onOpenDiff={onOpenDiff}
+								isAgentActive={isAgentActive}
+							/>
+						)
 					}
 					case "subagent":
 						return <SubagentExecution key={item.key} subagent={item.data} />

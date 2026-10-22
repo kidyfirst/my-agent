@@ -102,6 +102,30 @@ describe("messageParser", () => {
 			expect(res).toEqual([{ type: "text", text: "hello from signal" }])
 		})
 
+		it("normalizes multi-part data-user-message contents (text + attachment)", () => {
+			const part = {
+				type: "data-user-message",
+				data: {
+					contents: [
+						{ type: "text", text: "look at this" },
+						{
+							type: "file",
+							mediaType: "image/png",
+							data: "base64data",
+							filename: "a.png",
+						},
+					],
+				},
+			}
+			const res = normalizeMessageContent([part])
+			expect(res[0]).toEqual({ type: "text", text: "look at this" })
+			expect(res[1]).toMatchObject({
+				type: "image",
+				data: "base64data",
+				name: "a.png",
+			})
+		})
+
 		it("normalizes image file part into type image", () => {
 			const filePart = {
 				type: "file",

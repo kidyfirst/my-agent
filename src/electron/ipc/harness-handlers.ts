@@ -74,7 +74,8 @@ function isUsableChatModel(modelId: string): boolean {
 
 function modelSupportsVision(modelId: string): boolean {
 	const id = (modelId || "").toLowerCase()
-	// DeepSeek models (deepseek-flash, deepseek-v4-pro) support multimodal vision
+	// deepseek-flash (DeepSeek-V4.1-Flash) accepts images; deepseek-v4-pro does not.
+	if (id.includes("deepseek")) return id.includes("flash")
 	if (id.includes("o3-mini") || id.includes("o1-mini")) return false
 	if (id.includes("qwen-") && !id.includes("vl")) return false
 	if (id.includes("llama-") && !id.includes("vision")) return false
@@ -202,14 +203,14 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			ctx.getActiveSession().harness.abort()
 		},
 		// Files changed by the current task, with +/- line counts
-		getTaskChangedFiles: async () => {
-			if (!currentTaskSnapshot) return { files: [] }
+		getTaskChangedFiles: async (_command, ctx) => {
+			const root =
+				currentTaskSnapshot?.root || ctx?.getActiveSession()?.projectRoot
+			const baseline = currentTaskSnapshot?.baseline || {}
+			if (!root) return { files: [] }
 			try {
 				return {
-					files: diffSinceBaseline(
-						currentTaskSnapshot.root,
-						currentTaskSnapshot.baseline,
-					),
+					files: diffSinceBaseline(root, baseline),
 				}
 			} catch (err) {
 				console.warn("getTaskChangedFiles failed:", err)
@@ -217,15 +218,14 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		// Unified diff of one file changed by the current task
-		getTaskFileDiff: async (command) => {
-			if (!currentTaskSnapshot || !command.path) return { diff: "" }
+		getTaskFileDiff: async (command, ctx) => {
+			const root =
+				currentTaskSnapshot?.root || ctx?.getActiveSession()?.projectRoot
+			const baseline = currentTaskSnapshot?.baseline || {}
+			if (!root || !command.path) return { diff: "" }
 			try {
 				return {
-					diff: diffFileSinceBaseline(
-						currentTaskSnapshot.root,
-						currentTaskSnapshot.baseline,
-						command.path,
-					),
+					diff: diffFileSinceBaseline(root, baseline, command.path),
 				}
 			} catch (err) {
 				console.warn("getTaskFileDiff failed:", err)

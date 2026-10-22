@@ -109,55 +109,113 @@ export function FilesChangedBar({
 	const deleted = files.reduce((n, f) => n + f.deleted, 0)
 
 	return (
-		<div style={{ margin: "4px 0 12px 0", fontSize: 12 }}>
-			<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+		<div
+			style={{
+				margin: "10px 0 6px 0",
+				background: "var(--bg-surface)",
+				border: "1px solid var(--border-muted)",
+				borderRadius: 8,
+				padding: "7px 12px",
+				fontSize: 12,
+			}}
+		>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					gap: 8,
+				}}
+			>
 				<button
+					type="button"
 					onClick={() => setExpanded(!expanded)}
 					style={{
 						display: "inline-flex",
 						alignItems: "center",
-						gap: 8,
+						gap: 6,
 						padding: 0,
 						background: "none",
 						border: "none",
 						cursor: "pointer",
 						fontSize: 12,
 						fontFamily: "inherit",
-						color: "var(--muted)",
+						color: "var(--text)",
 						lineHeight: 1.4,
+						userSelect: "none",
 					}}
 				>
-					<span style={{ color: "var(--text)" }}>
+					<span style={{ fontWeight: 500 }}>
 						{files.length} file{files.length === 1 ? "" : "s"} changed
 					</span>
-					<span style={{ color: "var(--success, #22c55e)" }}>+{added}</span>
-					<span style={{ color: "var(--error, #ef4444)" }}>-{deleted}</span>
+					<span style={{ color: "var(--success, #22c55e)", fontWeight: 500 }}>
+						+{added}
+					</span>
+					<span style={{ color: "var(--error, #ef4444)", fontWeight: 500 }}>
+						-{deleted}
+					</span>
 					<Chevron open={expanded} size={10} />
 				</button>
+
 				{onOpenDiff && (
 					<button
-						onClick={() => onOpenDiff(files[0].path)}
+						type="button"
+						onClick={() => onOpenDiff(files[0]?.path || "")}
 						title="Review all changes"
 						style={{
-							marginLeft: "auto",
-							padding: "1px 8px",
+							display: "inline-flex",
+							alignItems: "center",
+							gap: 5,
+							padding: "3px 9px",
 							fontSize: 11,
+							fontWeight: 500,
 							fontFamily: "inherit",
-							color: "var(--error, #ef4444)",
-							background: "transparent",
-							border: "1px solid var(--error, #ef4444)",
-							borderRadius: 5,
+							color: "var(--text)",
+							background: "var(--bg-elevated)",
+							border: "1px solid var(--border-muted)",
+							borderRadius: 6,
 							cursor: "pointer",
 							flexShrink: 0,
+							transition: "background 0.15s, border-color 0.15s",
+						}}
+						onMouseEnter={(e) => {
+							e.currentTarget.style.background = "var(--bg-hover)"
+							e.currentTarget.style.borderColor = "var(--border)"
+						}}
+						onMouseLeave={(e) => {
+							e.currentTarget.style.background = "var(--bg-elevated)"
+							e.currentTarget.style.borderColor = "var(--border-muted)"
 						}}
 					>
+						<svg
+							width="12"
+							height="12"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.8"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							style={{ opacity: 0.8 }}
+						>
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+							<polyline points="14 2 14 8 20 8" />
+							<line x1="12" y1="18" x2="12" y2="12" />
+							<line x1="9" y1="15" x2="15" y2="15" />
+						</svg>
 						Review
 					</button>
 				)}
 			</div>
 
 			{expanded && (
-				<div style={{ marginTop: 6 }}>
+				<div
+					style={{
+						marginTop: 8,
+						paddingTop: 8,
+						borderTop: "1px solid var(--border-muted)",
+					}}
+				>
 					{files.map((file) => {
 						const isOpen = openFile === file.path
 						return (
@@ -166,43 +224,97 @@ export function FilesChangedBar({
 									onClick={() => setOpenFile(isOpen ? null : file.path)}
 									title={file.path}
 									style={{
-										display: "inline-flex",
+										display: "flex",
 										alignItems: "center",
+										justifyContent: "space-between",
 										gap: 6,
-										padding: "3px 0",
+										padding: "4px 6px",
+										borderRadius: 4,
 										cursor: "pointer",
 										userSelect: "none",
-										maxWidth: "100%",
+										transition: "background 0.1s",
+									}}
+									onMouseEnter={(e) => {
+										e.currentTarget.style.background = "var(--bg-hover)"
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.background = "transparent"
 									}}
 								>
-									<span
+									<div
 										style={{
-											color: "var(--text)",
+											display: "flex",
+											alignItems: "center",
+											gap: 6,
 											overflow: "hidden",
 											textOverflow: "ellipsis",
 											whiteSpace: "nowrap",
+											minWidth: 0,
 										}}
 									>
-										{basename(file.path)}
-									</span>
-									{dirname(file.path) && (
 										<span
 											style={{
-												color: "var(--dim)",
+												color: "var(--text)",
+												fontWeight: 500,
 												overflow: "hidden",
 												textOverflow: "ellipsis",
 												whiteSpace: "nowrap",
 											}}
 										>
-											{dirname(file.path)}
+											{basename(file.path)}
 										</span>
-									)}
-									<span style={{ color: "var(--success, #22c55e)" }}>
-										+{file.added}
-									</span>
-									<span style={{ color: "var(--error, #ef4444)" }}>
-										-{file.deleted}
-									</span>
+										{dirname(file.path) && (
+											<span
+												style={{
+													color: "var(--dim)",
+													fontSize: 11,
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+													whiteSpace: "nowrap",
+												}}
+											>
+												{dirname(file.path)}
+											</span>
+										)}
+									</div>
+									<div
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 6,
+											flexShrink: 0,
+											fontSize: 11,
+										}}
+									>
+										<span style={{ color: "var(--success, #22c55e)" }}>
+											+{file.added}
+										</span>
+										<span style={{ color: "var(--error, #ef4444)" }}>
+											-{file.deleted}
+										</span>
+										{onOpenDiff && (
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation()
+													onOpenDiff(file.path)
+												}}
+												title="Open in diff editor"
+												style={{
+													background: "none",
+													border: "none",
+													cursor: "pointer",
+													color: "var(--dim)",
+													padding: "1px 4px",
+													fontSize: 11,
+													display: "inline-flex",
+													alignItems: "center",
+												}}
+											>
+												↗
+											</button>
+										)}
+									</div>
 								</div>
 								{isOpen && (
 									<div
@@ -211,7 +323,7 @@ export function FilesChangedBar({
 											overflow: "auto",
 											border: "1px solid var(--border-muted)",
 											borderRadius: 6,
-											marginBottom: 6,
+											margin: "6px 0",
 										}}
 									>
 										<FileDiff path={file.path} isLive={isLive} />

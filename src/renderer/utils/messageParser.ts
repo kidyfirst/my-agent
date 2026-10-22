@@ -96,6 +96,17 @@ export function normalizeMessageContent(
 						})
 						continue
 					}
+					// Multi-part user messages (e.g. text + attachment) come through as
+					// `contents: [{type:"text"|"file", ...}]` instead of a plain string.
+					const nestedParts = Array.isArray(d.contents)
+						? d.contents
+						: Array.isArray(d.parts)
+							? d.parts
+							: null
+					if (nestedParts) {
+						blocks.push(...normalizeMessageContent(nestedParts, fallbackText))
+						continue
+					}
 				}
 				if (type === "user") {
 					const userText =

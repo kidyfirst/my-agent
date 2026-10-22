@@ -94,24 +94,22 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					const endPath = worktreePath || cb.projectInfoRef.current?.rootPath
 					if (isActiveWorktree) {
 						// Attach the files this task changed to its last assistant
-						// message. Fetch before AGENT_END so the message id is stable.
+						// message.
 						const lastAssistant = cb.getLastAssistantMessageId()
-						if (lastAssistant) {
-							window.api
-								.invoke({ type: "getTaskChangedFiles" })
-								.then((result: unknown) => {
-									const files = (result as { files?: Message["changedFiles"] })
-										?.files
-									if (files && files.length > 0) {
-										cb.dispatch({
-											type: "SET_MESSAGE_CHANGED_FILES",
-											messageId: lastAssistant,
-											files,
-										})
-									}
-								})
-								.catch(() => {})
-						}
+						window.api
+							.invoke({ type: "getTaskChangedFiles" })
+							.then((result: unknown) => {
+								const files = (result as { files?: Message["changedFiles"] })
+									?.files
+								if (files && files.length > 0) {
+									cb.dispatch({
+										type: "SET_MESSAGE_CHANGED_FILES",
+										messageId: lastAssistant || "",
+										files,
+									})
+								}
+							})
+							.catch(() => {})
 						cb.dispatch({ type: "AGENT_END" })
 						cb.loadThreads()
 						cb.loadPRStatus()

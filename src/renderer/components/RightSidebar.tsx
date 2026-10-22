@@ -162,19 +162,28 @@ export function RightSidebar({
 			>
 				{/* Tab strip */}
 				<div
+					className="titlebar-drag"
 					style={{
+						height: 38,
+						boxSizing: "border-box",
 						display: "flex",
+						alignItems: "stretch",
 						borderBottom: "1px solid var(--border-muted)",
+						background: "var(--bg-surface)",
 						flexShrink: 0,
 					}}
 				>
 					{tabs.map((tab) => (
 						<button
 							key={tab.id}
+							className="titlebar-no-drag"
 							onClick={() => onTabChange(tab.id)}
 							style={{
 								flex: 1,
-								padding: "6px 0",
+								height: "100%",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
 								fontSize: 11,
 								fontWeight: 500,
 								color:
@@ -186,7 +195,20 @@ export function RightSidebar({
 										? "2px solid var(--accent)"
 										: "2px solid transparent",
 								cursor: "pointer",
-								transition: "color 0.15s",
+								background: "transparent",
+								border: "none",
+								padding: 0,
+								transition: "color 0.15s, background-color 0.15s",
+							}}
+							onMouseEnter={(e) => {
+								if (activeTab !== tab.id) {
+									e.currentTarget.style.color = "var(--text)"
+								}
+							}}
+							onMouseLeave={(e) => {
+								if (activeTab !== tab.id) {
+									e.currentTarget.style.color = "var(--muted)"
+								}
 							}}
 						>
 							{tab.label}

@@ -3,10 +3,13 @@ import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { Message } from "../types/ipc"
 import { extractMessageDetails } from "../utils/messageParser"
+import { FilesChangedBar } from "./FilesChangedBar"
 import { ImagePreviewModal } from "./ImagePreviewModal"
 
 interface AssistantMessageProps {
 	message: Message & { isStreaming?: boolean }
+	onOpenDiff?: (path: string) => void
+	isAgentActive?: boolean
 }
 
 interface CodeBlockProps {
@@ -144,7 +147,11 @@ function CodeBlock({ children, className }: CodeBlockProps) {
 	)
 }
 
-export const AssistantMessage = React.memo(function AssistantMessage({ message }: AssistantMessageProps) {
+export const AssistantMessage = React.memo(function AssistantMessage({
+	message,
+	onOpenDiff,
+	isAgentActive,
+}: AssistantMessageProps) {
 	const [showThinking, setShowThinking] = useState(false)
 	const [copiedAnswer, setCopiedAnswer] = useState(false)
 	const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -425,8 +432,17 @@ export const AssistantMessage = React.memo(function AssistantMessage({ message }
 				</div>
 			)}
 
+			{/* Files changed bar (Codex-style review card) */}
+			{message.changedFiles && message.changedFiles.length > 0 && (
+				<FilesChangedBar
+					files={message.changedFiles}
+					isLive={Boolean(isAgentActive && message.isStreaming)}
+					onOpenDiff={onOpenDiff}
+				/>
+			)}
+
 			{/* Assistant footer toolbar: timestamp + copy entire answer */}
-			{text && !isActivelyStreaming && (
+			{(text || (message.changedFiles && message.changedFiles.length > 0)) && !isActivelyStreaming && (
 				<div
 					style={{
 						display: "flex",
@@ -501,7 +517,6 @@ export const AssistantMessage = React.memo(function AssistantMessage({ message }
 									<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
 									<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
 								</svg>
-								<span>Copy</span>
 							</>
 						)}
 					</button>

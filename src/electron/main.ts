@@ -56,6 +56,10 @@ try {
 	if (pkg.name) appName = pkg.name
 } catch {}
 app.name = appName
+app.setName(appName)
+if (process.platform === "darwin") {
+	process.title = appName
+}
 
 // =============================================================================
 // App state
