@@ -5,7 +5,16 @@ const openTargets = [
 		id: "finder",
 		label: "Finder",
 		icon: (
-			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 16 16"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="1.3"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
 				<rect x="2" y="2" width="12" height="12" rx="2" />
 				<line x1="2" y1="6" x2="14" y2="6" />
 				<line x1="6" y1="6" x2="6" y2="14" />
@@ -16,7 +25,16 @@ const openTargets = [
 		id: "cursor",
 		label: "Cursor",
 		icon: (
-			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 16 16"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="1.3"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
 				<path d="M4 2 L4 14 L7.5 10.5 L11 14 L13 12 L9.5 8.5 L14 7 Z" />
 			</svg>
 		),
@@ -25,7 +43,16 @@ const openTargets = [
 		id: "vscode",
 		label: "VS Code",
 		icon: (
-			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 16 16"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="1.3"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
 				<path d="M11 1 L14 3 V13 L11 15 L2 9 L5 7 L11 11 V5 L5 9 L2 7 L11 1 Z" />
 			</svg>
 		),
@@ -34,7 +61,16 @@ const openTargets = [
 		id: "terminal",
 		label: "Terminal",
 		icon: (
-			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 16 16"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="1.3"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
 				<polyline points="4,5 7,8 4,11" />
 				<line x1="9" y1="11" x2="12" y2="11" />
 			</svg>
@@ -42,7 +78,11 @@ const openTargets = [
 	},
 ]
 
-export function OpenInDropdown({ projectPath }: { projectPath: string | null }) {
+export function OpenInDropdown({
+	projectPath,
+}: {
+	projectPath: string | null
+}) {
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
 
@@ -60,7 +100,16 @@ export function OpenInDropdown({ projectPath }: { projectPath: string | null }) 
 	if (!projectPath) return null
 
 	return (
-		<div ref={ref} className="titlebar-no-drag" style={{ position: "relative", display: "flex", alignItems: "center", height: "100%" }}>
+		<div
+			ref={ref}
+			className="titlebar-no-drag"
+			style={{
+				position: "relative",
+				display: "flex",
+				alignItems: "center",
+				height: "100%",
+			}}
+		>
 			<button
 				onClick={() => setOpen((v) => !v)}
 				style={{
@@ -80,7 +129,16 @@ export function OpenInDropdown({ projectPath }: { projectPath: string | null }) 
 				title="Open project in..."
 			>
 				Open in...
-				<svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+				<svg
+					width="8"
+					height="8"
+					viewBox="0 0 8 8"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="1.5"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				>
 					<path d="M2 3 L4 5 L6 3" />
 				</svg>
 			</button>
@@ -90,7 +148,9 @@ export function OpenInDropdown({ projectPath }: { projectPath: string | null }) 
 						position: "absolute",
 						top: "100%",
 						right: 0,
-						zIndex: 10,
+						// Above the sticky user message (zIndex 20) so the menu isn't
+						// painted over when it drops into the chat area.
+						zIndex: 400,
 						background: "var(--bg-elevated)",
 						border: "1px solid var(--border)",
 						borderRadius: 6,
@@ -100,7 +160,16 @@ export function OpenInDropdown({ projectPath }: { projectPath: string | null }) 
 						boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
 					}}
 				>
-					<div style={{ padding: "4px 8px", fontSize: 10, color: "var(--dim)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+					<div
+						style={{
+							padding: "4px 8px",
+							fontSize: 10,
+							color: "var(--dim)",
+							fontWeight: 500,
+							textTransform: "uppercase",
+							letterSpacing: "0.5px",
+						}}
+					>
 						Open project in
 					</div>
 					{openTargets.map((target) => (

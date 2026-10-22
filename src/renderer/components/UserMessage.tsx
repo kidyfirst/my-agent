@@ -1,4 +1,4 @@
-import { useState, memo } from "react"
+import { useState, useEffect, useRef, memo } from "react"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
 import { ImagePreviewModal } from "./ImagePreviewModal"
@@ -7,11 +7,23 @@ interface UserMessageProps {
 	message: Message
 }
 
-export const UserMessage = memo(function UserMessage({ message }: UserMessageProps) {
+/** Collapsed content height; + 20px bubble padding = 80px total. */
+const COLLAPSED_CONTENT_HEIGHT = 60
+const IMAGE_HEIGHT = 60
+
+export const UserMessage = memo(function UserMessage({
+	message,
+}: UserMessageProps) {
 	const [copied, setCopied] = useState(false)
 	const [previewImage, setPreviewImage] = useState<string | null>(null)
+	const [expanded, setExpanded] = useState(false)
+	const [overflowing, setOverflowing] = useState(false)
+	const contentRef = useRef<HTMLDivElement>(null)
 
-	const contentArray = normalizeMessageContent(message.content, (message as any).text)
+	const contentArray = normalizeMessageContent(
+		message.content,
+		(message as any).text,
+	)
 
 	const textParts = contentArray.filter(
 		(c: MessageContent) => !c.type || c.type === "text",
@@ -27,10 +39,10 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 					)
 					.join("")
 			: typeof message.content === "string"
-			? message.content
-			: (message as any).text
-			? String((message as any).text)
-			: ""
+				? message.content
+				: (message as any).text
+					? String((message as any).text)
+					: ""
 
 	// 1. Collect images from contentArray, attachments, and files
 	const rawImages: Array<{ src: string; name?: string }> = []
@@ -41,7 +53,9 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 			c.type === "image" ||
 			(c.type === "file" &&
 				(String(c.mediaType || c.mimeType || "").startsWith("image/") ||
-					/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(String(c.name || c.filename || ""))))
+					/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(
+						String(c.name || c.filename || ""),
+					)))
 
 		if (isImg) {
 			const imgData = c as unknown as {
@@ -55,10 +69,10 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 			const src = imgData.url
 				? imgData.url
 				: imgData.data
-				? imgData.data.startsWith("data:")
-					? imgData.data
-					: `data:${imgData.mimeType || imgData.mediaType || "image/png"};base64,${imgData.data}`
-				: ""
+					? imgData.data.startsWith("data:")
+						? imgData.data
+						: `data:${imgData.mimeType || imgData.mediaType || "image/png"};base64,${imgData.data}`
+					: ""
 			const key = src.slice(0, 100) || imgData.name || ""
 			if (src && !seenImageKeys.has(key)) {
 				seenImageKeys.add(key)
@@ -103,7 +117,11 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 				/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)
 			if (!isImg && !seenFileNames.has(name)) {
 				seenFileNames.add(name)
-				rawFiles.push({ name, mimeType: mediaType, size: c.size as number | undefined })
+				rawFiles.push({
+					name,
+					mimeType: mediaType,
+					size: c.size as number | undefined,
+				})
 			}
 		}
 	}
@@ -135,6 +153,21 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 		: ""
 	const displayText = cleanedText || text
 
+	// Detect whether the content exceeds the collapsed height so we can show
+	// a "click to expand" affordance and enable the toggle.
+	useEffect(() => {
+		const el = contentRef.current
+		if (!el) return
+		setOverflowing(el.scrollHeight > COLLAPSED_CONTENT_HEIGHT + 1)
+	}, [displayText, rawFiles.length, rawImages.length])
+
+	const handleBubbleClick = () => {
+		if (!overflowing) return
+		// Don't toggle while the user is selecting text
+		if (window.getSelection()?.toString()) return
+		setExpanded((v) => !v)
+	}
+
 	const handleCopy = async () => {
 		const textToCopy = displayText || text
 		if (!textToCopy) return
@@ -152,7 +185,11 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 		try {
 			const date = new Date(iso)
 			if (isNaN(date.getTime())) return ""
-			return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+			return date.toLocaleTimeString([], {
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: false,
+			})
 		} catch {
 			return ""
 		}
@@ -161,14 +198,28 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 	const timeStr = formatTime(message.createdAt)
 
 	return (
+		// Spacing lives in padding rather than margin so the pinned card's
+		// background reaches the very top edge; otherwise scrolled content
+		// shows through the gap above it.
 		<div
 			style={{
 				display: "flex",
 				flexDirection: "column",
 				alignItems: "flex-end",
-				margin: "10px 0 14px",
+				// Negative side margins + matching padding bleed the sticky
+				// background over the column's side padding, so no strip of the
+				// scrolled content peeks out beside the pinned card. The bubble
+				// itself keeps exactly the same box.
+				margin: "0 -24px",
+				padding: "10px 24px 14px",
 				minWidth: 0,
-				maxWidth: "100%",
+				maxWidth: "none",
+				// Collapsed user messages stick to the top of the scroll viewport so
+				// the latest one in view stays visible; a newer one paints over it.
+				position: expanded ? undefined : "sticky",
+				top: 0,
+				zIndex: expanded ? undefined : 20,
+				background: expanded ? undefined : "var(--bg)",
 			}}
 		>
 			<div
@@ -186,103 +237,150 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 					maxWidth: "75%",
 					textAlign: "left",
 					boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
+					cursor: overflowing ? "pointer" : undefined,
 				}}
+				onClick={handleBubbleClick}
 			>
-				{displayText}
+				<div
+					ref={contentRef}
+					style={{
+						maxHeight: expanded ? undefined : COLLAPSED_CONTENT_HEIGHT,
+						overflow: "hidden",
+						position: "relative",
+					}}
+				>
+					{displayText}
 
-				{/* Non-image file chips */}
-				{rawFiles.length > 0 && (
-					<div
-						style={{
-							marginTop: displayText ? 8 : 0,
-							display: "flex",
-							gap: 6,
-							flexWrap: "wrap",
-							justifyContent: "flex-end",
-						}}
-					>
-						{rawFiles.map((file, i) => (
-							<div
-								key={i}
-								title={file.name}
-								style={{
-									display: "inline-flex",
-									alignItems: "center",
-									gap: 6,
-									padding: "4px 8px",
-									borderRadius: 6,
-									background: "var(--bg-elevated)",
-									border: "1px solid var(--border)",
-									fontSize: 11,
-									color: "var(--text)",
-									maxWidth: 220,
-								}}
-							>
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="var(--muted)"
-									strokeWidth="1.5"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									style={{ flexShrink: 0 }}
-								>
-									<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-									<polyline points="14 2 14 8 20 8" />
-								</svg>
-								<span
+					{/* Non-image file chips */}
+					{rawFiles.length > 0 && (
+						<div
+							style={{
+								marginTop: displayText ? 8 : 0,
+								display: "flex",
+								gap: 6,
+								flexWrap: "wrap",
+								justifyContent: "flex-end",
+							}}
+						>
+							{rawFiles.map((file, i) => (
+								<div
+									key={i}
+									title={file.name}
 									style={{
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										whiteSpace: "nowrap",
+										display: "inline-flex",
+										alignItems: "center",
+										gap: 6,
+										padding: "4px 8px",
+										borderRadius: 6,
+										background: "var(--bg-elevated)",
+										border: "1px solid var(--border)",
+										fontSize: 11,
+										color: "var(--text)",
+										maxWidth: 220,
 									}}
 								>
-									{file.name}
-								</span>
-							</div>
-						))}
-					</div>
-				)}
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="var(--muted)"
+										strokeWidth="1.5"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										style={{ flexShrink: 0 }}
+									>
+										<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+										<polyline points="14 2 14 8 20 8" />
+									</svg>
+									<span
+										style={{
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											whiteSpace: "nowrap",
+										}}
+									>
+										{file.name}
+									</span>
+								</div>
+							))}
+						</div>
+					)}
 
-				{/* Image attachments */}
-				{rawImages.length > 0 && (
-					<div
-						style={{
-							marginTop: displayText || rawFiles.length > 0 ? 8 : 0,
-							display: "flex",
-							gap: 8,
-							flexWrap: "wrap",
-							justifyContent: "flex-end",
-						}}
-					>
-						{rawImages.map((img, i) => (
-							<img
-								key={i}
-								src={img.src}
-								alt={img.name || "User attachment"}
-								title={img.name || "Click to zoom"}
-								onClick={() => setPreviewImage(img.src)}
-								style={{
-									maxWidth: 320,
-									maxHeight: 220,
-									borderRadius: 8,
-									border: "1px solid var(--border-muted)",
-									cursor: "pointer",
-									objectFit: "cover",
-									transition: "opacity 0.15s, transform 0.1s",
-								}}
-								onMouseEnter={(e) => {
-									e.currentTarget.style.opacity = "0.9"
-								}}
-								onMouseLeave={(e) => {
-									e.currentTarget.style.opacity = "1"
-								}}
-							/>
-						))}
-					</div>
-				)}
+					{/* Image attachments */}
+					{rawImages.length > 0 && (
+						<div
+							style={{
+								marginTop: displayText || rawFiles.length > 0 ? 8 : 0,
+								display: "flex",
+								gap: 8,
+								flexWrap: "wrap",
+								justifyContent: "flex-end",
+							}}
+						>
+							{rawImages.map((img, i) => (
+								<img
+									key={i}
+									src={img.src}
+									alt={img.name || "User attachment"}
+									title={img.name || "Click to zoom"}
+									onClick={(e) => {
+										e.stopPropagation()
+										setPreviewImage(img.src)
+									}}
+									style={{
+										height: IMAGE_HEIGHT,
+										width: "auto",
+										maxWidth: "100%",
+										borderRadius: 8,
+										border: "1px solid var(--border-muted)",
+										cursor: "pointer",
+										objectFit: "contain",
+										transition: "opacity 0.15s, transform 0.1s",
+									}}
+									onMouseEnter={(e) => {
+										e.currentTarget.style.opacity = "0.9"
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.opacity = "1"
+									}}
+								/>
+							))}
+						</div>
+					)}
+
+					{overflowing && !expanded && (
+						<div
+							style={{
+								position: "absolute",
+								left: 0,
+								right: 0,
+								bottom: 0,
+								height: 24,
+								display: "flex",
+								alignItems: "flex-end",
+								justifyContent: "center",
+								background:
+									"linear-gradient(to bottom, transparent, var(--user-message-bg))",
+								pointerEvents: "none",
+							}}
+						>
+							<svg
+								width="10"
+								height="10"
+								viewBox="0 0 10 10"
+								fill="none"
+								stroke="var(--muted)"
+								strokeWidth="1.3"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								style={{ marginBottom: 2 }}
+							>
+								<path d="M2 3.5L5 6.5L8 3.5" />
+							</svg>
+						</div>
+					)}
+				</div>
 			</div>
 
 			{/* Sub-bar below bubble aligned right: timestamp + copy button */}
@@ -317,11 +415,15 @@ export const UserMessage = memo(function UserMessage({ message }: UserMessagePro
 						transition: "color 0.15s, background-color 0.15s",
 					}}
 					onMouseEnter={(e) => {
-						e.currentTarget.style.color = copied ? "var(--success)" : "var(--text)"
+						e.currentTarget.style.color = copied
+							? "var(--success)"
+							: "var(--text)"
 						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
 					}}
 					onMouseLeave={(e) => {
-						e.currentTarget.style.color = copied ? "var(--success)" : "var(--dim)"
+						e.currentTarget.style.color = copied
+							? "var(--success)"
+							: "var(--dim)"
 						e.currentTarget.style.backgroundColor = "transparent"
 					}}
 				>

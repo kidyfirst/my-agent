@@ -209,9 +209,18 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 		return null
 	}
 
+	// A finished turn shows a single collapsed "Worked for 6m" line; the
+	// detailed steps only appear once the user clicks it.
+	const headerLabel = isActive
+		? formattedDuration
+			? `Thinking for ${formattedDuration}`
+			: "Thinking"
+		: formattedDuration
+			? `Worked for ${formattedDuration}`
+			: "Worked"
+
 	return (
 		<div style={{ margin: "6px 0 10px 0" }}>
-			{/* Top Header: Thinking + chevron */}
 			<div
 				onClick={() => setExpanded(!expanded)}
 				style={{
@@ -228,21 +237,19 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 				}}
 				title={expanded ? "Click to collapse" : "Click to expand all"}
 			>
-				<span>
-					{formattedDuration
-						? `${isActive ? "Thinking" : "Thought"} for ${formattedDuration}`
-						: "Thinking"}
-				</span>
-				<Chevron open={expanded} />
-				{steps.length > 0 && !expanded && (
+				<span>{headerLabel}</span>
+				{/* Down when collapsed (there is more to reveal), right when open */}
+				<Chevron open={!expanded} />
+				{steps.length > 0 && !expanded && isActive && (
 					<span style={{ fontSize: 11, color: "var(--dim)" }}>
 						({steps.length} step{steps.length > 1 ? "s" : ""})
 					</span>
 				)}
 			</div>
 
-			{/* Steps list: collapsed shows a 2~3 line scrollable window (~82px); expanded shows all */}
-			{steps.length > 0 && (
+			{/* Steps list: while running, collapsed shows a 2~3 line scrollable
+			    window (~82px); once finished it stays hidden until expanded. */}
+			{steps.length > 0 && (isActive || expanded) && (
 				<div
 					ref={scrollContainerRef}
 					onClick={!expanded ? () => setExpanded(true) : undefined}

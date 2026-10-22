@@ -571,12 +571,17 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				lastCurrent?.stopReason === "error" &&
 				!action.messages.some((m) => m.id === lastCurrent.id)
 
-			// Preserve ephemeral changedFiles across message reload
+			// Preserve ephemeral changedFiles and durationMs across message reload
 			const existingChangedFilesById = new Map<
 				string,
 				Message["changedFiles"]
 			>()
 			let lastAssistantChangedFiles: Message["changedFiles"] | undefined
+
+			// The DB has no duration column, so a reload would wipe the turn
+			// duration that drives "Worked for 45s".
+			const existingDurationById = new Map<string, number>()
+			let lastAssistantDuration: number | undefined
 
 			for (const m of state.messages) {
 				if (m.changedFiles && m.changedFiles.length > 0) {
@@ -584,6 +589,10 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 					if (m.role === "assistant") {
 						lastAssistantChangedFiles = m.changedFiles
 					}
+				}
+				if (m.role === "assistant" && m.durationMs != null) {
+					if (m.id) existingDurationById.set(m.id, m.durationMs)
+					lastAssistantDuration = m.durationMs
 				}
 			}
 
@@ -601,9 +610,14 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				}
 				const preservedFiles =
 					m.changedFiles || existingChangedFilesById.get(m.id)
-				cleanedMessages.push(
-					preservedFiles ? { ...m, changedFiles: preservedFiles } : m,
-				)
+				const preservedDuration = m.durationMs ?? existingDurationById.get(m.id)
+				cleanedMessages.push({
+					...m,
+					...(preservedFiles ? { changedFiles: preservedFiles } : {}),
+					...(preservedDuration != null
+						? { durationMs: preservedDuration }
+						: {}),
+				})
 			}
 
 			// If no message in the new list has changedFiles, but the previous state had them on the last assistant message,
@@ -619,6 +633,22 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 						cleanedMessages[i] = {
 							...cleanedMessages[i],
 							changedFiles: lastAssistantChangedFiles,
+						}
+						break
+					}
+				}
+			}
+
+			// Same fallback for the turn duration when nobody matched by id
+			if (
+				lastAssistantDuration != null &&
+				!cleanedMessages.some((m) => m.durationMs != null)
+			) {
+				for (let i = cleanedMessages.length - 1; i >= 0; i--) {
+					if (cleanedMessages[i].role === "assistant") {
+						cleanedMessages[i] = {
+							...cleanedMessages[i],
+							durationMs: lastAssistantDuration,
 						}
 						break
 					}

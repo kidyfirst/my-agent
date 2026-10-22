@@ -436,92 +436,94 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 			{message.changedFiles && message.changedFiles.length > 0 && (
 				<FilesChangedBar
 					files={message.changedFiles}
+					messageId={message.id}
 					isLive={Boolean(isAgentActive && message.isStreaming)}
 					onOpenDiff={onOpenDiff}
 				/>
 			)}
 
 			{/* Assistant footer toolbar: timestamp + copy entire answer */}
-			{(text || (message.changedFiles && message.changedFiles.length > 0)) && !isActivelyStreaming && (
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 8,
-						marginTop: 8,
-						fontSize: 11,
-						color: "var(--dim)",
-						userSelect: "none",
-					}}
-				>
-					{timeStr && <span>{timeStr}</span>}
-					<button
-						type="button"
-						onClick={handleCopyAnswer}
-						title={copiedAnswer ? "Copied" : "Copy response"}
-						aria-label={copiedAnswer ? "Copied" : "Copy response"}
+			{(text || (message.changedFiles && message.changedFiles.length > 0)) &&
+				!isActivelyStreaming && (
+					<div
 						style={{
-							background: "none",
-							border: "none",
-							padding: "2px 6px",
-							cursor: "pointer",
-							display: "inline-flex",
+							display: "flex",
 							alignItems: "center",
-							gap: 4,
-							color: copiedAnswer ? "var(--success)" : "var(--dim)",
-							borderRadius: 4,
+							gap: 8,
+							marginTop: 8,
 							fontSize: 11,
-							transition: "color 0.15s, background-color 0.15s",
-						}}
-						onMouseEnter={(e) => {
-							e.currentTarget.style.color = copiedAnswer
-								? "var(--success)"
-								: "var(--text)"
-							e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-						}}
-						onMouseLeave={(e) => {
-							e.currentTarget.style.color = copiedAnswer
-								? "var(--success)"
-								: "var(--dim)"
-							e.currentTarget.style.backgroundColor = "transparent"
+							color: "var(--dim)",
+							userSelect: "none",
 						}}
 					>
-						{copiedAnswer ? (
-							<>
-								<svg
-									width="12"
-									height="12"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<polyline points="20 6 9 17 4 12" />
-								</svg>
-								<span>Copied</span>
-							</>
-						) : (
-							<>
-								<svg
-									width="12"
-									height="12"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-									<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-								</svg>
-							</>
-						)}
-					</button>
-				</div>
-			)}
+						{timeStr && <span>{timeStr}</span>}
+						<button
+							type="button"
+							onClick={handleCopyAnswer}
+							title={copiedAnswer ? "Copied" : "Copy response"}
+							aria-label={copiedAnswer ? "Copied" : "Copy response"}
+							style={{
+								background: "none",
+								border: "none",
+								padding: "2px 6px",
+								cursor: "pointer",
+								display: "inline-flex",
+								alignItems: "center",
+								gap: 4,
+								color: copiedAnswer ? "var(--success)" : "var(--dim)",
+								borderRadius: 4,
+								fontSize: 11,
+								transition: "color 0.15s, background-color 0.15s",
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.color = copiedAnswer
+									? "var(--success)"
+									: "var(--text)"
+								e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.color = copiedAnswer
+									? "var(--success)"
+									: "var(--dim)"
+								e.currentTarget.style.backgroundColor = "transparent"
+							}}
+						>
+							{copiedAnswer ? (
+								<>
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<polyline points="20 6 9 17 4 12" />
+									</svg>
+									<span>Copied</span>
+								</>
+							) : (
+								<>
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+									</svg>
+								</>
+							)}
+						</button>
+					</div>
+				)}
 
 			{/* Error callout banner */}
 			{isError && (
