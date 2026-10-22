@@ -122,6 +122,20 @@ export function useTabManager(currentThreadId: string | null) {
 	}, [])
 	handleBrowserOpenRef.current = handleBrowserOpen
 
+	// Take the tab bar back to the conversation the chat pane is still showing.
+	// Settings and Agents deliberately leave currentThreadId alone, so landing on
+	// "chat" would leave no tab looking active.
+	const handleCloseOverlayTab = useCallback(() => {
+		if (currentThreadId) {
+			setOpenThreadTabs((prev) =>
+				prev.includes(currentThreadId) ? prev : [...prev, currentThreadId],
+			)
+			setActiveTab("thread:" + currentThreadId)
+			return
+		}
+		setActiveTab("chat")
+	}, [currentThreadId])
+
 	return {
 		openFiles,
 		setOpenFiles,
@@ -142,5 +156,6 @@ export function useTabManager(currentThreadId: string | null) {
 		handleDiffClick,
 		handleBrowserOpen,
 		handleBrowserOpenRef,
+		handleCloseOverlayTab,
 	}
 }

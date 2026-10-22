@@ -295,7 +295,7 @@ export function MainContent(props: MainContentProps) {
 
 			{activeTab === "settings" && (
 				<Settings
-					onClose={() => tabs.setActiveTab("chat")}
+					onClose={tabs.handleCloseOverlayTab}
 					loggedInProviders={auth.loggedInProviders}
 					onLogin={auth.handleLogin}
 					onApiKey={auth.handleApiKey}
@@ -307,7 +307,7 @@ export function MainContent(props: MainContentProps) {
 
 			{activeTab === "agents" && (
 				<AgentDashboard
-					onClose={() => tabs.setActiveTab("chat")}
+					onClose={tabs.handleCloseOverlayTab}
 					onSwitchToAgent={project.handleSwitchProject}
 				/>
 			)}
