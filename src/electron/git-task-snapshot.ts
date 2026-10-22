@@ -1,6 +1,6 @@
 import { spawnSync } from "child_process"
-import { createHash } from "crypto"
-import { readFileSync, statSync } from "fs"
+import { mkdtempSync, rmSync } from "fs"
+import { tmpdir } from "os"
 import { join } from "path"
 
 export interface ChangedFile {
@@ -10,135 +10,129 @@ export interface ChangedFile {
 	status: "added" | "modified" | "deleted"
 }
 
-export type GitSnapshot = Record<string, string>
+/**
+ * Object id of a tree holding the whole working tree (tracked files plus
+ * untracked files that aren't gitignored), captured at a point in time.
+ */
+export interface GitSnapshot {
+	tree: string
+}
 
-function git(root: string, args: string[]): string {
+export const EMPTY_SNAPSHOT: GitSnapshot = { tree: "" }
+
+function git(root: string, args: string[], env?: NodeJS.ProcessEnv): string {
 	const result = spawnSync("git", args, {
 		cwd: root,
 		encoding: "utf-8",
 		maxBuffer: 20 * 1024 * 1024,
+		env: env ? { ...process.env, ...env } : process.env,
 	})
 	if (result.error) throw result.error
 	return result.stdout || ""
 }
 
-function trackedFiles(root: string): string[] {
+/**
+ * Tree id of the current working tree. A throwaway index is used so the
+ * user's own index and stash are never touched.
+ */
+function snapshotTree(root: string): string {
+	const dir = mkdtempSync(join(tmpdir(), "myagent-snapshot-"))
 	try {
-		return git(root, ["ls-files", "-z"]).split("\0").filter(Boolean)
-	} catch {
-		return []
+		const env = { GIT_INDEX_FILE: join(dir, "index") }
+		git(root, ["add", "-A"], env)
+		return git(root, ["write-tree"], env).trim()
+	} finally {
+		rmSync(dir, { recursive: true, force: true })
 	}
 }
 
-function hashContent(root: string, path: string): string | null {
+/** Snapshot of the working tree, used both as a task baseline and as its end state. */
+export function captureGitSnapshot(root: string): GitSnapshot {
+	if (!root) return EMPTY_SNAPSHOT
 	try {
-		return createHash("sha1")
-			.update(readFileSync(join(root, path)))
-			.digest("hex")
-	} catch {
-		return null
+		const tree = snapshotTree(root)
+		return tree ? { tree } : EMPTY_SNAPSHOT
+	} catch (err) {
+		console.warn("captureGitSnapshot failed:", err)
+		return EMPTY_SNAPSHOT
 	}
+}
+
+function parseNumstat(
+	out: string,
+): Map<string, { added: number; deleted: number }> {
+	const counts = new Map<string, { added: number; deleted: number }>()
+	for (const line of out.split("\n")) {
+		const [added, deleted, ...rest] = line.split("\t")
+		const path = rest.join("\t")
+		if (!path) continue
+		counts.set(path, {
+			added: added === "-" ? 0 : Number(added) || 0,
+			deleted: deleted === "-" ? 0 : Number(deleted) || 0,
+		})
+	}
+	return counts
+}
+
+function treePaths(root: string, tree: string): Set<string> {
+	if (!tree) return new Set()
+	const out = git(root, ["ls-tree", "-r", "--name-only", "-z", tree])
+	return new Set(out.split("\0").filter(Boolean))
 }
 
 /**
- * Path -> content hash of every tracked file, used as a per-task baseline.
- * Hashes the working tree (not the index) so uncommitted edits are detected.
+ * Files that differ between two snapshots. Comparing snapshots (rather than
+ * the working tree against HEAD) keeps the report correct when the task
+ * commits its own work, and avoids reporting files the task never touched.
  */
-export function captureGitBaseline(root: string): GitSnapshot {
-	const hashes: GitSnapshot = {}
-	for (const path of trackedFiles(root)) {
-		if (!statSync(join(root, path), { throwIfNoEntry: false })?.isFile())
-			continue
-		const hash = hashContent(root, path)
-		if (hash) hashes[path] = hash
-	}
-	return hashes
-}
-
-/** Lines added/deleted for a file, read from `git diff --numstat`. */
-function numstatFor(
+export function diffBetweenSnapshots(
 	root: string,
-	args: string[],
-): { added: number; deleted: number } {
-	let out = ""
-	try {
-		out = git(root, args)
-	} catch {
-		return { added: 0, deleted: 0 }
-	}
-	const line = out.split("\n").find((l) => l.includes("\t"))
-	if (!line) return { added: 0, deleted: 0 }
-	const [added, deleted] = line.split("\t")
-	return {
-		added: added === "-" ? 0 : Number(added) || 0,
-		deleted: deleted === "-" ? 0 : Number(deleted) || 0,
-	}
-}
-
-/** Files changed relative to a baseline taken with captureGitBaseline. */
-export function diffSinceBaseline(
-	root: string,
-	baseline: GitSnapshot,
+	before: GitSnapshot,
+	after: GitSnapshot,
 ): ChangedFile[] {
+	if (!root || !before.tree || !after.tree) return []
+	if (before.tree === after.tree) return []
+
+	let numstat: Map<string, { added: number; deleted: number }>
+	try {
+		numstat = parseNumstat(
+			git(root, ["diff", "--numstat", "--no-renames", before.tree, after.tree]),
+		)
+	} catch (err) {
+		console.warn("diffBetweenSnapshots failed:", err)
+		return []
+	}
+
+	const beforePaths = treePaths(root, before.tree)
+	const afterPaths = treePaths(root, after.tree)
+
 	const files: ChangedFile[] = []
-
-	for (const path of trackedFiles(root)) {
-		const before = baseline[path]
-		if (before && hashContent(root, path) === before) continue
+	for (const [path, counts] of numstat) {
 		files.push({
 			path,
-			...numstatFor(root, ["diff", "--numstat", "HEAD", "--", path]),
-			status: before ? "modified" : "added",
+			...counts,
+			status: !beforePaths.has(path)
+				? "added"
+				: !afterPaths.has(path)
+					? "deleted"
+					: "modified",
 		})
 	}
-
-	// Files created during the task are still untracked, so `git diff` misses them.
-	const untracked = git(root, [
-		"ls-files",
-		"--others",
-		"--exclude-standard",
-		"-z",
-	])
-		.split("\0")
-		.filter(Boolean)
-	for (const path of untracked) {
-		if (!statSync(join(root, path), { throwIfNoEntry: false })?.isFile())
-			continue
-		files.push({
-			path,
-			...numstatFor(root, [
-				"diff",
-				"--numstat",
-				"--no-index",
-				"/dev/null",
-				path,
-			]),
-			status: "added",
-		})
-	}
-
-	for (const path of Object.keys(baseline)) {
-		if (statSync(join(root, path), { throwIfNoEntry: false })) continue
-		files.push({ path, added: 0, deleted: 0, status: "deleted" })
-	}
-
 	return files.sort((a, b) => a.path.localeCompare(b.path))
 }
 
-/** Unified diff of one file against a baseline taken with captureGitBaseline. */
-export function diffFileSinceBaseline(
+/** Unified diff of one file between two snapshots. */
+export function diffFileBetweenSnapshots(
 	root: string,
-	_baseline: GitSnapshot,
+	before: GitSnapshot,
+	after: GitSnapshot,
 	path: string,
 ): string {
-	const tracked = trackedFiles(root).includes(path)
+	if (!root || !before.tree || !after.tree) return ""
 	try {
-		return tracked
-			? git(root, ["diff", "HEAD", "--", path])
-			: git(root, ["diff", "--no-index", "/dev/null", path])
-	} catch (err: unknown) {
-		// `git diff --no-index` exits with 1 when the files differ
-		const stdout = (err as { stdout?: string | Buffer }).stdout
-		return stdout ? String(stdout) : ""
+		return git(root, ["diff", before.tree, after.tree, "--", path])
+	} catch (err) {
+		console.warn("diffFileBetweenSnapshots failed:", err)
+		return ""
 	}
 }

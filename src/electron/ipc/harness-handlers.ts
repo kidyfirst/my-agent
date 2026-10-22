@@ -1,9 +1,9 @@
 import type { IpcCommandHandler, HandlerContext } from "./types.js"
 import { normalizeControllerMessage } from "../../harness/index.js"
 import {
-	captureGitBaseline,
-	diffFileSinceBaseline,
-	diffSinceBaseline,
+	captureGitSnapshot,
+	diffBetweenSnapshots,
+	diffFileBetweenSnapshots,
 	type GitSnapshot,
 } from "../git-task-snapshot.js"
 import {
@@ -90,13 +90,18 @@ function modelSupportsVision(modelId: string): boolean {
 
 // Snapshot of the worktree taken when a task starts. Used to report the files
 // a task changed and the diff of a single file.
-let currentTaskSnapshot: { root: string; baseline: GitSnapshot } | null = null
+let currentTaskSnapshot: {
+	root: string
+	baseline: GitSnapshot
+	/** End state of the task, taken once its files are reported. */
+	after?: GitSnapshot
+} | null = null
 
 function beginTaskSnapshot(root: string): GitSnapshot | null {
 	if (!root) return null
-	const baseline = captureGitBaseline(root)
+	const baseline = captureGitSnapshot(root)
 	currentTaskSnapshot = { root, baseline }
-	return baseline
+	return baseline.tree ? baseline : null
 }
 
 export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
@@ -212,21 +217,30 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		getTaskChangedFiles: async (command, ctx) => {
 			const root =
 				currentTaskSnapshot?.root || ctx?.getActiveSession()?.projectRoot
-			const baseline = currentTaskSnapshot?.baseline || {}
-			if (!root) return { files: [] }
+			const baseline = currentTaskSnapshot?.baseline
+			if (!root || !baseline?.tree) return { files: [] }
 			try {
-				const files = diffSinceBaseline(root, baseline)
+				// The end state is snapshotted here rather than diffing against
+				// HEAD, so a task that commits its own work still reports counts.
+				const after = captureGitSnapshot(root)
+				if (currentTaskSnapshot) currentTaskSnapshot.after = after
+				const files = diffBetweenSnapshots(root, baseline, after)
 				const threadId =
 					(command.threadId as string) ||
 					ctx.getActiveSession().harness.getCurrentThreadId() ||
 					""
 				const messageId = command.messageId as string
 				if (threadId && messageId && files.length > 0) {
-					// Diffs are captured now because the in-memory baseline is gone
-					// after a restart and HEAD moves on once the work is committed.
+					// Diffs are captured now because the in-memory snapshot is gone
+					// after a restart.
 					const diffs: Record<string, string> = {}
 					for (const file of files) {
-						diffs[file.path] = diffFileSinceBaseline(root, baseline, file.path)
+						diffs[file.path] = diffFileBetweenSnapshots(
+							root,
+							baseline,
+							after,
+							file.path,
+						)
 					}
 					saveTaskChanges({ threadId, messageId, files, diffs })
 				}
@@ -254,11 +268,16 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 			const root =
 				currentTaskSnapshot?.root || ctx?.getActiveSession()?.projectRoot
-			const baseline = currentTaskSnapshot?.baseline || {}
-			if (!root) return { diff: "" }
+			const baseline = currentTaskSnapshot?.baseline
+			if (!root || !baseline?.tree) return { diff: "" }
 			try {
 				return {
-					diff: diffFileSinceBaseline(root, baseline, command.path),
+					diff: diffFileBetweenSnapshots(
+						root,
+						baseline,
+						currentTaskSnapshot?.after ?? captureGitSnapshot(root),
+						command.path as string,
+					),
 				}
 			} catch (err) {
 				console.warn("getTaskFileDiff failed:", err)
