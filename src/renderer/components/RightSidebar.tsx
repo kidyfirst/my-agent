@@ -173,47 +173,50 @@ export function RightSidebar({
 						flexShrink: 0,
 					}}
 				>
-					{tabs.map((tab) => (
-						<button
-							key={tab.id}
-							className="titlebar-no-drag"
-							onClick={() => onTabChange(tab.id)}
-							style={{
-								flex: 1,
-								height: "100%",
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-								fontSize: 11,
-								fontWeight: 500,
-								color:
-									activeTab === tab.id
-										? "var(--text)"
-										: "var(--muted)",
-								borderBottom:
-									activeTab === tab.id
+					{tabs.map((tab) => {
+						const isActive = activeTab === tab.id
+						return (
+							<button
+								key={tab.id}
+								className="titlebar-no-drag"
+								onClick={() => onTabChange(tab.id)}
+								style={{
+									flex: 1,
+									height: "100%",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+									fontSize: 11,
+									fontWeight: 500,
+									color: isActive ? "var(--text)" : "var(--muted)",
+									background: isActive ? "var(--bg)" : "transparent",
+									borderBottom: isActive
 										? "2px solid var(--accent)"
 										: "2px solid transparent",
-								cursor: "pointer",
-								background: "transparent",
-								border: "none",
-								padding: 0,
-								transition: "color 0.15s, background-color 0.15s",
-							}}
-							onMouseEnter={(e) => {
-								if (activeTab !== tab.id) {
-									e.currentTarget.style.color = "var(--text)"
-								}
-							}}
-							onMouseLeave={(e) => {
-								if (activeTab !== tab.id) {
-									e.currentTarget.style.color = "var(--muted)"
-								}
-							}}
-						>
-							{tab.label}
-						</button>
-					))}
+									cursor: "pointer",
+									borderTop: "none",
+									borderLeft: "none",
+									borderRight: "none",
+									padding: 0,
+									transition: "color 0.15s, background-color 0.15s",
+								}}
+								onMouseEnter={(e) => {
+									if (!isActive) {
+										e.currentTarget.style.color = "var(--text)"
+										e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+									}
+								}}
+								onMouseLeave={(e) => {
+									if (!isActive) {
+										e.currentTarget.style.color = "var(--muted)"
+										e.currentTarget.style.backgroundColor = "transparent"
+									}
+								}}
+							>
+								{tab.label}
+							</button>
+						)
+					})}
 				</div>
 
 				{/* Tab content + Terminal with loading overlay */}
