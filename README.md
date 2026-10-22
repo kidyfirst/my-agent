@@ -12,9 +12,14 @@
    - [3.1 主进程层 (`src/electron/`)](#31-主进程层-srcelectron)
    - [3.2 预加载与桥接层 (`src/electron/preload.ts`)](#32-预加载与桥接层-srcelectronpreloadts)
    - [3.3 渲染进程 UI 层 (`src/renderer/`)](#33-渲染进程-ui-层-srcrenderer)
+     - [3.3.1 ChatView 渲染管线](#331-chatview-渲染管线)
+     - [3.3.2 运行中与已结束两种展示形态](#332-运行中与已结束两种展示形态)
+     - [3.3.3 用户消息吸顶与折叠](#333-用户消息吸顶与折叠)
+     - [3.3.4 变更文件卡片与子智能体卡片](#334-变更文件卡片与子智能体卡片)
+     - [3.3.5 滚动、空态与层叠](#335-滚动空态与层叠)
    - [3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)](#34-agent-运行与能力层-智能体引擎--srctools)
 4. [核心业务与数据流时序](#4-核心业务与数据流时序)
-   - [4.1 用户消息与思考链流式响应时序](#41-用户消息与思考链流式响应时序)
+   - [4.1 用户消息、思考链与执行块流式时序](#41-用户消息思考链与执行块流式时序)
    - [4.2 工具调用审批与人机协同流程](#42-工具调用审批与人机协同流程)
    - [4.3 Git Worktree 多会话隔离机制](#43-git-worktree-多会话隔离机制)
 5. [源码目录结构映射](#5-源码目录结构映射)
@@ -142,15 +147,65 @@ contextBridge.exposeInMainWorld("api", {
     - `AGENT_START` / `AGENT_END`：标记全局运行态与加载光标。
     - `MESSAGE_START` / `MESSAGE_UPDATE` / `MESSAGE_END`：流式累加 Token 并实时更新对应消息块。
     - `TOOL_START` / `TOOL_UPDATE` / `TOOL_END`：更新工具调用入参与返回结果。
-- **思考与正文分离渲染 (`src/renderer/components/AssistantMessage.tsx`)**
-  - 解析消息体内的 `content` 数组：
-    - `type === "thinking"`：提取思维链文本，渲染为带 ⚙️ 标识的折叠栏，折叠时显示单行摘要预览，点击展开查看详细思考。
-    - `type === "text"`：通过 `react-markdown` 进行富文本与代码高亮渲染。
+- **会话消息渲染组件族 (`src/renderer/components/`)**
+  - `ChatView.tsx`：会话渲染管线，负责把 `messages` 归并为「用户消息 / 执行块 / 助手回复 / 子智能体 / 系统提示」五类渲染项，并把同一轮的多段工具调用折叠成一个执行块。
+  - `AssistantMessage.tsx`：助手正文渲染，`text` 块走 `react-markdown` 富文本 + 代码高亮，每个代码块带独立复制按钮。
+  - `ExecutionBlock.tsx`：执行块（思维链 + 工具调用）的统一展示组件，运行中与已结束两种形态见 [3.3.2](#332-运行中与已结束两种展示形态)。
+  - `UserMessage.tsx`：用户消息气泡，支持吸顶、超长折叠、图片预览与一键复制。
+  - `FilesChangedBar.tsx` / `SubagentExecution.tsx` / `TodoProgress.tsx`：变更文件卡片、子智能体执行卡片与任务进度条。
 - **IDE 多面板组件生态**
   - `TerminalPanel.tsx`：基于 `@xterm/xterm` 与 `@xterm/addon-fit` 实现的高性能 ANSI 终端仿真器。
   - `FileTree.tsx` / `FileEditor.tsx` / `DiffEditor.tsx`：文件树浏览、代码高亮查看与 Git 变更 Side-by-Side 差异对比。
   - `TaskBoard.tsx`：集成 Linear/GitHub 工单看板，支持将 issue 一键绑定当前分支开发。
   - `ToolApprovalDialog.tsx` / `PlanApproval.tsx`：人机交互弹窗，拦截危险操作请求用户确认。
+
+#### 3.3.1 ChatView 渲染管线
+
+`ChatView.tsx` 不直接遍历 `messages` 渲染组件，而是先把消息体归并成渲染项（`RenderItem`），再由一个 `switch` 分发到具体组件。这一过程是串行的多轮 `useMemo` 处理，顺序如下：
+
+1. **轮次时长预处理**：以 `user` / `system` 消息切分轮次，收集本轮内所有 assistant 消息 id 与最后一个非空的 `durationMs`，写入 `turnDurationById`。`agent_end` 只会把耗时写在最后一条 assistant 消息上，靠这张表把耗时还原到「本轮的第一个执行块」。
+2. **逐消息解析**：先用 `normalizeMessageContent` 归一化 `content`（Mastra 传入的可能是字符串、数组或 `parts`）。`tool_result` 块先建 `toolResultsById` 索引；随后按块类型分派：
+   - `text` / `output` / `message`（或无 type 但带 `text` / `content` / `value`）：累积正文；
+   - `thinking` / `reasoning` / `thought` / `redactedthinking`：生成思维链步骤，耗时优先取块内 `durationSec`，其次按消息耗时折算，最后按文本长度估算；
+   - `toolcall` / `tooluse` / `toolinvocation`：生成工具步骤，`isDone` 由 `state === "result"` 或已存在结果判定，工具定义从 `tools` / `subagents` 映射中查名称与图标。
+3. **刷新策略**：遇到正文块或子智能体时调用 `flushExecution()`，把当前累积的步骤落成一个执行块；遇到思维链或工具块时调用 `flushText()`，且**只在正文非空（或尾部为错误）时产出 assistant 项**，因此流式过程中不会出现空气泡。
+4. **消息收尾**：消息解析完成后再次 flush，并把 `msg.changedFiles` 挂到本轮最后一条 assistant 项上；若没有任何正文项，则补一个只含文件卡片的 assistant 项。
+5. **补漏**：状态机里已出现、但消息体中没有对应块的工具会被补进 `live-execution-block`；未渲染过的子智能体补成独立卡片。
+6. **占位**：Agent 运行中且最后一项是用户消息时，插入 `active-execution-placeholder`，让 `Thinking for …` 立刻可见，而不必等第一个工具调用。
+7. **收尾归并**：先合并相邻执行块（步骤按 id 去重）、丢弃空且非活跃的块；再做「一轮一个活动块」折叠——游标在 `user` / `system` 项处重置，同一轮后续所有执行块并入第一个块，`isActive` / `startedAt` / `durationMs` / `changedFiles` 取最新值。
+
+第 7 步是「一轮只出现一个 `Worked for …`」的关键：早期实现每个 assistant 消息各带一个执行块，一轮里就会冒出多个标题，现在统一在渲染层折叠。
+
+#### 3.3.2 运行中与已结束两种展示形态
+
+`ExecutionBlock.tsx` 用同一组件承载两种状态，形态由 `isActive` 决定：
+
+- **运行中**：标题为 `Thinking for 12.3s`（或 `1m 20s`），后面带 `(N steps)` 计数与向下箭头；折叠态下方是 82px 高的步骤预览窗，随新步骤自动滚到底，点击标题或预览窗展开全部步骤。
+- **已结束**：整轮只留一行 `Worked for 1m 6s ⌄`，步骤默认完全隐藏，点击才展开；若该块没有任何步骤且非活跃，组件直接返回 `null`。
+- **耗时来源**：`agent_end` 时写入消息的 `durationMs`；缺失时回退到 3.3.1 的 `turnDurationById`。数据库中没有耗时列，因此 `chatReducer` 的 `SET_MESSAGES` 会保留内存中的旧耗时，并给历史会话补到本轮最后一条 assistant 消息——更早的历史轮次仍可能只显示不带时长的 `Worked`。
+- **时长格式**：不足 60 秒显示一位小数（`12.3s`），超过则显示 `Xm Ys`；运行中由 100ms 定时器按 `startedAt` 刷新。
+
+#### 3.3.3 用户消息吸顶与折叠
+
+`UserMessage.tsx` 负责让「当前视口中最新的提问」常驻顶部：
+
+- 未展开时 `position: sticky` + `top: 0` + `zIndex: 20` + 不透明 `var(--bg)` 背景，滚动时停在视口顶端；展开态取消吸顶，恢复普通文档流。
+- 内容高度超过阈值（气泡约 80px）时折叠，底部叠 24px 渐变遮罩与 chevron，点击切换展开；若 `window.getSelection()` 显示存在选区则不触发切换，保留「拖选复制」。
+- 图片缩略图固定高度 60px、`object-fit: contain`，点击打开 `ImagePreviewModal`；气泡下方是时间戳与复制按钮。
+- 布局细节：滚动容器自身不设内边距，内层 800px 列承担 `16px 24px 0`；吸顶容器用负外边距 `-24px` + 等量 padding 把背景铺到列边缘，避免吸顶卡片两侧露出被滚动的正文。
+
+#### 3.3.4 变更文件卡片与子智能体卡片
+
+- **变更文件卡片 (`FilesChangedBar.tsx`)**：`message.changedFiles` 非空时挂在 assistant 消息尾部。头部一行是 `N files changed +X -Y`，点击整行展开；展开后每个文件显示 `basename` + 目录 + 增删行数，`Review` 按钮阻止冒泡并直接打开差异编辑器。行内 diff 懒加载（`getTaskFileDiff`，按 `messageId` 取），`isLive` 表示任务仍在执行。
+- **持久化 (`src/electron/task-changes-store.ts`)**：任务结束时的文件列表与 diff 写入 `<appData>/task-changes.json`（thread → message → files/diff，上限 40 个线程 × 80 个任务、单条 diff 200KB），重启后 `getMessages` 会重新挂回 `changedFiles`，删除线程时同步清理。
+- **子智能体卡片 (`SubagentExecution.tsx`)**：整行可点，`🏗️` + `Agent` + 任务描述 + 完成耗时 + ✓/✗/运行中脉冲点；展开后展示子智能体内部的工具调用与最终结果。
+
+#### 3.3.5 滚动、空态与层叠
+
+- **自动滚动**：用 `isAutoScroll` 标记是否跟随底部（距底小于 100px 视为跟随），新消息与工具更新时先把 `scrollTop` 置到底部，再在下一帧补滚一次，避免 React 提交时机导致的位置偏差。
+- **布局**：外层 `flex: 1` / `overflow-y: auto` / `overflow-x: hidden` / `scrollbar-gutter: stable`，内层 `max-width: 800px; margin: 0 auto; flex: 1 0 auto; min-height: 100%`，底部留 16px 占位。
+- **空态与进度**：无渲染项且 Agent 空闲时展示 `AsciiLogo`；存在 `todos` 时在列表底部渲染 `TodoProgress`；`system` 消息渲染为带 `System Notice` 标签的提示块；连续重复的用户消息按文本去重。
+- **层叠顺序**：吸顶卡片使用 `zIndex: 20`，所有可能下探到聊天区的浮层必须高于它——`OpenInDropdown` 为 400，编辑器内的模型/权限浮层为 200，命令面板与模态框为 1000 以上。
 
 ### 3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)
 
@@ -180,7 +235,7 @@ contextBridge.exposeInMainWorld("api", {
 
 ## 4. 核心业务与数据流时序
 
-### 4.1 用户消息与思考链流式响应时序
+### 4.1 用户消息、思考链与执行块流式时序
 
 ```mermaid
 sequenceDiagram
@@ -203,7 +258,7 @@ sequenceDiagram
         Harness->>Main: emit("message_update", msg)
         Main->>Preload: webContents.send("harness:event", msg)
         Preload->>React: window.api.onEvent 回调
-        React->>React: 更新 Thinking 折叠预览状态
+        React->>React: 更新 Thinking for … 预览（82px 自动滚动）
 
         Agent-->>Harness: 吐出回答文本增量 (type: "text")
         Harness->>Main: emit("message_update", msg)
@@ -216,6 +271,15 @@ sequenceDiagram
     Harness->>Main: emit("message_end", msg)
     Main->>Preload: webContents.send("harness:event", msg)
     Preload->>React: 更新完成态，停止 Streaming 光标
+
+    Harness->>Main: emit("agent_end")
+    Main->>Preload: webContents.send("harness:event", agent_end)
+    Preload->>React: onEvent 回调
+    React->>Main: invoke({ type: "getTaskChangedFiles", messageId })
+    Main->>Main: 取本轮变更文件与 diff 并落盘
+    Main-->>React: changedFiles
+    React->>React: SET_MESSAGE_CHANGED_FILES + AGENT_END 计算 durationMs
+    React->>React: 执行块折叠为 "Worked for …"，尾部挂变更文件卡片
 ```
 
 ### 4.2 工具调用审批与人机协同流程
@@ -287,6 +351,7 @@ src/
 │   ├── preload.ts             # 安全预加载脚本，实现 contextBridge 注入
 │   ├── electron-state.ts      # 工作区维度的集成状态管理 (Linear/GitHub 绑定)
 │   ├── notifications.ts       # 原生系统通知与角标更新服务
+│   ├── task-changes-store.ts  # 任务变更文件与 diff 的本地持久化 (task-changes.json)
 │   ├── helpers.ts             # 会话辅助工具 (OAuth 校验、对话标题自动生成)
 │   └── ipc/                   # 模块化 IPC 命令处理器 (14 个业务子模块)
 │       ├── harness-handlers.ts       # 消息收发、模式与模型调度
@@ -308,8 +373,12 @@ src/
 │   ├── main.tsx              # React 挂载入口
 │   ├── App.tsx                # 应用顶层布局骨架、快捷键注册与状态装配
 │   ├── components/            # 核心 UI 面板与交互组件
-│   │   ├── ChatView.tsx              # 核心对话面板，支持消息流与工具调用树
-│   │   ├── AssistantMessage.tsx      # Agent 消息渲染器，含 Thinking 思维链折叠
+│   │   ├── ChatView.tsx              # 会话渲染管线：消息分组、一轮一个执行块、吸顶用户消息
+│   │   ├── AssistantMessage.tsx      # 助手正文渲染 (Markdown / 代码高亮 / 复制)
+│   │   ├── ExecutionBlock.tsx        # 执行块：运行中 Thinking for … / 结束 Worked for …
+│   │   ├── UserMessage.tsx           # 用户消息气泡：吸顶、折叠、图片预览
+│   │   ├── FilesChangedBar.tsx       # 本轮变更文件卡片与行内 diff
+│   │   ├── TodoProgress.tsx          # 任务进度条
 │   │   ├── ToolExecution.tsx         # 工具执行状态卡片组件
 │   │   ├── SubagentExecution.tsx     # 子 Agent 执行嵌套可视化组件
 │   │   ├── TerminalPanel.tsx         # 基于 xterm.js 的嵌入式终端面板
