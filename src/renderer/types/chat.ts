@@ -655,6 +655,24 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				}
 			}
 
+			// A send shows up in the renderer before the harness has stored it, so
+			// a reload that races the send (e.g. the queue draining while
+			// agent_end reloads the thread) would drop the bubble the user just
+			// sent. Re-append optimistic user messages the stored list lacks.
+			const pendingUserMessages = state.messages.filter(
+				(m) => isUserMessage(m) && String(m.id ?? "").startsWith("user-"),
+			)
+			if (pendingUserMessages.length > 0) {
+				const storedTexts = new Set(
+					cleanedMessages.filter(isUserMessage).map((m) => getMessageText(m)),
+				)
+				for (const pending of pendingUserMessages) {
+					if (cleanedMessages.some((m) => m.id === pending.id)) continue
+					if (storedTexts.has(getMessageText(pending))) continue
+					cleanedMessages.push(pending)
+				}
+			}
+
 			return {
 				...state,
 				messages: hasPendingError

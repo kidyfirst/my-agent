@@ -317,4 +317,82 @@ describe("Message Deduplication and Reconciliation in chatReducer", () => {
 		expect(state.messages[0].changedFiles).toHaveLength(1)
 		expect(state.messages[0].changedFiles![0].path).toBe("src/renderer/App.tsx")
 	})
+
+	it("keeps an optimistic user message when a reload races the send", () => {
+		const stored: Message[] = [
+			{
+				id: "msg-user-1",
+				role: "user",
+				content: [{ type: "text", text: "first question" }],
+			},
+			{
+				id: "msg-assistant-1",
+				role: "assistant",
+				content: [{ type: "text", text: "answer" }],
+			},
+		]
+
+		let state = chatReducer(initialChatState, {
+			type: "SET_MESSAGES",
+			messages: stored,
+		})
+		// A queued message is sent optimistically, then the thread reloads
+		// before the harness has stored it.
+		state = chatReducer(state, {
+			type: "MESSAGE_START",
+			message: {
+				id: "user-2000",
+				role: "user",
+				content: [{ type: "text", text: "follow up" }],
+			},
+		})
+		state = chatReducer(state, { type: "SET_MESSAGES", messages: stored })
+
+		expect(state.messages).toHaveLength(3)
+		expect(state.messages[2].id).toBe("user-2000")
+	})
+
+	it("does not duplicate the optimistic message once it is stored", () => {
+		const stored: Message[] = [
+			{
+				id: "msg-user-1",
+				role: "user",
+				content: [{ type: "text", text: "first question" }],
+			},
+			{
+				id: "msg-assistant-1",
+				role: "assistant",
+				content: [{ type: "text", text: "answer" }],
+			},
+		]
+
+		let state = chatReducer(initialChatState, {
+			type: "SET_MESSAGES",
+			messages: stored,
+		})
+		state = chatReducer(state, {
+			type: "MESSAGE_START",
+			message: {
+				id: "user-2000",
+				role: "user",
+				content: [{ type: "text", text: "follow up" }],
+			},
+		})
+
+		const withStoredFollowUp: Message[] = [
+			...stored,
+			{
+				id: "msg-user-2",
+				role: "user",
+				content: [{ type: "text", text: "follow up" }],
+			},
+		]
+		state = chatReducer(state, {
+			type: "SET_MESSAGES",
+			messages: withStoredFollowUp,
+		})
+
+		expect(state.messages).toHaveLength(3)
+		expect(state.messages[2].id).toBe("msg-user-2")
+	})
 })

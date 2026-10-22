@@ -60,15 +60,20 @@ export function captureGitSnapshot(root: string): GitSnapshot {
 
 function parseNumstat(
 	out: string,
-): Map<string, { added: number; deleted: number }> {
-	const counts = new Map<string, { added: number; deleted: number }>()
+): Map<string, { added: number; deleted: number; binary: boolean }> {
+	const counts = new Map<
+		string,
+		{ added: number; deleted: number; binary: boolean }
+	>()
 	for (const line of out.split("\n")) {
 		const [added, deleted, ...rest] = line.split("\t")
 		const path = rest.join("\t")
 		if (!path) continue
+		const binary = added === "-" || deleted === "-"
 		counts.set(path, {
-			added: added === "-" ? 0 : Number(added) || 0,
-			deleted: deleted === "-" ? 0 : Number(deleted) || 0,
+			added: binary ? 0 : Number(added) || 0,
+			deleted: binary ? 0 : Number(deleted) || 0,
+			binary,
 		})
 	}
 	return counts
@@ -93,7 +98,7 @@ export function diffBetweenSnapshots(
 	if (!root || !before.tree || !after.tree) return []
 	if (before.tree === after.tree) return []
 
-	let numstat: Map<string, { added: number; deleted: number }>
+	let numstat: Map<string, { added: number; deleted: number; binary: boolean }>
 	try {
 		numstat = parseNumstat(
 			git(root, ["diff", "--numstat", "--no-renames", before.tree, after.tree]),
@@ -108,14 +113,26 @@ export function diffBetweenSnapshots(
 
 	const files: ChangedFile[] = []
 	for (const [path, counts] of numstat) {
+		const status = !beforePaths.has(path)
+			? "added"
+			: !afterPaths.has(path)
+				? "deleted"
+				: "modified"
+		// A mode-only change (e.g. chmod) shows up with zero line counts. It is
+		// not a content change, so it should not produce a changed-files card.
+		if (
+			status === "modified" &&
+			!counts.binary &&
+			counts.added === 0 &&
+			counts.deleted === 0
+		) {
+			continue
+		}
 		files.push({
 			path,
-			...counts,
-			status: !beforePaths.has(path)
-				? "added"
-				: !afterPaths.has(path)
-					? "deleted"
-					: "modified",
+			added: counts.added,
+			deleted: counts.deleted,
+			status,
 		})
 	}
 	return files.sort((a, b) => a.path.localeCompare(b.path))

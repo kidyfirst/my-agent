@@ -53,6 +53,13 @@ describe("git task snapshot", () => {
 		expect(diffBetweenSnapshots(repo, before, after)).toEqual([])
 	})
 
+	it("ignores mode-only changes", () => {
+		const before = captureGitSnapshot(repo)
+		execFileSync("chmod", ["+x", join(repo, "a.ts")])
+		const after = captureGitSnapshot(repo)
+		expect(diffBetweenSnapshots(repo, before, after)).toEqual([])
+	})
+
 	it("diffs a single file between two snapshots", () => {
 		const before = captureGitSnapshot(repo)
 		writeFileSync(join(repo, "new.ts"), "brand new\n")
