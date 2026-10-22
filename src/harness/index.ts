@@ -49,7 +49,12 @@ import {
 	type StorageConfig,
 } from "../utils/project.js"
 import { syncGateways } from "../utils/gateway-sync.js"
-import { getToolCategory } from "../permissions.js"
+import {
+	getToolCategory,
+	getRuntimeYolo,
+	getRuntimeCategoryPolicies,
+	setRuntimeCategoryPolicy,
+} from "../permissions.js"
 import {
 	stateSchema,
 	DEFAULT_OM_MODEL_ID,
@@ -530,7 +535,7 @@ export async function createMastraCode(
 			projectPath: project.rootPath,
 			projectName: project.name,
 			gitBranch: project.gitBranch,
-			yolo: true,
+			yolo: getRuntimeYolo(),
 			...config?.initialState,
 		},
 		modelUseCountProvider: () => loadSettings().modelUseCounts,
@@ -562,6 +567,24 @@ export async function createMastraCode(
 			const currentSessionModelId = s.state?.get?.()?.currentModelId
 			if (!currentSessionModelId) {
 				await s.state?.set?.({ currentModelId: defaultModelId })
+			}
+			// Re-apply the process-wide permission mode: a session created before
+			// the renderer sent its mode (or a new one after a mode change) would
+			// otherwise fall back to the gate's "ask" default for every tool.
+			const runtimePolicies = getRuntimeCategoryPolicies()
+			for (const [category, policy] of Object.entries(runtimePolicies)) {
+				try {
+					await s.permissions.setForCategory({
+						category: category as ToolCategory,
+						policy: policy as PermissionPolicy,
+					})
+				} catch (e) {
+					console.error("Failed to apply permission policy:", e)
+				}
+			}
+			const runtimeYolo = getRuntimeYolo()
+			if (s.state?.get?.()?.yolo !== runtimeYolo) {
+				await s.state?.set?.({ yolo: runtimeYolo })
 			}
 			const knownMessages = new Map<string, ControllerMessageLike>()
 			s.subscribe((event: HarnessEvent) => {
@@ -645,7 +668,7 @@ export async function createMastraCode(
 				projectPath: project.rootPath,
 				projectName: project.name,
 				gitBranch: project.gitBranch,
-				yolo: true,
+				yolo: getRuntimeYolo(),
 				...config?.initialState,
 				...sessionState,
 				currentModelId: sessionState.currentModelId || currentModel,
@@ -834,6 +857,10 @@ export async function createMastraCode(
 		},
 		setPermissionForCategory(options: { category: string; policy: string }) {
 			categoryPolicies[options.category] = options.policy
+			setRuntimeCategoryPolicy(
+				options.category as Parameters<typeof setRuntimeCategoryPolicy>[0],
+				options.policy as Parameters<typeof setRuntimeCategoryPolicy>[1],
+			)
 			if (activeSession?.permissions?.setForCategory) {
 				activeSession.permissions.setForCategory({
 					category: options.category as ToolCategory,

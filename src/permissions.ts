@@ -79,10 +79,14 @@ const ALWAYS_ALLOW_TOOLS = new Set([
 ])
 
 /**
- * Get the category for a tool, or null if the tool is always-allowed.
+ * Get the category for a tool.
+ *
+ * Always-allowed tools resolve to "read" so the approval gate auto-allows them
+ * in every mode ("read" is "allow" in all built-in policies) instead of falling
+ * through to the gate's "ask" default.
  */
-export function getToolCategory(toolName: string): ToolCategory | null {
-	if (ALWAYS_ALLOW_TOOLS.has(toolName)) return null
+export function getToolCategory(toolName: string): ToolCategory {
+	if (ALWAYS_ALLOW_TOOLS.has(toolName)) return "read"
 	return TOOL_CATEGORY_MAP[toolName] ?? "mcp"
 }
 // ---------------------------------------------------------------------------
@@ -112,4 +116,40 @@ export const YOLO_POLICIES: Record<ToolCategory, PermissionPolicy> = {
 	edit: "allow",
 	execute: "allow",
 	mcp: "allow",
+}
+
+// ---------------------------------------------------------------------------
+// Runtime permission state
+// ---------------------------------------------------------------------------
+//
+// The permission mode is chosen in the composer and applies process-wide until
+// it changes again. Keeping it here (instead of only on a live Session) means a
+// session created later — a new worktree, or the very first session at startup,
+// before the renderer has sent any IPC — still inherits the selected mode.
+
+let runtimeYolo = false
+const runtimeCategoryPolicies: Partial<Record<ToolCategory, PermissionPolicy>> =
+	{}
+
+export function getRuntimeYolo(): boolean {
+	return runtimeYolo
+}
+
+export function setRuntimeYolo(enabled: boolean): void {
+	runtimeYolo = enabled
+	const policies = enabled ? YOLO_POLICIES : DEFAULT_POLICIES
+	for (const [category, policy] of Object.entries(policies)) {
+		runtimeCategoryPolicies[category as ToolCategory] = policy
+	}
+}
+
+export function getRuntimeCategoryPolicies(): Record<string, PermissionPolicy> {
+	return { ...runtimeCategoryPolicies }
+}
+
+export function setRuntimeCategoryPolicy(
+	category: ToolCategory,
+	policy: PermissionPolicy,
+): void {
+	runtimeCategoryPolicies[category] = policy
 }

@@ -68,7 +68,6 @@ export async function ensureAuthenticatedModel(
 			subagentModelId: modelId,
 			observerModelId: modelId,
 			reflectorModelId: modelId,
-			yolo: true,
 		})
 		if ((h as any).config?.modes) {
 			for (const mode of (h as any).config.modes) {
@@ -95,7 +94,6 @@ export async function ensureAuthenticatedModel(
 					subagentModelId: fallback,
 					observerModelId: fallback,
 					reflectorModelId: fallback,
-					yolo: true,
 				})
 				if ((h as any).config?.modes) {
 					for (const mode of (h as any).config.modes) {
