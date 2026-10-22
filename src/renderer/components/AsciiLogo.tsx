@@ -44,7 +44,8 @@ export function AsciiLogo() {
 				flexDirection: "column",
 				alignItems: "center",
 				justifyContent: "center",
-				height: "100%",
+				flex: 1,
+				minHeight: "100%",
 				gap: 16,
 			}}
 		>

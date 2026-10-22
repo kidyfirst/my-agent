@@ -549,9 +549,22 @@ export function ChatView({
 				overflowX: "hidden",
 				padding: "16px 24px",
 				minWidth: 0,
+				display: "flex",
+				flexDirection: "column",
 			}}
 		>
-			{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
+			<div
+				style={{
+					maxWidth: 800,
+					width: "100%",
+					margin: "0 auto",
+					display: "flex",
+					flexDirection: "column",
+					flex: "1 0 auto",
+					minHeight: "100%",
+				}}
+			>
+				{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
 
 			{cleanedItems.map((item) => {
 				switch (item.type) {
@@ -652,5 +665,6 @@ export function ChatView({
 			{/* Bottom padding */}
 			<div style={{ height: 16 }} />
 		</div>
+	</div>
 	)
 }

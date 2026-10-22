@@ -525,7 +525,15 @@ export function EditorInput({
 				background: "var(--bg)",
 			}}
 		>
-			{queue && queue.length > 0 && (
+			<div
+				style={{
+					maxWidth: 800,
+					width: "100%",
+					margin: "0 auto",
+					position: "relative",
+				}}
+			>
+				{queue && queue.length > 0 && (
 				<MessageQueueBar
 					queue={queue}
 					isAgentActive={isAgentActive}
@@ -1441,6 +1449,7 @@ export function EditorInput({
 					</div>
 				</div>
 			</div>
+		</div>
 
 			<ImagePreviewModal
 				src={previewImage}
