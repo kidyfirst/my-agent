@@ -34,7 +34,7 @@ export type {
 	ToolCategory,
 }
 import { Agent } from "@mastra/core/agent"
-import { Memory } from "@mastra/memory"
+import { Memory } from "../memory/index.js"
 import { LibSQLStore } from "@mastra/libsql"
 import type { RequestContext } from "@mastra/core/request-context"
 import { AuthStorage } from "../auth/storage.js"
