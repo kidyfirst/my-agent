@@ -595,7 +595,7 @@ export function EditorInput({
 								? "1px solid var(--accent)"
 								: "1px solid var(--border)",
 						borderRadius: 16,
-						padding: "12px 14px 10px",
+						padding: "6px 14px 5px",
 						boxShadow: isDraggingOver
 							? "0 0 12px rgba(109, 40, 217, 0.2)"
 							: isFocused

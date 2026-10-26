@@ -630,19 +630,73 @@ export class Session<TState = any> {
 			const userText =
 				typeof options.content === "string"
 					? options.content
-					: (options.content as any)?.text || JSON.stringify(options.content)
+					: (options.content as any)?.text ||
+						(options.content ? JSON.stringify(options.content) : "")
+
+			const userParts: any[] = []
+			if (userText) {
+				userParts.push({ type: "text", text: userText })
+			}
+
+			const incomingFiles = Array.isArray(options.files)
+				? options.files
+				: Array.isArray(options.images)
+					? options.images
+					: []
+
+			for (const f of incomingFiles) {
+				if (!f) continue
+				const mime = String(f.mimeType || f.mediaType || "image/png")
+				const name = String(f.name || f.filename || "image.png")
+				const isImg =
+					f.type === "image" ||
+					mime.startsWith("image/") ||
+					/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)
+				if (isImg) {
+					userParts.push({
+						type: "image",
+						mimeType: mime,
+						mediaType: mime,
+						data: f.data || "",
+						name,
+						filename: name,
+						url:
+							f.url ||
+							(f.data
+								? f.data.startsWith("data:")
+									? f.data
+									: `data:${mime};base64,${f.data}`
+								: undefined),
+					})
+				} else {
+					userParts.push({
+						type: "file",
+						mimeType: mime || "text/plain",
+						mediaType: mime || "text/plain",
+						data: f.data || "",
+						name,
+						filename: name,
+					})
+				}
+			}
+
+			if (userParts.length === 0) {
+				userParts.push({ type: "text", text: "" })
+			}
 
 			const userDbMessage = {
 				id: userMessageId,
 				role: "user",
 				content: {
 					format: 2,
-					parts: [{ type: "text", text: userText }],
+					parts: userParts,
 					content: userText,
+					attachments: incomingFiles.length > 0 ? incomingFiles : undefined,
 				},
 				threadId,
 				resourceId,
 				createdAt: new Date(),
+				attachments: incomingFiles.length > 0 ? incomingFiles : undefined,
 			}
 
 			const store = await this.getMemoryStore()
@@ -821,21 +875,107 @@ export class Session<TState = any> {
 			//   - turns that only carry tool invocations, which yield empty text
 			// A run of empty `content: ""` messages deforms the conversation and
 			// makes models stop trusting their (real) tool list.
+			const modelIdStr = String(
+				(model as any)?.modelId || (model as any)?.id || "",
+			).toLowerCase()
+			const canVision =
+				!modelIdStr ||
+				(!modelIdStr.includes("deepseek-v4-pro") &&
+					!modelIdStr.includes("o3-mini") &&
+					!modelIdStr.includes("o1-mini") &&
+					!(modelIdStr.includes("qwen-") && !modelIdStr.includes("vl")) &&
+					!(modelIdStr.includes("llama-") && !modelIdStr.includes("vision")))
+
 			const coreMessages: any[] = []
 			for (const m of historyMessages) {
 				if (m.role !== "user" && m.role !== "assistant") continue
 				const role = m.role
-				let text = ""
-				if (typeof m.content === "string") {
-					text = m.content
-				} else if (m.content?.content) {
-					text = typeof m.content.content === "string" ? m.content.content : ""
-				} else if (Array.isArray(m.content?.parts)) {
-					text = m.content.parts.map((p: any) => p.text || "").join("")
+				if (role === "user") {
+					const parts: any[] = []
+					let userText = ""
+
+					const rawParts = Array.isArray(m.content?.parts)
+						? m.content.parts
+						: Array.isArray(m.content)
+							? m.content
+							: []
+
+					if (rawParts.length > 0) {
+						for (const p of rawParts) {
+							if (!p) continue
+							if (p.type === "text" && typeof p.text === "string") {
+								userText = (userText ? userText + "\n" : "") + p.text
+							} else if (p.type === "image" && canVision) {
+								const imgData =
+									p.data ||
+									p.image ||
+									(typeof p.url === "string" && p.url.startsWith("data:")
+										? p.url.split(",")[1]
+										: p.url)
+								if (imgData) {
+									const mediaType = p.mimeType || p.mediaType || "image/png"
+									parts.push({
+										type: "image",
+										image: String(imgData),
+										mediaType,
+									})
+								}
+							}
+						}
+					} else {
+						if (typeof m.content === "string") {
+							userText = m.content
+						} else if (m.content?.content) {
+							userText =
+								typeof m.content.content === "string" ? m.content.content : ""
+						}
+					}
+
+					if (parts.length === 0 && canVision && Array.isArray(m.attachments)) {
+						for (const att of m.attachments) {
+							const mime = String(att.mimeType || att.mediaType || "")
+							const isImg =
+								att.type === "image" ||
+								mime.startsWith("image/") ||
+								/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(String(att.name || ""))
+							if (isImg && (att.data || att.preview)) {
+								const rawData = att.data || att.preview
+								const cleanData =
+									typeof rawData === "string" && rawData.startsWith("data:")
+										? rawData.split(",")[1]
+										: rawData
+								parts.push({
+									type: "image",
+									image: String(cleanData),
+									mediaType: mime || "image/png",
+								})
+							}
+						}
+					}
+
+					userText = userText.trim()
+					if (parts.length > 0) {
+						if (userText) {
+							parts.unshift({ type: "text", text: userText })
+						}
+						coreMessages.push({ role: "user", content: parts })
+					} else if (userText) {
+						coreMessages.push({ role: "user", content: userText })
+					}
+				} else {
+					let text = ""
+					if (typeof m.content === "string") {
+						text = m.content
+					} else if (m.content?.content) {
+						text =
+							typeof m.content.content === "string" ? m.content.content : ""
+					} else if (Array.isArray(m.content?.parts)) {
+						text = m.content.parts.map((p: any) => p.text || "").join("")
+					}
+					text = text.trim()
+					if (!text) continue
+					coreMessages.push({ role: "assistant", content: text })
 				}
-				text = text.trim()
-				if (!text) continue
-				coreMessages.push({ role, content: text })
 			}
 
 			// 6. Create assistant message placeholder

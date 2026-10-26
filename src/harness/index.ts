@@ -137,10 +137,17 @@ export function normalizeControllerMessage(
 		}
 	}
 
+	const attachments =
+		record.attachments ||
+		(content && typeof content === "object"
+			? (content as any).attachments
+			: undefined)
+
 	return {
 		...record,
 		role,
 		content,
+		...(attachments ? { attachments } : {}),
 	}
 }
 

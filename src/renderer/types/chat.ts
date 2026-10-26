@@ -1,4 +1,4 @@
-import type { Message } from "./ipc"
+import type { Message, MessageContent } from "./ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
 
 export function isUserMessage(
@@ -333,12 +333,35 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 
 			if (matchIdx !== -1) {
 				const existing = state.messages[matchIdx]
+				const mergedAttachments = existing.attachments || incoming.attachments
+				let mergedContent = incoming.content
+
+				if (isUserMessage(existing)) {
+					const existingBlocks = normalizeMessageContent(existing.content)
+					const existingImages = existingBlocks.filter(
+						(b) => b.type === "image",
+					)
+					if (existingImages.length > 0) {
+						const incomingBlocks = normalizeMessageContent(incoming.content)
+						const incomingImages = incomingBlocks.filter(
+							(b) => b.type === "image",
+						)
+						if (incomingImages.length === 0) {
+							const incomingTextBlocks = incomingBlocks.filter(
+								(b) => !b.type || b.type === "text",
+							)
+							mergedContent = [...incomingTextBlocks, ...existingImages]
+						}
+					}
+				}
+
 				const merged: Message = {
 					...existing,
 					...incoming,
 					id: incoming.id,
 					role: incoming.role || existing.role,
-					attachments: existing.attachments || incoming.attachments,
+					content: mergedContent,
+					attachments: mergedAttachments,
 					createdAt: existing.createdAt || incoming.createdAt,
 				}
 				// Never let a text-less server update wipe the optimistic user text
@@ -387,10 +410,30 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 
 			if (matchIdx !== -1) {
 				const existing = state.messages[matchIdx]
-				const newContent =
+				let newContent =
 					incoming.content && incoming.content.length > 0
 						? incoming.content
 						: existing.content
+
+				if (isUserMessage(existing)) {
+					const existingBlocks = normalizeMessageContent(existing.content)
+					const existingImages = existingBlocks.filter(
+						(b) => b.type === "image",
+					)
+					if (existingImages.length > 0) {
+						const incomingBlocks = normalizeMessageContent(newContent)
+						const incomingImages = incomingBlocks.filter(
+							(b) => b.type === "image",
+						)
+						if (incomingImages.length === 0) {
+							const incomingTextBlocks = incomingBlocks.filter(
+								(b) => !b.type || b.type === "text",
+							)
+							newContent = [...incomingTextBlocks, ...existingImages]
+						}
+					}
+				}
+
 				const merged: Message = {
 					...existing,
 					...incoming,
@@ -437,10 +480,30 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 
 			if (matchIdx !== -1) {
 				const existing = state.messages[matchIdx]
-				const newContent =
+				let newContent =
 					incoming.content && incoming.content.length > 0
 						? incoming.content
 						: existing.content
+
+				if (isUserMessage(existing)) {
+					const existingBlocks = normalizeMessageContent(existing.content)
+					const existingImages = existingBlocks.filter(
+						(b) => b.type === "image",
+					)
+					if (existingImages.length > 0) {
+						const incomingBlocks = normalizeMessageContent(newContent)
+						const incomingImages = incomingBlocks.filter(
+							(b) => b.type === "image",
+						)
+						if (incomingImages.length === 0) {
+							const incomingTextBlocks = incomingBlocks.filter(
+								(b) => !b.type || b.type === "text",
+							)
+							newContent = [...incomingTextBlocks, ...existingImages]
+						}
+					}
+				}
+
 				const merged: Message = {
 					...existing,
 					...incoming,
@@ -594,8 +657,24 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 			// duration that drives "Worked for 45s".
 			const existingDurationById = new Map<string, number>()
 			let lastAssistantDuration: number | undefined
+			const existingAttachmentsById = new Map<
+				string,
+				NonNullable<Message["attachments"]>
+			>()
+			const existingImagePartsById = new Map<string, MessageContent[]>()
 
 			for (const m of state.messages) {
+				if (m.attachments && m.attachments.length > 0 && m.id) {
+					existingAttachmentsById.set(m.id, m.attachments)
+				}
+				if (isUserMessage(m) && m.id) {
+					const imgs = normalizeMessageContent(m.content).filter(
+						(b) => b.type === "image",
+					)
+					if (imgs.length > 0) {
+						existingImagePartsById.set(m.id, imgs)
+					}
+				}
 				if (m.changedFiles && m.changedFiles.length > 0) {
 					if (m.id) existingChangedFilesById.set(m.id, m.changedFiles)
 					if (m.role === "assistant") {
@@ -623,8 +702,29 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				const preservedFiles =
 					m.changedFiles || existingChangedFilesById.get(m.id)
 				const preservedDuration = m.durationMs ?? existingDurationById.get(m.id)
+				const preservedAttachments =
+					m.attachments || existingAttachmentsById.get(m.id)
+				let finalContent = m.content
+				if (isUserMessage(m)) {
+					const incomingImgs = normalizeMessageContent(m.content).filter(
+						(b) => b.type === "image",
+					)
+					if (incomingImgs.length === 0) {
+						const prevImgs = existingImagePartsById.get(m.id)
+						if (prevImgs && prevImgs.length > 0) {
+							const textBlocks = normalizeMessageContent(m.content).filter(
+								(b) => !b.type || b.type === "text",
+							)
+							finalContent = [...textBlocks, ...prevImgs]
+						}
+					}
+				}
 				cleanedMessages.push({
 					...m,
+					content: finalContent,
+					...(preservedAttachments
+						? { attachments: preservedAttachments }
+						: {}),
 					...(preservedFiles ? { changedFiles: preservedFiles } : {}),
 					...(preservedDuration != null
 						? { durationMs: preservedDuration }

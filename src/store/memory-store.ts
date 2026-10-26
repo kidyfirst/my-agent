@@ -708,12 +708,15 @@ export class SQLiteMemoryStore {
 				content = JSON.parse(row.content)
 			} catch {}
 		}
+		const attachments =
+			content && typeof content === "object" ? content.attachments : undefined
 		return {
 			id: row.id,
 			threadId: row.thread_id,
 			role: row.role,
 			type: row.type,
 			content,
+			...(attachments ? { attachments } : {}),
 			createdAt: new Date(row.createdAt),
 			resourceId: row.resourceId || undefined,
 			durationMs: row.durationMs != null ? Number(row.durationMs) : undefined,

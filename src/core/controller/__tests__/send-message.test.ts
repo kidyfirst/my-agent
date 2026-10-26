@@ -297,4 +297,77 @@ describe("Session.sendMessage", () => {
 		const assistant = messages.filter((m: any) => m.role === "assistant")
 		expect(assistant).toHaveLength(0)
 	})
+
+	it("persists image parts and attachments and passes ImagePart to vision model", async () => {
+		let receivedPrompt: any = null
+		const model = new MockLanguageModelV3({
+			doStream: async (options) => {
+				receivedPrompt = options.prompt
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "t1" },
+						{ type: "text-delta", id: "t1", delta: "I see your screenshot" },
+						{ type: "text-end", id: "t1" },
+						{
+							type: "finish",
+							finishReason: "stop",
+							usage,
+						},
+					]),
+					warnings: [],
+				}
+			},
+		})
+		const controller = makeController(model)
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "test-img" })
+
+		await session.sendMessage({
+			content: "看看这个输入框",
+			files: [
+				{
+					type: "image",
+					mediaType: "image/png",
+					data: "fakeBase64ScreenshotData",
+					name: "screenshot.png",
+				},
+			],
+		} as any)
+
+		const threadId = session.thread.getId()
+		const store = await (controller.storage as SQLiteStore).getStore("memory")
+		const { messages } = await store.listMessages({ threadId })
+
+		const userMsg = messages.find((m: any) => m.role === "user")
+		expect(userMsg).toBeDefined()
+		expect(userMsg.content.parts).toHaveLength(2)
+		expect(userMsg.content.parts[0]).toMatchObject({
+			type: "text",
+			text: "看看这个输入框",
+		})
+		expect(userMsg.content.parts[1]).toMatchObject({
+			type: "image",
+			mimeType: "image/png",
+			data: "fakeBase64ScreenshotData",
+			name: "screenshot.png",
+		})
+		expect(userMsg.attachments).toHaveLength(1)
+
+		// Model prompt verification
+		expect(receivedPrompt).toBeDefined()
+		const userTurn = receivedPrompt.find((p: any) => p.role === "user")
+		expect(userTurn).toBeDefined()
+		expect(Array.isArray(userTurn.content)).toBe(true)
+		expect(userTurn.content[0]).toMatchObject({
+			type: "text",
+			text: "看看这个输入框",
+		})
+		const imgPart = userTurn.content.find(
+			(c: any) => c.type === "image" || c.type === "file",
+		)
+		expect(imgPart).toBeDefined()
+		expect(imgPart.image || imgPart.data).toBe("fakeBase64ScreenshotData")
+		expect(imgPart.mediaType || imgPart.mimeType).toBe("image/png")
+	})
 })

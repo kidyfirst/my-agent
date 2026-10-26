@@ -144,38 +144,44 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				Array.isArray(command.images) && command.images.length > 0
 			let messageContent = command.content || ""
 
-			let files: any[] | undefined
-			if (hasImages) {
-				if (modelSupportsVision(currentModelId)) {
-					files = command.images.map((img: any) => ({
+			const imageFiles = hasImages
+				? command.images.map((img: any) => ({
+						type: "image",
 						mediaType: img.mediaType || img.mimeType || "image/png",
 						mimeType: img.mimeType || img.mediaType || "image/png",
 						data: img.data || "",
+						name: img.name || img.filename || "image.png",
 						filename: img.name || img.filename || "image.png",
 					}))
-				} else {
-					// Model is text-only (e.g. DeepSeek). Do not send raw image files to avoid API 400 Bad Request.
-					const fileNames = command.images
-						.map((img: any) => img.name || img.filename || "image.png")
-						.join(", ")
-					messageContent = `${messageContent}\n\n[Attached image: ${fileNames}]\n(Note: The currently selected model "${currentModelId}" is text-only and cannot process images directly. If you need image analysis, please switch to a multimodal model such as Claude, GPT-4o, or Gemini.)`
-				}
+				: []
+
+			if (hasImages && !modelSupportsVision(currentModelId)) {
+				// Model is text-only (e.g. DeepSeek-V4-Pro). Append note to text prompt.
+				const fileNames = command.images
+					.map((img: any) => img.name || img.filename || "image.png")
+					.join(", ")
+				messageContent = `${messageContent}\n\n[Attached image: ${fileNames}]\n(Note: The currently selected model "${currentModelId}" is text-only and cannot process images directly. If you need image analysis, please switch to a multimodal model such as Claude, GPT-4o, or Gemini.)`
 			}
 
-			if (Array.isArray(command.files) && command.files.length > 0) {
-				const nonImgFiles = command.files.map((f: any) => ({
-					mediaType: f.mediaType || f.mimeType || "text/plain",
-					mimeType: f.mimeType || f.mediaType || "text/plain",
-					data: f.data || "",
-					filename: f.name || f.filename || "attachment.txt",
-				}))
-				files = files ? [...files, ...nonImgFiles] : nonImgFiles
-			}
+			const nonImgFiles =
+				Array.isArray(command.files) && command.files.length > 0
+					? command.files.map((f: any) => ({
+							type: "file",
+							mediaType: f.mediaType || f.mimeType || "text/plain",
+							mimeType: f.mimeType || f.mediaType || "text/plain",
+							data: f.data || "",
+							name: f.name || f.filename || "attachment.txt",
+							filename: f.name || f.filename || "attachment.txt",
+						}))
+					: []
+
+			const allFiles = [...imageFiles, ...nonImgFiles]
 
 			const startTime = Date.now()
 			h.sendMessage({
 				content: messageContent,
-				...(files ? { files } : {}),
+				...(allFiles.length > 0 ? { files: allFiles } : {}),
+				...(imageFiles.length > 0 ? { images: imageFiles } : {}),
 			})
 				.then(async () => {
 					const threadAfter = h.getCurrentThreadId()
