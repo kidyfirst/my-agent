@@ -1,5 +1,5 @@
 /**
- * MyAgent - Official Landing & Download Page Client Script
+ * My Agent - Official Landing & Download Page Client Script
  * Handles OS & Architecture detection, GitHub Releases API integration,
  * dynamic download button updating, and clipboard utilities.
  */
@@ -8,15 +8,19 @@
 	"use strict"
 
 	const GITHUB_REPO = "kidyfirst/my-agent"
-	const DEFAULT_VERSION = "v1.0.0"
+	const DEFAULT_VERSION = "v0.1.0"
 	const BASE_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases`
 
-	// Fallback direct download links if GitHub API is unreachable or before first release tag
+	// Fallback direct download links for v0.1.0
 	const FALLBACK_ASSETS = {
-		macArmDmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-1.0.0-mac-arm64.dmg`,
-		macArmZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-1.0.0-mac-arm64.zip`,
-		macX64Dmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-1.0.0-mac-x64.dmg`,
-		macX64Zip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-1.0.0-mac-x64.zip`,
+		macArmDmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-arm64.dmg`,
+		macArmZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-arm64.zip`,
+		macX64Dmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-x64.dmg`,
+		macX64Zip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-x64.zip`,
+		winExe: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-win-x64.exe`,
+		winZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-win-x64.zip`,
+		linuxAppImage: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-linux-x86_64.AppImage`,
+		linuxDeb: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-linux-amd64.deb`,
 	}
 
 	/**
@@ -34,8 +38,7 @@
 			/Mac OS X/i.test(ua)
 		) {
 			os = "mac"
-			// Detect Apple Silicon vs Intel
-			// Check for Apple GPU via WebGL
+			// Detect Apple Silicon vs Intel via WebGL unmasked renderer
 			try {
 				const canvas = document.createElement("canvas")
 				const gl =
@@ -55,7 +58,7 @@
 				// Fallback
 			}
 
-			// If still unknown on modern Mac, arm64 (M1/M2/M3/M4) is modern default
+			// If still unknown on modern Mac, arm64 (M1/M2/M3/M4) is default
 			if (arch === "unknown") {
 				arch = "arm64"
 			}
@@ -115,7 +118,7 @@
 			return data
 		} catch (err) {
 			console.warn(
-				"Could not fetch latest release from GitHub API:",
+				"Could not fetch latest release from GitHub API, using fallback:",
 				err.message,
 			)
 			return null
@@ -130,14 +133,14 @@
 			tag: release ? release.tag_name : DEFAULT_VERSION,
 			date: release ? formatDate(release.published_at) : "2026-10-26",
 			assets: {
-				macArmDmg: { url: FALLBACK_ASSETS.macArmDmg, size: "" },
-				macArmZip: { url: FALLBACK_ASSETS.macArmZip, size: "" },
-				macX64Dmg: { url: FALLBACK_ASSETS.macX64Dmg, size: "" },
-				macX64Zip: { url: FALLBACK_ASSETS.macX64Zip, size: "" },
-				winExe: { url: "", size: "" },
-				winZip: { url: "", size: "" },
-				linuxAppImage: { url: "", size: "" },
-				linuxDeb: { url: "", size: "" },
+				macArmDmg: { url: FALLBACK_ASSETS.macArmDmg, size: "146.9 MB" },
+				macArmZip: { url: FALLBACK_ASSETS.macArmZip, size: "140.3 MB" },
+				macX64Dmg: { url: FALLBACK_ASSETS.macX64Dmg, size: "152.5 MB" },
+				macX64Zip: { url: FALLBACK_ASSETS.macX64Zip, size: "145.8 MB" },
+				winExe: { url: FALLBACK_ASSETS.winExe, size: "117.1 MB" },
+				winZip: { url: FALLBACK_ASSETS.winZip, size: "164.4 MB" },
+				linuxAppImage: { url: FALLBACK_ASSETS.linuxAppImage, size: "151.5 MB" },
+				linuxDeb: { url: FALLBACK_ASSETS.linuxDeb, size: "110.9 MB" },
 			},
 		}
 
@@ -232,7 +235,7 @@
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.79 1.06-1.88.94-2.98-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.76-.95 2.84 1.05.08 2.12-.53 2.74-1.26z"/></svg>
             <span>下载 macOS 版 (${release.tag})</span>
           `
-					heroTip.innerHTML = `已自动适配 <strong>Apple Silicon (M1/M2/M3/M4)</strong> · <a href="#downloads">查看所有平台与格式</a>`
+					heroTip.innerHTML = `已自动适配 <strong>Apple Silicon (M1/M2/M3/M4)</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
 					highlightPlatformCard("platform-mac-arm")
 				} else {
 					heroBtn.href = release.assets.macX64Dmg.url
@@ -240,22 +243,28 @@
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.79 1.06-1.88.94-2.98-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.76-.95 2.84 1.05.08 2.12-.53 2.74-1.26z"/></svg>
             <span>下载 macOS Intel 版 (${release.tag})</span>
           `
-					heroTip.innerHTML = `已自动适配 <strong>Intel 处理器</strong> · <a href="#downloads">查看所有平台与格式</a>`
+					heroTip.innerHTML = `已自动适配 <strong>Intel 处理器</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
 					highlightPlatformCard("platform-mac-x64")
 				}
 			} else if (client.os === "windows") {
 				heroBtn.href = release.assets.winExe.url || "#downloads"
-				heroBtn.innerHTML = `<span>下载 Windows 版 (${release.tag})</span>`
-				heroTip.innerHTML = `已自动适配 <strong>Windows 64位</strong> · <a href="#downloads">查看所有平台与格式</a>`
+				heroBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.901-1.801"/></svg>
+          <span>下载 Windows 版 (${release.tag})</span>
+        `
+				heroTip.innerHTML = `已自动适配 <strong>Windows 64位</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
 				highlightPlatformCard("platform-win")
 			} else if (client.os === "linux") {
 				heroBtn.href = release.assets.linuxAppImage.url || "#downloads"
-				heroBtn.innerHTML = `<span>下载 Linux 版 (${release.tag})</span>`
-				heroTip.innerHTML = `已自动适配 <strong>Linux x64</strong> · <a href="#downloads">查看所有平台与格式</a>`
+				heroBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.003 0c-2.457 0-4.043 1.942-4.043 4.398 0 1.259.452 2.738.995 4.093-1.09.432-2.179 1.144-2.846 2.052-.906 1.233-.872 2.651-.872 4.148 0 1.559.39 3.275 1.579 4.35 1.05.947 2.502 1.344 3.904 1.488.47.781 1.096 1.493 1.83 2.087-.456.195-.916.353-1.378.48-1.095.302-2.146.402-2.91.564-.468.099-.54.34-.343.606.336.453 1.27.734 2.215.734 1.844 0 3.864-.897 5.029-2.122 1.165 1.225 3.185 2.122 5.029 2.122.945 0 1.879-.281 2.215-.734.197-.266.125-.507-.343-.606-.764-.162-1.815-.262-2.91-.564-.462-.127-.922-.285-1.378-.48.734-.594 1.36-1.306 1.83-2.087 1.402-.144 2.854-.541 3.904-1.488 1.189-1.075 1.579-2.791 1.579-4.35 0-1.497.034-2.915-.872-4.148-.667-.908-1.756-1.62-2.846-2.052.543-1.355.995-2.834.995-4.093C16.046 1.942 14.46 0 12.003 0z"/></svg>
+          <span>下载 Linux 版 (${release.tag})</span>
+        `
+				heroTip.innerHTML = `已自动适配 <strong>Linux x64</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
 				highlightPlatformCard("platform-linux")
 			} else {
 				heroBtn.href = "#downloads"
-				heroBtn.innerHTML = `<span>立即下载 MyAgent (${release.tag})</span>`
+				heroBtn.innerHTML = `<span>立即下载 My Agent (${release.tag})</span>`
 				heroTip.innerHTML = `请在下方选择适合您的操作系统版本`
 			}
 		}
@@ -264,7 +273,7 @@
 		const copyBtn = document.getElementById("copy-cmd-btn")
 		if (copyBtn) {
 			copyBtn.addEventListener("click", () => {
-				const cmd = "xattr -cr /Applications/MyAgent.app"
+				const cmd = 'xattr -cr "/Applications/My Agent.app"'
 				navigator.clipboard.writeText(cmd).then(() => {
 					const originalText = copyBtn.textContent
 					copyBtn.textContent = "已复制!"

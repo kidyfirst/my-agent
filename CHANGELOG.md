@@ -4,34 +4,24 @@
 
 ---
 
-## [v1.0.0] - 2026-10-26
+## [v0.1.0] - 2026-10-26
 
-### 🚀 新特性与重大重构 (Major Features & Architecture)
+### 🚀 核心架构与功能特性 (Core Features & Architecture)
 
-- **全新独立自主架构**：自主实现 `src/core` 调度层、Agent 控制器、事件总线与会话机制，全面解耦第三方框架依赖。
-- **纯原生 MCP 客户端**：自研实现标准 MCP（Model Context Protocol）协议客户端，支持 Stdio 进程与 HTTP JSON-RPC 传输通道，实现服务器动态发现、工具注入与生命周期管理。
-- **自动化历史会话恢复**：解决每次启动打开空白会话的问题，在启动和切换项目时自动记忆并无缝打开上次活跃的历史会话窗口。
-- **完整的原生开发工具集**：主 Agent 原生内置终端命令执行（`execute_command`）、文件操作（`view`, `write_file`, `find_files`, `search_content`）及 AST 智能语法树编辑与 LSP 字符串替换。
+- **全新自主独立架构**：自研核心调度引擎与 Agent 控制器，脱离第三方高耦合框架，提供轻量、高效的纯原生 AI 编程体验。
+- **自主 ReAct 执行闭环**：支持大模型自主推理、规划步骤、调用工具、校验结果与自动自我修正。
+- **原生 MCP (Model Context Protocol) 支持**：完整自研标准 MCP 客户端规范，支持 Stdio 进程与 HTTP/JSON-RPC 协议通道，实现外部工具服务器自动发现、动态注入与安全管理。
+- **多模型生态接入**：原生兼容并优化 Gemini (Gemini 2.5/3.8)、DeepSeek、Claude、OpenAI Codex 等主流大语言模型，支持 API Key 零泄露本地安全加密存储。
+- **Git Worktree 隔离工作空间**：支持在独立 Git 工作树分支中运行 Agent 任务，零污染开发者当前正在编辑的工作区代码，方便随时可视化比对 Diff 与一键合并。
+- **原生内置全套工程工具**：
+  - `execute_command`：在受控伪终端（node-pty + xterm.js）中实时流式执行终端命令，支持交互式输入与超时控制；
+  - `read_file` / `write_file` / `find_files` / `search_content`：受控的文件查看、编辑与全文/正则代码搜索；
+  - `string_replace_lsp`：基于精确匹配与 AST 语法的可靠代码替换，避免正则误改。
+- **观察性记忆（Observational Memory）与会话恢复**：基于本地 SQLite（`myagent.db`）管理历史会话与上下文记忆摘要，启动和切换项目时自动无缝记忆并恢复最近会话。
 
-### 🛠️ 优化与修复 (Improvements & Fixes)
+### 🛠️ 桌面客户端体验与系统优化 (Desktop App & UX)
 
-- **进程安全退出保障**：全面消除关闭应用或窗口时因 PTY 异步事件引发的 `TypeError: Object has been destroyed` 异常，完善生命周期清理。
-- **模型权限与智能回退**：自动校验用户登录状态，优先使用已授权模型（如 DeepSeek），避免无效模型引发的配置警告。
-- **数据库平滑迁移**：历史线程、消息记录与观察性记忆数据全面统一同步至本地 `myagent.db` SQLite 数据库。
-- **控制台噪声过滤**：自动过滤 macOS 系统的输入法与 Mach Port 系统级调试日志，保持终端与开发环境清爽整洁。
-
----
-
-## [v0.9.0] - 2026-10-20
-
-### 🚀 新特性 (Features)
-
-- **多模型无缝切换**：支持 DeepSeek、OpenAI Codex、Claude、Gemini 等主流大语言模型。
-- **内置终端集成**：基于 `node-pty` 和 `xterm.js` 提供高性能内嵌式终端体验。
-- **YOLO 极速权限模式**：支持一键切换全局自动授权 / 安全确认执行策略。
-- **观察性记忆（Observational Memory）**：支持后台长对话摘要与动态记忆压缩，突破长上下文瓶颈。
-
-### 🛠️ 优化与修复 (Improvements)
-
-- 支持深色 / 浅色主题随系统自动切换。
-- 优化文件树与快速文件查找（Quick File Open）响应速度。
+- **品牌与原生桌面支持**：正式确立 **`My Agent`** 品牌，完美适配 macOS（访达 Applications、启动台 Launchpad、程序坞 Dock 原生显示）、Windows 10/11 与 Linux 桌面。
+- **Codex 风格同心圆环下载更新进度**：应用内集成自动更新系统，并在侧边栏更新按钮中呈现类似 Codex 的同心动态圆环流光与精准百分比进度动画。
+- **轻量原生交互**：优化按钮 Tooltip 体验，采用原生 hover 提示避免界面元素遮挡；修复工作区空仓库与幽灵项显示异常。
+- **全平台自动化 CI/CD 构建**：采用 GitHub Actions 构建矩阵，全自动生成 macOS (Apple Silicon arm64 & Intel x64)、Windows (x64) 以及 Linux (AppImage & deb) 安装包。

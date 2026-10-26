@@ -1,4 +1,4 @@
-# MyAgent 项目架构与模块实现说明
+# My Agent 项目架构与模块实现说明
 
 本项目是一个基于 **Electron**、**React** 构建的桌面级智能编码助手。项目采用多进程解耦架构，结合现代自主 Agent 的 ReAct 循环与观察性记忆机制，支持多工作区会话隔离、工具流式执行与多面板 IDE 协同交互。
 
@@ -23,17 +23,17 @@
 
 ### 全平台客户端下载
 
-| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.0)                                                                                                                 | 说明                      |
-| :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
-| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.0-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.dmg)           | 推荐 Mac 用户首选         |
-| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.0-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.zip)           | 解压即用                  |
-| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.0-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.dmg)               | 适配 Intel 架构 Mac       |
-| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.0-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.zip)               | 解压即用                  |
-| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.0-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.exe)               | NSIS 引导向导安装         |
-| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.0-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.zip)               | 解压即可直接运行          |
-| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.0-linux-x64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x64.AppImage) | `chmod +x` 后直接双击执行 |
-| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.0-linux-x64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x64.deb)           | `sudo dpkg -i` 系统级安装 |
-| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.0-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x64.zip)           | 适用于无 root 环境        |
+| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.0)                                                                                                                       | 说明                      |
+| :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.0-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.0-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.zip)                 | 解压即用                  |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.0-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.0-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.zip)                     | 解压即用                  |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.0-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.exe)                     | NSIS 引导向导安装         |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.0-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.zip)                     | 解压即可直接运行          |
+| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.0-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
+| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.0-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
+| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.0-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x64.zip)                 | 适用于无 root 环境        |
 
 > [!IMPORTANT]
 > **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  
@@ -57,30 +57,35 @@
 
 - [📥 客户端下载与版本日志 (ChangeLog)](#-客户端下载与版本日志-changelog)
 
-1. [整体架构设计](#1-整体架构设计)
-2. [进程划分与通信机制](#2-进程划分与通信机制)
-3. [核心模块实现说明](#3-核心模块实现说明)
-   - [3.1 主进程层 (`src/electron/`)](#31-主进程层-srcelectron)
-   - [3.2 预加载与桥接层 (`src/electron/preload.ts`)](#32-预加载与桥接层-srcelectronpreloadts)
-   - [3.3 渲染进程 UI 层 (`src/renderer/`)](#33-渲染进程-ui-层-srcrenderer)
-     - [3.3.1 ChatView 渲染管线](#331-chatview-渲染管线)
-     - [3.3.2 运行中与已结束两种展示形态](#332-运行中与已结束两种展示形态)
-     - [3.3.3 用户消息吸顶与折叠](#333-用户消息吸顶与折叠)
-     - [3.3.4 变更文件卡片与子智能体卡片](#334-变更文件卡片与子智能体卡片)
-     - [3.3.5 滚动、空态与层叠](#335-滚动空态与层叠)
-   - [3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)](#34-agent-运行与能力层-智能体引擎--srctools)
-   - [3.5 Memory 记忆模块 (`src/memory/`)](#35-memory-记忆模块-srcmemory)
-     - [3.5.1 类继承关系与职责边界](#351-类继承关系与职责边界)
-     - [3.5.2 存储域适配与线程/消息 CRUD](#352-存储域适配与线程消息-crud)
-     - [3.5.3 Observational Memory 参数与触发阈值](#353-observational-memory-参数与触发阈值)
-     - [3.5.4 动态 Memory 工厂与模型热切换](#354-动态-memory-工厂与模型热切换)
-     - [3.5.5 分词估算与 Working Memory 空实现](#355-分词估算与-working-memory-空实现)
-     - [3.5.6 配置入口与测试覆盖](#356-配置入口与测试覆盖)
-4. [核心业务与数据流时序](#4-核心业务与数据流时序)
-   - [4.1 用户消息、思考链与执行块流式时序](#41-用户消息思考链与执行块流式时序)
-   - [4.2 工具调用审批与人机协同流程](#42-工具调用审批与人机协同流程)
-   - [4.3 Git Worktree 多会话隔离机制](#43-git-worktree-多会话隔离机制)
-5. [源码目录结构映射](#5-源码目录结构映射)
+- [My Agent 项目架构与模块实现说明](#my-agent-项目架构与模块实现说明)
+  - [📥 客户端下载与版本日志 (ChangeLog)](#-客户端下载与版本日志-changelog)
+    - [全平台客户端下载](#全平台客户端下载)
+  - [目录](#目录)
+  - [1. 整体架构设计](#1-整体架构设计)
+    - [核心设计原则](#核心设计原则)
+  - [2. 进程划分与通信机制](#2-进程划分与通信机制)
+  - [3. 核心模块实现说明](#3-核心模块实现说明)
+    - [3.1 主进程层 (`src/electron/`)](#31-主进程层-srcelectron)
+    - [3.2 预加载与桥接层 (`src/electron/preload.ts`)](#32-预加载与桥接层-srcelectronpreloadts)
+    - [3.3 渲染进程 UI 层 (`src/renderer/`)](#33-渲染进程-ui-层-srcrenderer)
+      - [3.3.1 ChatView 渲染管线](#331-chatview-渲染管线)
+      - [3.3.2 运行中与已结束两种展示形态](#332-运行中与已结束两种展示形态)
+      - [3.3.3 用户消息吸顶与折叠](#333-用户消息吸顶与折叠)
+      - [3.3.4 变更文件卡片与子智能体卡片](#334-变更文件卡片与子智能体卡片)
+      - [3.3.5 滚动、空态与层叠](#335-滚动空态与层叠)
+    - [3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)](#34-agent-运行与能力层-智能体引擎--srctools)
+    - [3.5 Memory 记忆模块 (`src/memory/`)](#35-memory-记忆模块-srcmemory)
+      - [3.5.1 类继承关系与职责边界](#351-类继承关系与职责边界)
+      - [3.5.2 存储域适配与线程/消息 CRUD](#352-存储域适配与线程消息-crud)
+      - [3.5.3 Observational Memory 参数与触发阈值](#353-observational-memory-参数与触发阈值)
+      - [3.5.4 动态 Memory 工厂与模型热切换](#354-动态-memory-工厂与模型热切换)
+      - [3.5.5 分词估算与 Working Memory 空实现](#355-分词估算与-working-memory-空实现)
+      - [3.5.6 配置入口与测试覆盖](#356-配置入口与测试覆盖)
+  - [4. 核心业务与数据流时序](#4-核心业务与数据流时序)
+    - [4.1 用户消息、思考链与执行块流式时序](#41-用户消息思考链与执行块流式时序)
+    - [4.2 工具调用审批与人机协同流程](#42-工具调用审批与人机协同流程)
+    - [4.3 Git Worktree 多会话隔离机制](#43-git-worktree-多会话隔离机制)
+  - [5. 源码目录结构映射](#5-源码目录结构映射)
 
 ---
 

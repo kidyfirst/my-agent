@@ -129,7 +129,7 @@ export function openaiCodexProvider(
 		const headers = new Headers()
 		if (init?.headers) {
 			if (init.headers instanceof Headers) {
-				init.headers.forEach((value, key) => {
+				init.headers.forEach((value: string, key: string) => {
 					if (key.toLowerCase() !== "authorization") {
 						headers.set(key, value)
 					}

@@ -1,5 +1,5 @@
 /**
- * MyAgent - Changelog Dynamic Enhancer
+ * My Agent - Changelog Dynamic Enhancer
  * Fetches GitHub Releases history and augments the changelog timeline.
  * Gracefully falls back to pre-rendered HTML if offline or rate limited.
  */
@@ -102,17 +102,22 @@
 	}
 
 	function renderReleaseItem(release, isLatest) {
-		const tagName = release.tag_name || "v1.0.0"
-		const date = release.published_at ? release.published_at.split("T")[0] : ""
+		const tagName = release.tag_name || "v0.1.0"
+		const date = release.published_at
+			? release.published_at.split("T")[0]
+			: "2026-10-26"
 		const bodyHtml = markdownToHtml(release.body)
 
 		let assetsHtml = ""
 		if (Array.isArray(release.assets) && release.assets.length > 0) {
+			const nonMetaAssets = release.assets.filter(
+				(a) => !a.name.endsWith(".yml") && !a.name.endsWith(".txt"),
+			)
 			assetsHtml = `
         <div class="release-assets-box">
           <div class="assets-title">📦 下载安装包 (Release Assets)</div>
           <div class="assets-chips">
-            ${release.assets
+            ${nonMetaAssets
 							.map((asset) => {
 								const sizeMb = (asset.size / (1024 * 1024)).toFixed(1)
 								return `

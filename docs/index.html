@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MyAgent - 全栈自主 AI 编程工作台 | 官方下载</title>
-  <meta name="description" content="MyAgent 是一款基于自研核心架构与原生 MCP 协议的自主 AI 编程工作台，深度集成高性能终端、智能代码编辑与会话历史无缝恢复。">
+  <title>My Agent - 全栈自主 AI 编程工作台 | 官方下载</title>
+  <meta name="description" content="My Agent 是一款专为高效工程研发打造的桌面级自主 AI 编程工作台。搭载自研 ReAct 调度引擎、原生 MCP 协议客户端、双向 Git Worktree 隔离与极速内嵌终端。">
   <link rel="icon" type="image/svg+xml" href="./assets/icon.svg">
   <link rel="alternate icon" type="image/png" href="./assets/icon.png">
   <link rel="stylesheet" href="./assets/style.css">
@@ -15,8 +15,8 @@
   <nav class="navbar">
     <div class="nav-container">
       <a href="./index.html" class="brand">
-        <img src="./assets/icon.svg" alt="MyAgent Logo" class="brand-icon">
-        <span class="brand-title">MyAgent</span>
+        <img src="./assets/icon.svg" alt="My Agent Logo" class="brand-icon">
+        <span class="brand-title">My Agent</span>
       </a>
 
       <ul class="nav-links">
@@ -41,17 +41,17 @@
   <header class="hero">
     <a href="./changelog.html" class="version-pill" title="查看更新详情">
       <span class="dot"></span>
-      <span>最新版本 <span class="js-version-tag">v1.0.1</span> 现已发布</span>
+      <span>最新版本 <span class="js-version-tag">v0.1.0</span> 现已发布</span>
       <span style="opacity: 0.6;">→</span>
     </a>
 
     <h1 class="hero-title">
-      自主纯原生核心<br>
+      自主原生核心 · 深度工作流集成<br>
       <span class="gradient-text">全栈 AI 编程工作台</span>
     </h1>
 
     <p class="hero-subtitle">
-      MyAgent 搭载自研调度引擎与原生 MCP 协议客户端，深度融合终端交互、上下文智能压缩与历史会话瞬时恢复，专为高效编码打造。
+      My Agent 是一款专为高效工程研发打造的桌面级自主 AI 编程工作台。搭载自研 ReAct 调度引擎、原生 MCP 协议客户端、双向 Git Worktree 隔离与极速内嵌终端，助你专注于更高维度的创造。
     </p>
 
     <div class="hero-actions">
@@ -59,7 +59,7 @@
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
         </svg>
-        <span>立即下载 MyAgent (<span class="js-version-tag">v1.0.1</span>)</span>
+        <span>立即下载 My Agent (<span class="js-version-tag">v0.1.0</span>)</span>
       </a>
       <div id="hero-os-tip" class="hero-meta-tip">
         正在智能识别操作系统...
@@ -76,7 +76,7 @@
           <span class="ctrl-minimize"></span>
           <span class="ctrl-maximize"></span>
         </div>
-        <div class="window-title">MyAgent — ~/Projects/awesome-app — Active Thread</div>
+        <div class="window-title">My Agent — ~/Projects/my-awesome-app — Active Thread</div>
       </div>
       <div class="mockup-body">
         <div class="mockup-sidebar">
@@ -85,30 +85,95 @@
             <span>💬 重构认证核心模块并接入 MCP</span>
           </div>
           <div class="thread-item">
-            <span>💬 修复数据库迁移索引</span>
+            <span>💬 在 Git Worktree 隔离环境中运行迁移</span>
           </div>
           <div class="thread-item">
-            <span>💬 单元测试用例全量覆盖</span>
+            <span>💬 单元测试用例全量覆盖与校验</span>
           </div>
           <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-muted);">
-            <div>🤖 活跃模型: DeepSeek Flash</div>
-            <div style="margin-top: 4px;">⚡ YOLO 权限模式: 已启用</div>
+            <div>🤖 活跃模型: DeepSeek / Gemini 3.8 / Codex</div>
+            <div style="margin-top: 4px;">⚡ YOLO 权限模式: 已启用 (极速免确认)</div>
           </div>
         </div>
         <div class="mockup-chat">
           <div class="chat-bubble user">
-            请帮我实现一个通过 MCP 协议管理数据库连接的工具，并在终端执行迁移测试。
+            请帮我实现一个通过 MCP 协议管理数据库连接的工具，并在隔离的 Worktree 分支终端执行自动化回归测试。
           </div>
           <div class="chat-bubble agent">
-            <div class="tool-badge">⚡ tool_call: execute_command (pnpm run test:mcp)</div>
-            收到！我已通过原生 MCP Client 探测到当前可用的 Database Server，正在编写适配器并调用内嵌终端运行测试：
+            <div style="font-size: 0.75rem; color: #818cf8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🧠 Worked for 8.6s · 3 thinking steps</span>
+            </div>
+            <div class="tool-badge">⚡ tool_call: execute_command (git worktree add -b feat/mcp-db)</div>
+            <div class="tool-badge">⚡ tool_call: string_replace_lsp (src/core/mcp-manager.ts)</div>
+            收到！我已通过原生 MCP Client 探测到可用的 Database Server 工具集，并在独立隔离分支中完成了代码修改与回归测试：
             <div class="agent-code-block">
 ✓ [MCP] Connected to sqlite-mcp via stdio<br>
 ✓ [Core] Registered 4 tools: db_query, db_migrate, db_schema, db_backup<br>
-✓ [Test] 159 tests passed in 2.14s
+✓ [Git] Isolated worktree ready at .worktrees/feat-mcp-db<br>
+✓ [Test] 48 tests passed in 1.42s
             </div>
+            所有变更均已就绪，随时可以在界面右上方一键合并回主工作区！
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Highlights Grid -->
+  <section id="features" class="section">
+    <div class="section-header">
+      <div class="section-tag">Core Features</div>
+      <h2 class="section-title">为专业开发者打造的强劲底座</h2>
+      <p class="section-desc">打破黑盒约束，回归掌控。原生性能、安全隔离与生态开放的深度结合。</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="color: #60a5fa;">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h3 class="feature-title">自主 ReAct 闭环循环</h3>
+        <p class="feature-desc">自研调度引擎，支持多轮复杂推理、步骤规划、代码智能检索、AST 精准替换与运行报错自我修复闭环。</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" style="color: #a78bfa;">
+          <svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        </div>
+        <h3 class="feature-title">纯原生 MCP 协议支持</h3>
+        <p class="feature-desc">深度集成 Model Context Protocol 标准客户端，原生支持 Stdio 与 HTTP/JSON-RPC 服务发现与外部工具生态无缝对接。</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" style="color: #34d399;">
+          <svg viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zm-12 9a3 3 0 100-6 3 3 0 000 6zm12 3a3 3 0 100-6 3 3 0 000 6zM6 9a9 9 0 019 9"/></svg>
+        </div>
+        <h3 class="feature-title">Git Worktree 安全隔离</h3>
+        <p class="feature-desc">任务自动运行在独立 Git 工作树分支中，代码修改与测试绝不污染当前正在编写的本地文件，安全无忧。</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" style="color: #f472b6;">
+          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h3 class="feature-title">极速内嵌 PTY 终端</h3>
+        <p class="feature-desc">深度定制 node-pty 与 xterm.js，支持双向交互式输入、窗口尺寸动态同步与长执行命令实时日志流式中继。</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" style="color: #38bdf8;">
+          <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="feature-title">观察性记忆与历史恢复</h3>
+        <p class="feature-desc">基于本地 SQLite 引擎存储完整会话，支持超长上下文后台关键事实抽取与压缩，启动即开即用、会话无缝接续。</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon" style="color: #fbbf24;">
+          <svg viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </div>
+        <h3 class="feature-title">Codex 风格同心圆环更新</h3>
+        <p class="feature-desc">无缝对接 GitHub Releases 发布源，侧边栏更新按钮呈现现代同心圆环动态下载进度指示，启动即用、无感升级。</p>
       </div>
     </div>
   </section>
@@ -118,7 +183,7 @@
     <div class="section-header">
       <div class="section-tag">Downloads</div>
       <h2 class="section-title">全平台客户端下载</h2>
-      <p class="section-desc">当前最新稳定版本 <span class="js-version-tag">v1.0.1</span>，选择适合您设备的安装包。</p>
+      <p class="section-desc">当前最新稳定版本 <span class="js-version-tag">v0.1.0</span>，选择适合您设备的安装包。</p>
     </div>
 
     <div class="platforms-grid">
@@ -131,12 +196,12 @@
         <h3 class="platform-name">macOS (Apple Silicon)</h3>
         <p class="platform-arch">适用于 M1 / M2 / M3 / M4 芯片 (ARM64)</p>
         <div class="card-downloads">
-          <a id="btn-mac-arm-dmg" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-mac-arm64.dmg" class="btn-card-download primary" download>
-            <span>下载 .dmg 安装包 <span class="js-asset-size"></span></span>
+          <a id="btn-mac-arm-dmg" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.dmg" class="btn-card-download primary" download>
+            <span>下载 .dmg 安装包 <span class="js-asset-size">(146.9 MB)</span></span>
             <span class="ext-badge">DMG</span>
           </a>
-          <a id="btn-mac-arm-zip" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-mac-arm64.zip" class="btn-card-download" download>
-            <span>免安装解压包 (.zip) <span class="js-asset-size"></span></span>
+          <a id="btn-mac-arm-zip" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.zip" class="btn-card-download" download>
+            <span>免安装解压包 (.zip) <span class="js-asset-size">(140.3 MB)</span></span>
             <span class="ext-badge">ZIP</span>
           </a>
         </div>
@@ -148,14 +213,14 @@
           <svg viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.79 1.06-1.88.94-2.98-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.76-.95 2.84 1.05.08 2.12-.53 2.74-1.26z"/></svg>
         </div>
         <h3 class="platform-name">macOS (Intel Core)</h3>
-        <p class="platform-arch">适用于 Intel 处理器 Mac (x86_64)</p>
+        <p class="platform-arch">适用于 Intel 架构 64位 Mac 设备</p>
         <div class="card-downloads">
-          <a id="btn-mac-x64-dmg" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-mac-x64.dmg" class="btn-card-download primary" download>
-            <span>下载 .dmg 安装包 <span class="js-asset-size"></span></span>
+          <a id="btn-mac-x64-dmg" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.dmg" class="btn-card-download primary" download>
+            <span>下载 .dmg 安装包 <span class="js-asset-size">(152.5 MB)</span></span>
             <span class="ext-badge">DMG</span>
           </a>
-          <a id="btn-mac-x64-zip" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-mac-x64.zip" class="btn-card-download" download>
-            <span>免安装解压包 (.zip) <span class="js-asset-size"></span></span>
+          <a id="btn-mac-x64-zip" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.zip" class="btn-card-download" download>
+            <span>免安装解压包 (.zip) <span class="js-asset-size">(145.8 MB)</span></span>
             <span class="ext-badge">ZIP</span>
           </a>
         </div>
@@ -167,14 +232,14 @@
           <svg viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.901-1.801"/></svg>
         </div>
         <h3 class="platform-name">Windows</h3>
-        <p class="platform-arch">适用于 Windows 10 / 11 64位 (x64)</p>
+        <p class="platform-arch">适用于 Windows 10 / 11 64位</p>
         <div class="card-downloads">
-          <a id="btn-win-exe" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-win-x64.exe" class="btn-card-download primary" download>
-            <span>下载 .exe 安装包 <span class="js-asset-size"></span></span>
-            <span class="ext-badge">EXE</span>
+          <a id="btn-win-exe" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.exe" class="btn-card-download primary" download>
+            <span>下载 Windows 安装程序 <span class="js-asset-size">(117.1 MB)</span></span>
+            <span class="ext-badge">.EXE</span>
           </a>
-          <a id="btn-win-zip" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-win-x64.zip" class="btn-card-download" download>
-            <span>免安装解压包 (.zip) <span class="js-asset-size"></span></span>
+          <a id="btn-win-zip" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.zip" class="btn-card-download" download>
+            <span>免安装便携包 (.zip) <span class="js-asset-size">(164.4 MB)</span></span>
             <span class="ext-badge">ZIP</span>
           </a>
         </div>
@@ -186,85 +251,47 @@
           <svg viewBox="0 0 24 24"><path d="M12.003 0c-2.457 0-4.043 1.942-4.043 4.398 0 1.259.452 2.738.995 4.093-1.09.432-2.179 1.144-2.846 2.052-.906 1.233-.872 2.651-.872 4.148 0 1.559.39 3.275 1.579 4.35 1.05.947 2.502 1.344 3.904 1.488.47.781 1.096 1.493 1.83 2.087-.456.195-.916.353-1.378.48-1.095.302-2.146.402-2.91.564-.468.099-.54.34-.343.606.336.453 1.27.734 2.215.734 1.844 0 3.864-.897 5.029-2.122 1.165 1.225 3.185 2.122 5.029 2.122.945 0 1.879-.281 2.215-.734.197-.266.125-.507-.343-.606-.764-.162-1.815-.262-2.91-.564-.462-.127-.922-.285-1.378-.48.734-.594 1.36-1.306 1.83-2.087 1.402-.144 2.854-.541 3.904-1.488 1.189-1.075 1.579-2.791 1.579-4.35 0-1.497.034-2.915-.872-4.148-.667-.908-1.756-1.62-2.846-2.052.543-1.355.995-2.834.995-4.093C16.046 1.942 14.46 0 12.003 0z"/></svg>
         </div>
         <h3 class="platform-name">Linux</h3>
-        <p class="platform-arch">Ubuntu / Debian / Fedora / Arch (x64)</p>
+        <p class="platform-arch">Ubuntu / Debian / Arch / Fedora</p>
         <div class="card-downloads">
-          <a id="btn-linux-appimage" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-linux-x64.AppImage" class="btn-card-download primary" download>
-            <span>下载 AppImage <span class="js-asset-size"></span></span>
+          <a id="btn-linux-appimage" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x86_64.AppImage" class="btn-card-download primary" download>
+            <span>下载 AppImage 独立包 <span class="js-asset-size">(151.5 MB)</span></span>
             <span class="ext-badge">AppImage</span>
           </a>
-          <a id="btn-linux-deb" href="https://github.com/kidyfirst/my-agent/releases/download/v1.0.1/my-agent-1.0.1-linux-x64.deb" class="btn-card-download" download>
-            <span>下载 .deb 安装包 <span class="js-asset-size"></span></span>
-            <span class="ext-badge">DEB</span>
+          <a id="btn-linux-deb" href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-amd64.deb" class="btn-card-download" download>
+            <span>Debian / Ubuntu 安装包 <span class="js-asset-size">(110.9 MB)</span></span>
+            <span class="ext-badge">.DEB</span>
           </a>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Features Section -->
-  <section id="features" class="section">
-    <div class="section-header">
-      <div class="section-tag">Core Features</div>
-      <h2 class="section-title">为专业开发者打造的 AI 体验</h2>
-      <p class="section-desc">脱离繁琐的云端限制与臃肿包装，回归极简、极速、纯粹的原生开发效能。</p>
-    </div>
-
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">⚡</div>
-        <h3 class="feature-title">自研纯原生核心架构</h3>
-        <p class="feature-desc">重构去除了第三方臃肿库，纯 TypeScript 原生构建的 Agent 调度引擎、事件总线与生命周期，轻巧敏捷、毫秒级响应。</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">🔌</div>
-        <h3 class="feature-title">原生 MCP 协议支持</h3>
-        <p class="feature-desc">全自研实现的 Model Context Protocol 客户端，原生支持 Stdio 进程与 HTTP JSON-RPC 传输，无缝接入全球丰富的 MCP 工具服务器生态。</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">💾</div>
-        <h3 class="feature-title">活跃会话无缝记忆恢复</h3>
-        <p class="feature-desc">彻底告别每次打开都是空白会话的困扰。智能记忆并恢复上次打开的活跃会话历史窗口，随时接续前序工作心流。</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">💻</div>
-        <h3 class="feature-title">高性能终端与 YOLO 授权</h3>
-        <p class="feature-desc">内嵌 node-pty 与 xterm 高性能终端，主 Agent 可直接执行构建测试命令。配合灵动的 YOLO 极速模式，免去频繁弹窗授权打扰。</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">🧠</div>
-        <h3 class="feature-title">观察性记忆与长上下文压缩</h3>
-        <p class="feature-desc">基于后台动态长对话摘要与 Observational Memory 算法，在大规模代码工程或长程对话中自动浓缩上下文，节约 Token 并保持专注。</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon-wrapper">🛡️</div>
-        <h3 class="feature-title">本地存储与数据隐私安全</h3>
-        <p class="feature-desc">所有配置、会话记录、线程历史均安全落盘于本地 myagent.db SQLite 数据库中，代码与提示词不出本地，隐私无忧。</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Installation Guide & Troubleshooting -->
+  <!-- Installation & Gatekeeper Guide -->
   <section id="install-guide" class="section">
-    <div class="install-box">
-      <div class="section-tag" style="text-align: left;">Installation Guide</div>
-      <h3 style="font-size: 1.5rem; margin-bottom: 12px; font-weight: 700;">macOS 首次安装与打开提示</h3>
-      <p style="color: var(--text-secondary); font-size: 0.938rem; margin-bottom: 16px;">
-        在 macOS 上若从浏览器直接下载并打开应用时提示「“MyAgent”已损坏，无法打开」或「无法验证开发者」，这是由于 macOS Gatekeeper 隔离属性所致。仅需在“终端”中执行以下命令清除隔离标记即可：
+    <div class="section-header">
+      <div class="section-tag">Guide</div>
+      <h2 class="section-title">安装与安全提示 (macOS Gatekeeper)</h2>
+      <p class="section-desc">若系统提示「应用已损坏」或「无法打开来自未验证开发者的应用」，请按下方指引操作。</p>
+    </div>
+
+    <div class="guide-box">
+      <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 12px; color: #f8fafc;">
+        🍎 macOS 隔离属性清除命令
+      </h3>
+      <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.938rem; line-height: 1.6;">
+        在 macOS 上若从浏览器直接下载并将 <strong>My Agent</strong> 移动到「应用程序」后打开提示报错，这是 macOS Gatekeeper 针对未签名应用添加的隔离属性（Quarantine）所致。只需打开「终端（Terminal）」并运行以下命令即可：
       </p>
 
-      <div class="cmd-container">
-        <code>xattr -cr /Applications/MyAgent.app</code>
-        <button id="copy-cmd-btn" class="btn-copy">复制命令</button>
+      <div class="command-block">
+        <code>xattr -cr "/Applications/My Agent.app"</code>
+        <button id="copy-cmd-btn" class="btn-copy" type="button" title="点击复制命令">
+          复制命令
+        </button>
       </div>
 
-      <p style="color: var(--text-muted); font-size: 0.813rem;">
-        执行完成后重新在应用程序文件夹中双击 MyAgent 即可正常启动运行。
-      </p>
+      <div style="margin-top: 14px; font-size: 0.875rem; color: var(--text-muted); line-height: 1.5;">
+        💡 提示：如果终端提示权限不足，可加上 <code>sudo</code> 执行：<code>sudo xattr -rd com.apple.quarantine "/Applications/My Agent.app"</code>。命令执行完成后，重新在应用程序中双击 <strong>My Agent</strong> 即可正常启动。
+      </div>
     </div>
   </section>
 
@@ -272,16 +299,14 @@
   <footer class="footer">
     <div class="footer-container">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="./assets/icon.svg" alt="MyAgent Logo" width="22" height="22">
-        <span>MyAgent © 2026. Released under the Apache-2.0 License.</span>
+        <img src="./assets/icon.svg" alt="My Agent Logo" width="22" height="22">
+        <span>My Agent © 2026. Released under the Apache-2.0 License.</span>
       </div>
-
-      <ul class="footer-links">
-        <li><a href="./changelog.html">更新日志 (Changelog)</a></li>
-        <li><a href="https://github.com/kidyfirst/my-agent/releases" target="_blank" rel="noopener noreferrer">所有发布包</a></li>
-        <li><a href="https://github.com/kidyfirst/my-agent/issues" target="_blank" rel="noopener noreferrer">反馈建议</a></li>
-        <li><a href="https://github.com/kidyfirst/my-agent" target="_blank" rel="noopener noreferrer">GitHub 源码</a></li>
-      </ul>
+      <div class="footer-links">
+        <a href="https://github.com/kidyfirst/my-agent" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+        <a href="https://github.com/kidyfirst/my-agent/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+        <a href="./changelog.html">Changelog</a>
+      </div>
     </div>
   </footer>
 
