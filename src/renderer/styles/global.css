@@ -1,0 +1,286 @@
+:root,
+[data-theme="light"],
+body.light-theme {
+	/* Core UI */
+	--accent: #6d28d9;
+	--border: #e2e8f0;
+	--border-accent: #6d28d9;
+	--border-muted: #f1f5f9;
+	--success: #16a34a;
+	--error: #dc2626;
+	--warning: #d97706;
+	--muted: #64748b;
+	--dim: #94a3b8;
+	--text: #0f172a;
+	--thinking-text: #475569;
+
+	/* Backgrounds */
+	--bg: #ffffff;
+	--bg-surface: #f8fafc;
+	--bg-elevated: #f1f5f9;
+	--bg-hover: #e2e8f0;
+	--user-message-bg: #f8fafc;
+	--user-message-text: #0f172a;
+	--system-reminder-bg: #fefce8;
+
+	/* Tool execution */
+	--tool-pending-bg: #faf5ff;
+	--tool-success-bg: #f8fafc;
+	--tool-error-bg: #fef2f2;
+	--tool-border-pending: #8b5cf6;
+	--tool-border-success: #22c55e;
+	--tool-border-error: #ef4444;
+	--tool-title: #6d28d9;
+	--tool-output: #334155;
+
+	/* Error display */
+	--error-bg: #fef2f2;
+	--path-color: #475569;
+	--number-color: #b45309;
+	--function-color: #2563eb;
+
+	/* Selection & overlays */
+	--selected-bg: #ede9fe;
+	--overlay-bg: #ffffff;
+
+	/* Mode colors */
+	--mode-build: #7c3aed;
+	--mode-plan: #2563eb;
+	--mode-fast: #059669;
+	--mode-observe: #d97706;
+	--mode-reflect: #db2777;
+
+	/* Diff */
+	--diff-add: #16a34a;
+	--diff-add-bg: rgba(22, 163, 74, 0.12);
+	--diff-del: #dc2626;
+	--diff-del-bg: rgba(220, 38, 38, 0.12);
+	--diff-hunk: #0284c7;
+
+	/* File tree */
+	--file-icon: #64748b;
+	--dir-icon: #2563eb;
+
+	/* Scrollbar */
+	--scrollbar-track: transparent;
+	--scrollbar-thumb: rgba(0, 0, 0, 0.16);
+	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+
+	/* Brand & Logo */
+	--logo-accent: #059669;
+}
+
+[data-theme="dark"],
+body.dark-theme {
+	/* Core UI */
+	--accent: #7c3aed;
+	--border: #3f3f46;
+	--border-accent: #7c3aed;
+	--border-muted: #27272a;
+	--success: #22c55e;
+	--error: #ef4444;
+	--warning: #f59e0b;
+	--muted: #71717a;
+	--dim: #52525b;
+	--text: #fafafa;
+	--thinking-text: #a1a1aa;
+
+	/* Backgrounds */
+	--bg: #09090b;
+	--bg-surface: #18181b;
+	--bg-elevated: #1f1f23;
+	--bg-hover: #27272a;
+	--user-message-bg: #0f172a;
+	--user-message-text: #fafafa;
+	--system-reminder-bg: #1a1400;
+
+	/* Tool execution */
+	--tool-pending-bg: #18152a;
+	--tool-success-bg: #18152a;
+	--tool-error-bg: #1f0a0a;
+	--tool-border-pending: #6366f1;
+	--tool-border-success: #22c55e;
+	--tool-border-error: #ef4444;
+	--tool-title: #a78bfa;
+	--tool-output: #d4d4d8;
+
+	/* Error display */
+	--error-bg: #291415;
+	--path-color: #9ca3af;
+	--number-color: #fbbf24;
+	--function-color: #60a5fa;
+
+	/* Selection & overlays */
+	--selected-bg: #3f3f46;
+	--overlay-bg: #15131f;
+
+	/* Mode colors */
+	--mode-build: #7f45e0;
+	--mode-plan: #2563eb;
+	--mode-fast: #059669;
+	--mode-observe: #fdac53;
+	--mode-reflect: #ff69cc;
+
+	/* Diff */
+	--diff-add: #22c55e;
+	--diff-add-bg: rgba(34, 197, 94, 0.1);
+	--diff-del: #ef4444;
+	--diff-del-bg: rgba(239, 68, 68, 0.1);
+	--diff-hunk: #38bdf8;
+
+	/* File tree */
+	--file-icon: #71717a;
+	--dir-icon: #60a5fa;
+
+	/* Scrollbar */
+	--scrollbar-track: transparent;
+	--scrollbar-thumb: rgba(255, 255, 255, 0.18);
+	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
+
+	/* Brand & Logo */
+	--logo-accent: #00FF41;
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	overflow: hidden;
+	background: var(--bg);
+	color: var(--text);
+	font-family:
+		"SF Mono",
+		"Menlo",
+		"Monaco",
+		"Cascadia Code",
+		"Consolas",
+		monospace;
+	font-size: 13px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar - hidden by default across all containers, visible on hover */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: transparent transparent;
+}
+
+*:hover {
+	scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: transparent;
+	border-radius: 9999px;
+	transition: background-color 0.15s ease;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+/* Completely hidden scrollbar utility */
+.scrollbar-none {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Selection */
+::selection {
+	background: var(--accent);
+	color: #ffffff;
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+/* Code blocks */
+pre {
+	background: var(--bg-surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 12px;
+	overflow-x: auto;
+	font-size: 12px;
+	color: var(--text);
+}
+
+code {
+	font-family: inherit;
+	font-size: 12px;
+}
+
+:not(pre) > code {
+	background: var(--bg-elevated);
+	border: 1px solid var(--border-muted);
+	padding: 2px 5px;
+	border-radius: 3px;
+	color: var(--accent);
+}
+
+/* Draggable title bar region */
+.titlebar-drag {
+	-webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+	-webkit-app-region: no-drag;
+}
+
+/* Button base */
+button {
+	font-family: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	border: none;
+	background: none;
+	color: var(--text);
+}
+
+input,
+select,
+textarea {
+	color: var(--text);
+	background: var(--bg-surface);
+}
+
+input::placeholder,
+textarea::placeholder {
+	color: var(--dim);
+}
