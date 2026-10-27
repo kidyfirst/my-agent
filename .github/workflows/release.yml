@@ -134,6 +134,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download all packages
         uses: actions/download-artifact@v4
@@ -158,5 +160,23 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update README.md with latest release info
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git pull origin main
+          node scripts/update-readme-release.js "${{ github.ref_name }}"
+          if ! git diff --quiet README.md; then
+            git add README.md
+            git commit -m "docs: auto-update release download matrix for ${{ github.ref_name }} [skip ci]"
+            git push origin main
+          else
+            echo "README.md is already up to date."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

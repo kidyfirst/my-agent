@@ -11,6 +11,7 @@
 		"package": "node scripts/build-local.js",
 		"package:all": "node scripts/build-local.js --all",
 		"update:readme": "node scripts/update-readme-release.js",
+		"version": "node scripts/update-readme-release.js && git add README.md",
 		"preview": "electron-vite preview",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",

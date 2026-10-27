@@ -8,19 +8,19 @@
 	"use strict"
 
 	const GITHUB_REPO = "kidyfirst/my-agent"
-	const DEFAULT_VERSION = "v0.1.0"
+	const DEFAULT_VERSION = "v0.1.1"
 	const BASE_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases`
 
-	// Fallback direct download links for v0.1.0
+	// Fallback direct download links for v0.1.1
 	const FALLBACK_ASSETS = {
-		macArmDmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-arm64.dmg`,
-		macArmZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-arm64.zip`,
-		macX64Dmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-x64.dmg`,
-		macX64Zip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-mac-x64.zip`,
-		winExe: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-win-x64.exe`,
-		winZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-win-x64.zip`,
-		linuxAppImage: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-linux-x86_64.AppImage`,
-		linuxDeb: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.0-linux-amd64.deb`,
+		macArmDmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-arm64.dmg`,
+		macArmZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-arm64.zip`,
+		macX64Dmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-x64.dmg`,
+		macX64Zip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-x64.zip`,
+		winExe: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-win-x64.exe`,
+		winZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-win-x64.zip`,
+		linuxAppImage: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-linux-x86_64.AppImage`,
+		linuxDeb: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-linux-amd64.deb`,
 	}
 
 	/**

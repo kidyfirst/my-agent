@@ -16,24 +16,24 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#全平台客户端下载)
 [![ChangeLog](https://img.shields.io/badge/ChangeLog-%E7%89%88%E6%9C%AC%E6%97%A5%E5%BF%97-blueviolet)](https://kidyfirst.github.io/my-agent/changelog.html)
 
-**当前最新稳定版本：`v0.1.0`**  
+**当前最新稳定版本：`v0.1.1`**  
 🌐 **[访问官方在线下载站 (GitHub Pages)](https://kidyfirst.github.io/my-agent/)** ｜ 📋 **[查看版本更新日志 (ChangeLog)](https://kidyfirst.github.io/my-agent/changelog.html)** ｜ 📦 **[GitHub Releases 资产归档](https://github.com/kidyfirst/my-agent/releases)**
 
 </div>
 
 ### 全平台客户端下载
 
-| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.0)                                                                                                                       | 说明                      |
+| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.1)                                                                                                                       | 说明                      |
 | :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
-| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.0-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
-| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.0-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-arm64.zip)                 | 解压即用                  |
-| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.0-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
-| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.0-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-mac-x64.zip)                     | 解压即用                  |
-| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.0-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.exe)                     | NSIS 引导向导安装         |
-| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.0-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-win-x64.zip)                     | 解压即可直接运行          |
-| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.0-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
-| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.0-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
-| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.0-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.0/my-agent-0.1.0-linux-x64.zip)                 | 适用于无 root 环境        |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.1-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.1-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.zip)                 | 解压即用                  |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.1-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.1-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.zip)                     | 解压即用                  |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.1-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.exe)                     | NSIS 引导向导安装         |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.1-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.zip)                     | 解压即可直接运行          |
+| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.1-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
+| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.1-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
+| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.1-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x64.zip)                 | 适用于无 root 环境        |
 
 > [!IMPORTANT]
 > **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  

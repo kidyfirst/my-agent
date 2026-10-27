@@ -20,17 +20,20 @@ const pkgPath = path.join(rootDir, "package.json")
 const readmePath = path.join(rootDir, "README.md")
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"))
-const currentVersion = pkg.version || "0.1.0"
+const targetVersion = process.argv[2]
+	? process.argv[2].replace(/^v/, "")
+	: pkg.version || "0.1.0"
 const appName = pkg.name || "my-agent"
 const appTitle = pkg.build?.productName || pkg.productName || "My Agent"
 const githubRepo = "kidyfirst/my-agent"
 
 function generateReleaseSection() {
-	const v = currentVersion
+	const v = targetVersion
 	const baseUrl = `https://github.com/${githubRepo}/releases/download/v${v}`
 
 	const lines = [
 		"<!-- LATEST_RELEASE_START -->",
+		"",
 		"## 📥 客户端下载与版本日志 (ChangeLog)",
 		"",
 		'<div align="center">',
@@ -65,12 +68,15 @@ function generateReleaseSection() {
 		"> [!IMPORTANT]",
 		"> **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  ",
 		"> 由于开源社区版本未购买苹果商业开发者签名证书，macOS Gatekeeper 安全机制在从浏览器下载应用后会附带隔离属性。若首次打开提示“已损坏，应移到废纸篓”或“无法打开”，只需在终端执行一次以下命令解除隔离即可正常打开：",
+		">",
 		"> ```bash",
 		`> xattr -cr "/Applications/${appTitle}.app"`,
 		"> ```",
+		">",
 		"> 或在系统设置中授权：**【系统设置】->【隐私与安全性】-> 下滑找到并点击【仍要打开】**。",
 		"",
 		"> [!TIP]",
+		">",
 		`> - 完整更新履历与历史版本详情请参阅 👉 **[在线 ChangeLog 日志](https://kidyfirst.github.io/my-agent/changelog.html)** 或 **[GitHub Releases 全部发布归档](https://github.com/${githubRepo}/releases)**。`,
 		"",
 		"---",
@@ -120,17 +126,22 @@ function updateReadme() {
 		}
 	}
 
-	// Ensure Table of Contents link
-	const oldTocRegex = /- \[📥 [^\]]+\]\([^\)]+\)\n(\s+-[^\n]+\n)*/g
-	content = content.replace(oldTocRegex, "")
+	// Ensure Table of Contents has release link if missing
+	const releaseTocItem =
+		"- [📥 客户端下载与版本日志 (ChangeLog)](#-客户端下载与版本日志-changelog)"
+	if (!content.includes(releaseTocItem)) {
+		content = content.replace("## 目录\n\n", `## 目录\n\n${releaseTocItem}\n\n`)
+	}
 
-	content = content.replace(
-		"## 目录\n\n1. [整体架构设计]",
-		"## 目录\n\n- [📥 客户端下载与版本日志 (ChangeLog)](#-客户端下载与版本日志-changelog)\n1. [整体架构设计]",
-	)
+	// Also ensure package.json version is synced if CLI passed a version
+	if (pkg.version !== targetVersion && process.argv[2]) {
+		pkg.version = targetVersion
+		fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, "\t") + "\n", "utf8")
+		console.log(`Updated package.json version to ${targetVersion}`)
+	}
 
 	fs.writeFileSync(readmePath, content, "utf8")
-	console.log(`Successfully updated README.md for version v${currentVersion}!`)
+	console.log(`Successfully updated README.md for version v${targetVersion}!`)
 }
 
 updateReadme()
