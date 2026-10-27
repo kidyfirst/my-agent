@@ -128,52 +128,84 @@
     </div>
 
     <div class="features-grid">
+      <!-- 1. 自主 ReAct 闭环循环 -->
       <div class="feature-card">
-        <div class="feature-icon" style="color: #60a5fa;">
-          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <div class="feature-img-wrapper">
+          <img src="./assets/feature-react-loop.jpg" alt="自主 ReAct 闭环循环" class="feature-img" loading="lazy">
         </div>
-        <h3 class="feature-title">自主 ReAct 闭环循环</h3>
-        <p class="feature-desc">自研调度引擎，支持多轮复杂推理、步骤规划、代码智能检索、AST 精准替换与运行报错自我修复闭环。</p>
+        <div class="feature-body">
+          <div class="feature-header">
+            <div class="feature-icon" style="color: #60a5fa;">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <h3 class="feature-title">自主 ReAct 闭环循环</h3>
+          </div>
+          <p class="feature-desc">自研调度引擎，支持多轮复杂推理、步骤规划、代码智能检索、AST 精准替换与运行报错自我修复闭环。</p>
+        </div>
       </div>
 
+      <!-- 2. 纯原生 MCP 协议支持 -->
       <div class="feature-card">
-        <div class="feature-icon" style="color: #a78bfa;">
-          <svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        <div class="feature-img-wrapper">
+          <img src="./assets/feature-mcp.jpg" alt="纯原生 MCP 协议支持" class="feature-img" loading="lazy">
         </div>
-        <h3 class="feature-title">纯原生 MCP 协议支持</h3>
-        <p class="feature-desc">深度集成 Model Context Protocol 标准客户端，原生支持 Stdio 与 HTTP/JSON-RPC 服务发现与外部工具生态无缝对接。</p>
+        <div class="feature-body">
+          <div class="feature-header">
+            <div class="feature-icon" style="color: #a78bfa;">
+              <svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+            </div>
+            <h3 class="feature-title">纯原生 MCP 协议支持</h3>
+          </div>
+          <p class="feature-desc">深度集成 Model Context Protocol 标准客户端，原生支持 Stdio 与 HTTP/JSON-RPC 服务发现与外部工具生态无缝对接。</p>
+        </div>
       </div>
 
+      <!-- 3. Git Worktree 安全隔离 -->
       <div class="feature-card">
-        <div class="feature-icon" style="color: #34d399;">
-          <svg viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zm-12 9a3 3 0 100-6 3 3 0 000 6zm12 3a3 3 0 100-6 3 3 0 000 6zM6 9a9 9 0 019 9"/></svg>
+        <div class="feature-img-wrapper">
+          <img src="./assets/feature-worktree.jpg" alt="Git Worktree 安全隔离" class="feature-img" loading="lazy">
         </div>
-        <h3 class="feature-title">Git Worktree 安全隔离</h3>
-        <p class="feature-desc">任务自动运行在独立 Git 工作树分支中，代码修改与测试绝不污染当前正在编写的本地文件，安全无忧。</p>
+        <div class="feature-body">
+          <div class="feature-header">
+            <div class="feature-icon" style="color: #34d399;">
+              <svg viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zm-12 9a3 3 0 100-6 3 3 0 000 6zm12 3a3 3 0 100-6 3 3 0 000 6zM6 9a9 9 0 019 9"/></svg>
+            </div>
+            <h3 class="feature-title">Git Worktree 安全隔离</h3>
+          </div>
+          <p class="feature-desc">任务自动运行在独立 Git 工作树分支中，代码修改与测试绝不污染当前正在编写的本地文件，安全无忧。</p>
+        </div>
       </div>
 
+      <!-- 4. 极速内嵌 PTY 终端 -->
       <div class="feature-card">
-        <div class="feature-icon" style="color: #f472b6;">
-          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <div class="feature-img-wrapper">
+          <img src="./assets/feature-pty-terminal.jpg" alt="极速内嵌 PTY 终端" class="feature-img" loading="lazy">
         </div>
-        <h3 class="feature-title">极速内嵌 PTY 终端</h3>
-        <p class="feature-desc">深度定制 node-pty 与 xterm.js，支持双向交互式输入、窗口尺寸动态同步与长执行命令实时日志流式中继。</p>
+        <div class="feature-body">
+          <div class="feature-header">
+            <div class="feature-icon" style="color: #f472b6;">
+              <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <h3 class="feature-title">极速内嵌 PTY 终端</h3>
+          </div>
+          <p class="feature-desc">深度定制 node-pty 与 xterm.js，支持双向交互式输入、窗口尺寸动态同步与长执行命令实时日志流式中继。</p>
+        </div>
       </div>
 
+      <!-- 5. 观察性记忆与历史恢复 -->
       <div class="feature-card">
-        <div class="feature-icon" style="color: #38bdf8;">
-          <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="feature-img-wrapper">
+          <img src="./assets/feature-memory.jpg" alt="观察性记忆与历史恢复" class="feature-img" loading="lazy">
         </div>
-        <h3 class="feature-title">观察性记忆与历史恢复</h3>
-        <p class="feature-desc">基于本地 SQLite 引擎存储完整会话，支持超长上下文后台关键事实抽取与压缩，启动即开即用、会话无缝接续。</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon" style="color: #fbbf24;">
-          <svg viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <div class="feature-body">
+          <div class="feature-header">
+            <div class="feature-icon" style="color: #38bdf8;">
+              <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h3 class="feature-title">观察性记忆与历史恢复</h3>
+          </div>
+          <p class="feature-desc">基于本地 SQLite 引擎存储完整会话，支持超长上下文后台关键事实抽取与压缩，启动即开即用、会话无缝接续。</p>
         </div>
-        <h3 class="feature-title">Codex 风格同心圆环更新</h3>
-        <p class="feature-desc">无缝对接 GitHub Releases 发布源，侧边栏更新按钮呈现现代同心圆环动态下载进度指示，启动即用、无感升级。</p>
       </div>
     </div>
   </section>
