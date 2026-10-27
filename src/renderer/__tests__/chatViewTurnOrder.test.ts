@@ -195,6 +195,26 @@ describe("organizeTurnItems - Turn Order and Placement", () => {
 		expect(result[1].type).toBe("assistant")
 	})
 
+	it("synthesizes an execution block with durationMs when assistant completed with task duration", () => {
+		const user = createUserItem("u1", "帮我看看这个图片有什么错误")
+		const asst = createAssistantItem(
+			"a1",
+			"根据图片分析，发现有以下两处问题...",
+			3200,
+		)
+
+		const result = organizeTurnItems([user, asst])
+
+		expect(result).toHaveLength(3)
+		expect(result[0].type).toBe("user")
+		expect(result[1].type).toBe("execution")
+		expect(result[2].type).toBe("assistant")
+		if (result[1].type === "execution") {
+			expect(result[1].data.durationMs).toBe(3200)
+			expect(result[1].data.steps).toHaveLength(0)
+		}
+	})
+
 	it("preserves active placeholder execution block when agent is active", () => {
 		const user = createUserItem("u1", "Run a long task")
 		const activeExec: RenderItem = {

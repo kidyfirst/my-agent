@@ -161,6 +161,11 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 
 	const isError =
 		message.stopReason === "error" || Boolean(message.errorMessage)
+	const displayText =
+		text ||
+		(isError
+			? message.errorMessage || "An error occurred during generation"
+			: "")
 	const isActivelyStreaming = Boolean(message.isStreaming)
 	const lineCount = thinking ? thinking.split("\n").length : 0
 
@@ -182,9 +187,9 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 	const timeStr = formatTime(message.createdAt)
 
 	const handleCopyAnswer = async () => {
-		if (!text) return
+		if (!displayText) return
 		try {
-			await navigator.clipboard.writeText(text)
+			await navigator.clipboard.writeText(displayText)
 			setCopiedAnswer(true)
 			setTimeout(() => setCopiedAnswer(false), 2000)
 		} catch (err) {
@@ -301,8 +306,11 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 			)}
 
 			{/* Main text with streaming cursor */}
-			{text && (
-				<div className="markdown-body">
+			{displayText && (
+				<div
+					className={isError ? "markdown-body is-error" : "markdown-body"}
+					style={isError ? { color: "var(--error, #ef4444)" } : undefined}
+				>
 					<Markdown
 						remarkPlugins={[remarkGfm]}
 						components={{
@@ -350,7 +358,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							},
 						}}
 					>
-						{text}
+						{displayText}
 					</Markdown>
 					{isActivelyStreaming && !isStreamingThinking && (
 						<span
@@ -376,6 +384,17 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 						.markdown-body {
 							overflow-wrap: anywhere;
 							word-break: break-word;
+						}
+						.markdown-body.is-error,
+						.markdown-body.is-error p,
+						.markdown-body.is-error li,
+						.markdown-body.is-error span,
+						.markdown-body.is-error strong,
+						.markdown-body.is-error em,
+						.markdown-body.is-error h1,
+						.markdown-body.is-error h2,
+						.markdown-body.is-error h3 {
+							color: var(--error, #ef4444);
 						}
 						.markdown-body h1, .markdown-body h2, .markdown-body h3 {
 							color: var(--text);
@@ -443,7 +462,8 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 			)}
 
 			{/* Assistant footer toolbar: timestamp + copy entire answer */}
-			{(text || (message.changedFiles && message.changedFiles.length > 0)) &&
+			{(displayText ||
+				(message.changedFiles && message.changedFiles.length > 0)) &&
 				!isActivelyStreaming && (
 					<div
 						style={{
@@ -524,31 +544,6 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 						</button>
 					</div>
 				)}
-
-			{/* Error callout banner */}
-			{isError && (
-				<div
-					style={{
-						padding: "8px 12px",
-						marginTop: text || thinking ? 8 : 4,
-						marginBottom: 4,
-						borderRadius: 6,
-						background: "rgba(239, 68, 68, 0.08)",
-						border: "1px solid rgba(239, 68, 68, 0.25)",
-						color: "#ef4444",
-						fontSize: 13,
-						lineHeight: 1.5,
-						whiteSpace: "pre-wrap",
-						overflowWrap: "anywhere",
-						wordBreak: "break-word",
-						maxWidth: "100%",
-						boxSizing: "border-box",
-					}}
-				>
-					{message.errorMessage ||
-						(text ? null : "An error occurred during generation")}
-				</div>
-			)}
 
 			<ImagePreviewModal
 				src={previewImage}

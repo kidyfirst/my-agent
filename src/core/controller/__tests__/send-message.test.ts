@@ -367,7 +367,129 @@ describe("Session.sendMessage", () => {
 			(c: any) => c.type === "image" || c.type === "file",
 		)
 		expect(imgPart).toBeDefined()
-		expect(imgPart.image || imgPart.data).toBe("fakeBase64ScreenshotData")
+		const dataVal =
+			typeof imgPart.data === "object"
+				? imgPart.data.data
+				: imgPart.image || imgPart.data
+		expect(dataVal).toBe("fakeBase64ScreenshotData")
 		expect(imgPart.mediaType || imgPart.mimeType).toBe("image/png")
+	})
+
+	it("keeps user images in store while sending text-only prompt to text models like DeepSeek", async () => {
+		let receivedPrompt: any = null
+		const model = new MockLanguageModelV3({
+			modelId: "deepseek-chat",
+			doStream: async (options) => {
+				receivedPrompt = options.prompt
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "0" },
+						{ type: "text-delta", id: "0", delta: "收到文字消息" },
+						{ type: "text-end", id: "0" },
+						{
+							type: "finish",
+							finishReason: "stop",
+							usage,
+						},
+					]),
+					warnings: [],
+				}
+			},
+		})
+		const controller = makeController(model)
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "test-deepseek",
+		})
+
+		await session.sendMessage({
+			content: "输入框上下内padding减少一半",
+			files: [
+				{
+					type: "image",
+					mediaType: "image/png",
+					data: "fakeBase64ScreenshotData",
+					name: "screenshot.png",
+				},
+			],
+		} as any)
+
+		const threadId = session.thread.getId()
+		const store = await (controller.storage as SQLiteStore).getStore("memory")
+		const { messages } = await store.listMessages({ threadId })
+
+		// Store must still contain the image for UI rendering
+		const userMsg = messages.find((m: any) => m.role === "user")
+		expect(userMsg).toBeDefined()
+		expect(userMsg.content.parts).toHaveLength(2)
+		expect(userMsg.attachments).toHaveLength(1)
+
+		// Model prompt must NOT contain image/file parts to avoid API 400 Bad Request
+		expect(receivedPrompt).toBeDefined()
+		const userTurn = receivedPrompt.find((p: any) => p.role === "user")
+		expect(userTurn).toBeDefined()
+		const promptText =
+			typeof userTurn.content === "string"
+				? userTurn.content
+				: userTurn.content.map((c: any) => c.text || "").join("\n")
+		expect(promptText).toContain("输入框上下内padding减少一半")
+		expect(promptText).toContain("[Attached image: screenshot.png]")
+		if (Array.isArray(userTurn.content)) {
+			const nonTextParts = userTurn.content.filter(
+				(c: any) => c.type !== "text",
+			)
+			expect(nonTextParts).toHaveLength(0)
+		}
+	})
+
+	it("passes image parts to multimodal DeepSeek models like deepseek-flash", async () => {
+		let receivedPrompt: any = null
+		const model = new MockLanguageModelV3({
+			modelId: "deepseek-flash",
+			doStream: async (options) => {
+				receivedPrompt = options.prompt
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "0" },
+						{ type: "text-delta", id: "0", delta: "已识别图片内容" },
+						{ type: "text-end", id: "0" },
+						{
+							type: "finish",
+							finishReason: "stop",
+							usage,
+						},
+					]),
+					warnings: [],
+				}
+			},
+		})
+		const controller = makeController(model)
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "test-deepseek-flash",
+		})
+
+		await session.sendMessage({
+			content: "这个图片有什么错误么？",
+			files: [
+				{
+					type: "image",
+					mediaType: "image/png",
+					data: "fakeBase64ScreenshotData",
+					name: "image.png",
+				},
+			],
+		} as any)
+
+		expect(receivedPrompt).toBeDefined()
+		const userTurn = receivedPrompt.find((p: any) => p.role === "user")
+		expect(userTurn).toBeDefined()
+		expect(Array.isArray(userTurn.content)).toBe(true)
+		const imgPart = userTurn.content.find(
+			(c: any) => c.type === "image" || c.type === "file",
+		)
+		expect(imgPart).toBeDefined()
 	})
 })

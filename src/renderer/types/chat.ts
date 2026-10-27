@@ -113,14 +113,28 @@ function findMatchingMessageIndex(
 			if (isUserMessage(m)) {
 				// Reconcile if optimistic ID ("user-") and text matches or matches turn
 				if (m.id.startsWith("user-")) {
-					const existingText = getMessageText(m)
-					if (!existingText || !incomingText || existingText === incomingText) {
+					const existingText = getMessageText(m).trim()
+					const incText = incomingText.trim()
+					if (
+						!existingText ||
+						!incText ||
+						existingText === incText ||
+						incText.startsWith(existingText) ||
+						existingText.startsWith(incText)
+					) {
 						return i
 					}
 				}
 				// Or if text content is identical
-				const existingText = getMessageText(m)
-				if (existingText && incomingText && existingText === incomingText) {
+				const existingText = getMessageText(m).trim()
+				const incText = incomingText.trim()
+				if (
+					existingText &&
+					incText &&
+					(existingText === incText ||
+						incText.startsWith(existingText) ||
+						existingText.startsWith(incText))
+				) {
 					return i
 				}
 			}
@@ -775,12 +789,35 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				(m) => isUserMessage(m) && String(m.id ?? "").startsWith("user-"),
 			)
 			if (pendingUserMessages.length > 0) {
-				const storedTexts = new Set(
-					cleanedMessages.filter(isUserMessage).map((m) => getMessageText(m)),
-				)
+				const storedTexts = cleanedMessages
+					.filter(isUserMessage)
+					.map((m) => getMessageText(m).trim())
 				for (const pending of pendingUserMessages) {
 					if (cleanedMessages.some((m) => m.id === pending.id)) continue
-					if (storedTexts.has(getMessageText(pending))) continue
+					const pendingText = getMessageText(pending).trim()
+					if (
+						storedTexts.some(
+							(st) =>
+								!pendingText ||
+								!st ||
+								st === pendingText ||
+								st.startsWith(pendingText) ||
+								pendingText.startsWith(st),
+						)
+					) {
+						continue
+					}
+					// Only keep pending message if it was created AFTER the last message in stored list
+					const pendingTime = pending.createdAt
+						? new Date(pending.createdAt).getTime()
+						: parseInt(pending.id.replace("user-", ""), 10) || 0
+					const lastMsg = cleanedMessages[cleanedMessages.length - 1]
+					const lastTime = lastMsg?.createdAt
+						? new Date(lastMsg.createdAt).getTime()
+						: 0
+					if (lastTime > 0 && pendingTime > 0 && pendingTime < lastTime) {
+						continue
+					}
 					cleanedMessages.push(pending)
 				}
 			}

@@ -83,11 +83,11 @@ function isUsableChatModel(modelId: string): boolean {
 
 function modelSupportsVision(modelId: string): boolean {
 	const id = (modelId || "").toLowerCase()
-	// deepseek-flash (DeepSeek-V4.1-Flash) accepts images; deepseek-v4-pro does not.
-	if (id.includes("deepseek")) return id.includes("flash")
+	// deepseek-flash (DeepSeek-V4.1-Flash) is multimodal and accepts images; deepseek-v4-pro is text-only.
+	if (id.includes("deepseek")) return id.includes("flash") || id.includes("vl")
 	if (id.includes("o3-mini") || id.includes("o1-mini")) return false
-	if (id.includes("qwen-") && !id.includes("vl")) return false
-	if (id.includes("llama-") && !id.includes("vision")) return false
+	if (id.includes("qwen") && !id.includes("vl")) return false
+	if (id.includes("llama") && !id.includes("vision")) return false
 	return true
 }
 
@@ -142,7 +142,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 			const hasImages =
 				Array.isArray(command.images) && command.images.length > 0
-			let messageContent = command.content || ""
+			const messageContent = command.content || ""
 
 			const imageFiles = hasImages
 				? command.images.map((img: any) => ({
@@ -154,14 +154,6 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 						filename: img.name || img.filename || "image.png",
 					}))
 				: []
-
-			if (hasImages && !modelSupportsVision(currentModelId)) {
-				// Model is text-only (e.g. DeepSeek-V4-Pro). Append note to text prompt.
-				const fileNames = command.images
-					.map((img: any) => img.name || img.filename || "image.png")
-					.join(", ")
-				messageContent = `${messageContent}\n\n[Attached image: ${fileNames}]\n(Note: The currently selected model "${currentModelId}" is text-only and cannot process images directly. If you need image analysis, please switch to a multimodal model such as Claude, GPT-4o, or Gemini.)`
-			}
 
 			const nonImgFiles =
 				Array.isArray(command.files) && command.files.length > 0

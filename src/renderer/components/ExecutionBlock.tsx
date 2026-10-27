@@ -212,7 +212,7 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 				? formatSecs(durationMs / 1000)
 				: null
 
-	if (steps.length === 0 && !isActive) {
+	if (steps.length === 0 && !isActive && !formattedDuration) {
 		return null
 	}
 
@@ -226,15 +226,19 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 			? `Worked for ${formattedDuration}`
 			: "Worked"
 
+	const isClickable = steps.length > 0 || isActive
+
 	return (
 		<div style={{ margin: "6px 0 10px 0" }}>
 			<div
-				onClick={() => setExpanded(!expanded)}
+				onClick={() => {
+					if (isClickable) setExpanded(!expanded)
+				}}
 				style={{
 					display: "inline-flex",
 					alignItems: "center",
 					gap: 6,
-					cursor: "pointer",
+					cursor: isClickable ? "pointer" : "default",
 					userSelect: "none",
 					padding: "3px 0",
 					fontSize: 13,
@@ -244,15 +248,21 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 					transition: "color 0.15s ease",
 				}}
 				onMouseEnter={(e) => {
-					(e.currentTarget as HTMLElement).style.color = "var(--text)"
+					if (isClickable) (e.currentTarget as HTMLElement).style.color = "var(--text)"
 				}}
 				onMouseLeave={(e) => {
-					(e.currentTarget as HTMLElement).style.color = "var(--muted)"
+					if (isClickable) (e.currentTarget as HTMLElement).style.color = "var(--muted)"
 				}}
-				title={expanded ? "Click to collapse" : "Click to expand all"}
+				title={
+					isClickable
+						? expanded
+							? "Click to collapse"
+							: "Click to expand all"
+						: undefined
+				}
 			>
 				<span>{headerLabel}</span>
-				<Chevron open={expanded} />
+				{steps.length > 0 && <Chevron open={expanded} />}
 				{steps.length > 0 && !expanded && (
 					<span style={{ fontSize: 11, color: "var(--dim)" }}>
 						({steps.length} step{steps.length > 1 ? "s" : ""})

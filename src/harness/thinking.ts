@@ -145,12 +145,23 @@ export function withThinkingOptions<T>(
 	level?: string,
 ): T {
 	const options = thinkingProviderOptions(provider, normalizeLevel(level))
-	// DeepSeek always needs the wrapper so its reasoning stream is surfaced.
-	if (!options && provider !== "deepseek") return model
+	// DeepSeek and OpenAI always need the wrapper (DeepSeek for reasoning stream, OpenAI for v3/v4 prompt compatibility).
+	if (!options && provider !== "deepseek" && provider !== "openai") return model
 
 	const middleware: LanguageModelMiddleware = {
 		specificationVersion: "v3",
 		transformParams: async ({ params }) => {
+			if (Array.isArray(params.prompt)) {
+				for (const msg of params.prompt) {
+					if (Array.isArray(msg.content)) {
+						for (const part of msg.content) {
+							if (part.type === "file" && typeof part.data === "string") {
+								;(part as any).data = { type: "data", data: part.data }
+							}
+						}
+					}
+				}
+			}
 			const existing = (params as any).providerOptions ?? {}
 			const merged: Record<string, Record<string, unknown>> = { ...existing }
 			for (const [name, values] of Object.entries(options ?? {})) {

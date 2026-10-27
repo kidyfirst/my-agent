@@ -299,6 +299,7 @@ export function ChatView({
 										? currentTextBlocks
 										: [{ type: "text", text: msg.errorMessage ?? "" }],
 								isStreaming: isStreaming && isTrailing,
+								durationMs: msgDurationMs,
 							},
 						})
 					}
@@ -777,9 +778,37 @@ export function organizeTurnItems(cleanedItems: RenderItem[]): RenderItem[] {
 			turnItems.push(currentTurnUser)
 			currentTurnUser = null
 		}
+
+		// If no execution block was created by tool/thinking steps, but assistant has durationMs,
+		// synthesize an execution block for this turn so "Worked for Xs" is displayed.
+		if (!currentTurnExec && currentTurnAssistants.length > 0) {
+			let foundDuration: number | undefined
+			for (let i = currentTurnAssistants.length - 1; i >= 0; i--) {
+				const d = currentTurnAssistants[i].data.durationMs
+				if (d != null) {
+					foundDuration = d
+					break
+				}
+			}
+			if (foundDuration != null && foundDuration > 0) {
+				currentTurnExec = {
+					type: "execution",
+					key: `turn-exec-${currentTurnAssistants[0].data.id}`,
+					data: {
+						isActive: false,
+						steps: [],
+						durationMs: foundDuration,
+						startedAt: null,
+					},
+				}
+			}
+		}
+
 		if (
 			currentTurnExec &&
-			(currentTurnExec.data.steps.length > 0 || currentTurnExec.data.isActive)
+			(currentTurnExec.data.steps.length > 0 ||
+				currentTurnExec.data.isActive ||
+				currentTurnExec.data.durationMs != null)
 		) {
 			if (currentTurnExec.data.durationMs == null) {
 				for (let i = currentTurnAssistants.length - 1; i >= 0; i--) {

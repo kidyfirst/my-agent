@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { stepCountIs, streamText } from "ai"
+import { stepCountIs, streamText, wrapLanguageModel } from "ai"
 import { RequestContext } from "../context/index.js"
 import { toModelTool } from "../tools/ai-tool.js"
 import type { Agent, MyAgentMessagePart } from "../agent/index.js"
@@ -880,11 +880,13 @@ export class Session<TState = any> {
 			).toLowerCase()
 			const canVision =
 				!modelIdStr ||
-				(!modelIdStr.includes("deepseek-v4-pro") &&
+				((!modelIdStr.includes("deepseek") ||
+					modelIdStr.includes("flash") ||
+					modelIdStr.includes("vl")) &&
 					!modelIdStr.includes("o3-mini") &&
 					!modelIdStr.includes("o1-mini") &&
-					!(modelIdStr.includes("qwen-") && !modelIdStr.includes("vl")) &&
-					!(modelIdStr.includes("llama-") && !modelIdStr.includes("vision")))
+					!(modelIdStr.includes("qwen") && !modelIdStr.includes("vl")) &&
+					!(modelIdStr.includes("llama") && !modelIdStr.includes("vision")))
 
 			const coreMessages: any[] = []
 			for (const m of historyMessages) {
@@ -893,6 +895,7 @@ export class Session<TState = any> {
 				if (role === "user") {
 					const parts: any[] = []
 					let userText = ""
+					const attachedNames: string[] = []
 
 					const rawParts = Array.isArray(m.content?.parts)
 						? m.content.parts
@@ -905,20 +908,25 @@ export class Session<TState = any> {
 							if (!p) continue
 							if (p.type === "text" && typeof p.text === "string") {
 								userText = (userText ? userText + "\n" : "") + p.text
-							} else if (p.type === "image" && canVision) {
-								const imgData =
-									p.data ||
-									p.image ||
-									(typeof p.url === "string" && p.url.startsWith("data:")
-										? p.url.split(",")[1]
-										: p.url)
-								if (imgData) {
-									const mediaType = p.mimeType || p.mediaType || "image/png"
-									parts.push({
-										type: "image",
-										image: String(imgData),
-										mediaType,
-									})
+							} else if (p.type === "image") {
+								if (canVision) {
+									const imgData =
+										p.data ||
+										p.image ||
+										(typeof p.url === "string" && p.url.startsWith("data:")
+											? p.url.split(",")[1]
+											: p.url)
+									if (imgData) {
+										const mediaType = p.mimeType || p.mediaType || "image/png"
+										parts.push({
+											type: "image",
+											image: String(imgData),
+											mediaType,
+										})
+									}
+								} else {
+									const name = p.name || p.filename || "screenshot.png"
+									attachedNames.push(name)
 								}
 							}
 						}
@@ -931,25 +939,38 @@ export class Session<TState = any> {
 						}
 					}
 
-					if (parts.length === 0 && canVision && Array.isArray(m.attachments)) {
+					if (parts.length === 0 && Array.isArray(m.attachments)) {
 						for (const att of m.attachments) {
 							const mime = String(att.mimeType || att.mediaType || "")
 							const isImg =
 								att.type === "image" ||
 								mime.startsWith("image/") ||
 								/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(String(att.name || ""))
-							if (isImg && (att.data || att.preview)) {
-								const rawData = att.data || att.preview
-								const cleanData =
-									typeof rawData === "string" && rawData.startsWith("data:")
-										? rawData.split(",")[1]
-										: rawData
-								parts.push({
-									type: "image",
-									image: String(cleanData),
-									mediaType: mime || "image/png",
-								})
+							if (isImg) {
+								if (canVision && (att.data || att.preview)) {
+									const rawData = att.data || att.preview
+									const cleanData =
+										typeof rawData === "string" && rawData.startsWith("data:")
+											? rawData.split(",")[1]
+											: rawData
+									parts.push({
+										type: "image",
+										image: String(cleanData),
+										mediaType: mime || "image/png",
+									})
+								} else if (!canVision) {
+									const name = att.name || att.filename || "screenshot.png"
+									attachedNames.push(name)
+								}
 							}
+						}
+					}
+
+					if (!canVision && attachedNames.length > 0) {
+						const uniqueNames = Array.from(new Set(attachedNames)).join(", ")
+						const note = `[Attached image: ${uniqueNames}]`
+						if (!userText.includes("[Attached image:")) {
+							userText = userText ? `${userText}\n\n${note}` : note
 						}
 					}
 
@@ -997,8 +1018,46 @@ export class Session<TState = any> {
 			// The AI SDK dropped `maxSteps` in favour of `stopWhen`; without it the
 			// run stops after a single model call, so a tool call would never be
 			// followed by the assistant's answer.
+			// Wrap model to guarantee v3/v4 file part compatibility (avoiding null serialization).
+			// `modelIdStr` also decides how image parts are shaped: providers built on
+			// AI SDK v4 (DeepSeek) only understand the legacy `image` part and serialize
+			// anything newer as `null`, which the API rejects with a 400.
+			const legacyImageParts = modelIdStr.includes("deepseek")
+			const effectiveModel = wrapLanguageModel({
+				model: model as any,
+				middleware: {
+					specificationVersion: "v3",
+					transformParams: async ({ params }) => {
+						if (Array.isArray(params.prompt)) {
+							for (const msg of params.prompt) {
+								if (!Array.isArray(msg.content)) continue
+								for (const part of msg.content) {
+									if (part.type === "file" && typeof part.data === "string") {
+										;(part as any).data = { type: "data", data: part.data }
+									}
+									if (legacyImageParts && (part as any).type === "image") {
+										// `image_url` -> `image`: the OpenAI-compatible
+										// adapter rebuilds the data URL from base64 + mediaType.
+										const url = (part as any).image_url
+										if (typeof url === "string" && url.startsWith("data:")) {
+											const comma = url.indexOf(",")
+											const header = url.slice(5, comma)
+											;(part as any).image = url.slice(comma + 1)
+											;(part as any).mediaType =
+												header.split(";")[0] || "image/png"
+											delete (part as any).image_url
+										}
+									}
+								}
+							}
+						}
+						return params
+					},
+				},
+			})
+
 			const streamRes = (streamText as any)({
-				model,
+				model: effectiveModel,
 				system: instructions,
 				messages: coreMessages,
 				tools:

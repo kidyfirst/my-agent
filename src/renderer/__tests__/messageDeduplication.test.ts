@@ -425,4 +425,46 @@ describe("Message Deduplication and Reconciliation in chatReducer", () => {
 		expect(state.messages[0].id).toBe("msg-user-1")
 		expect(state.messages[1].id).toBe("msg-assistant-1")
 	})
+
+	it("does not re-append stale optimistic user message after assistant response in SET_MESSAGES", () => {
+		let state = chatReducer(initialChatState, {
+			type: "MESSAGE_START",
+			message: {
+				id: "user-1729510000000",
+				role: "user",
+				content: [{ type: "text", text: "这个图片有什么错误么？" }],
+				createdAt: "2026-10-26T11:48:00.000Z",
+			},
+		})
+
+		const storedAfterAgentEnd: Message[] = [
+			{
+				id: "msg-user-db-1",
+				role: "user",
+				content: [
+					{
+						type: "text",
+						text: "这个图片有什么错误么？\n\n[Attached image: image.png]",
+					},
+				],
+				createdAt: "2026-10-26T11:48:01.000Z",
+			},
+			{
+				id: "msg-assistant-db-1",
+				role: "assistant",
+				content: [{ type: "text", text: "已为您分析图片内容" }],
+				createdAt: "2026-10-26T11:49:00.000Z",
+			},
+		]
+
+		state = chatReducer(state, {
+			type: "SET_MESSAGES",
+			messages: storedAfterAgentEnd,
+		})
+
+		// Optimistic message should NOT be re-appended after the assistant response
+		expect(state.messages).toHaveLength(2)
+		expect(state.messages[0].id).toBe("msg-user-db-1")
+		expect(state.messages[1].id).toBe("msg-assistant-db-1")
+	})
 })
