@@ -1,7 +1,7 @@
 {
 	"name": "my-agent",
 	"productName": "My Agent",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "My Agent for vibe coding",
 	"main": "dist/main/main.cjs",
 	"type": "module",

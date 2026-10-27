@@ -62,6 +62,72 @@
     <!-- Timeline Wrapper -->
     <div id="dynamic-timeline" class="timeline">
 
+      <!-- Version 0.1.1 -->
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-tag">v0.1.1</span>
+            <span class="release-date">2026-10-27</span>
+            <span class="badge-latest">Latest</span>
+          </div>
+
+          <div class="release-content">
+            <h4 class="release-category-title">🚀 多模态视觉与消息交互体验 (Multimodal Vision & Chat UX)</h4>
+            <ul class="release-list">
+              <li><strong>多模态视觉模型全面放开</strong>：修正模型视觉支持识别逻辑，放开对 <code>deepseek-flash</code> 等多模态模型的图片输入通道；采用 <code>wrapLanguageModel</code> 中间件消除 AI SDK v4 文件参数序列化为 <code>null</code> 导致的 400 异常。</li>
+              <li><strong>纯净消息交互体验</strong>：彻底移除服务端向用户提问注入提示文本的侵入式逻辑，保持用户气泡与数据库存储纯净一致。</li>
+              <li><strong>乐观消息对齐与防重击穿</strong>：升级消息对齐算法并加入时间戳判定，彻底修复大模型答复后用户消息重复追加到底部的显示缺陷。</li>
+              <li><strong>任务完成耗时统一感知</strong>：优化回复顶部指示，统一显示 <code>Worked for x.xs</code> 耗时信息，多步任务支持展开查看每个步骤细节。</li>
+            </ul>
+
+            <h4 class="release-category-title">🌐 官网文档与真实 UI 展现 (Documentation & Features)</h4>
+            <ul class="release-list">
+              <li><strong>真实产品 UI 局部特性图</strong>：官网 5 大核心特性卡片全面升级为基于最新真实 UI 渲染的高清 16:9 拟物图。</li>
+              <li><strong>特性结构精简聚焦</strong>：移除冗余的 Codex 同心圆环说明，聚焦呈现专业自主 AI 编程底座。</li>
+            </ul>
+          </div>
+
+          <div class="release-assets-box">
+            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
+            <div class="assets-chips">
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.dmg" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-mac-arm64.dmg</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.zip" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-mac-arm64.zip</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.dmg" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-mac-x64.dmg</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.zip" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-mac-x64.zip</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.exe" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-win-x64.exe</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.zip" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-win-x64.zip</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x86_64.AppImage" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-linux-x86_64.AppImage</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-amd64.deb" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.1-linux-amd64.deb</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Version 0.1.0 -->
       <div class="timeline-item">
         <div class="timeline-dot"></div>
