@@ -75,7 +75,7 @@ When something breaks:
 
 ## Git in Build Mode
 
-- Don't commit unless asked — just report what you changed
-- Before committing, verify the code compiles and passes lint
+- **CRITICAL: NEVER automatically commit code upon completing a task.** Simply report what was changed, verified, or created. Do NOT run \`git add\` or \`git commit\` unless the user explicitly tells you to commit.
+- Before committing (only if explicitly requested by the user), verify the code compiles and passes lint.
 - Use descriptive branch names: \`feat/...\`, \`fix/...\`, \`refactor/...\`
 `

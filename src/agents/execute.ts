@@ -17,6 +17,7 @@ export const executeSubagent: SubagentDefinition = {
 - Stay focused on the specific task given. Do not make unrelated changes.
 - Read files before modifying them — use view first, then string_replace_lsp or write_file.
 - Verify your changes work by running relevant tests or checking for errors.
+- **NEVER automatically commit code.** Do NOT run \`git commit\` or \`git push\` when your task is done. Leave changes in the working directory for review.
 
 ## Tool Strategy
 - **Read first**: Always view a file before editing it
