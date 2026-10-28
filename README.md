@@ -23,17 +23,17 @@
 
 ### 全平台客户端下载
 
-| 操作系统 / 平台 | 架构 / 适用机型 | 安装包格式 | 直接下载链接 (v0.1.1) | 说明 |
-| :--- | :--- | :--- | :--- | :--- |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像 | [my-agent-0.1.1-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.dmg) | 推荐 Mac 用户首选 |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包 | [my-agent-0.1.1-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.zip) | 解压即用 |
-| 🍏 **macOS** | **Intel x86_64** 芯片 | `.dmg` 安装镜像 | [my-agent-0.1.1-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.dmg) | 适配 Intel 架构 Mac |
-| 🍏 **macOS** | **Intel x86_64** 芯片 | `.zip` 免安装包 | [my-agent-0.1.1-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.zip) | 解压即用 |
-| 🪟 **Windows** | **Windows 10 / 11** (64 位) | `.exe` 安装程序 | [my-agent-0.1.1-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.exe) | NSIS 引导向导安装 |
-| 🪟 **Windows** | **Windows 10 / 11** (64 位) | `.zip` 免安装便携版 | [my-agent-0.1.1-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.zip) | 解压即可直接运行 |
-| 🐧 **Linux** | **Linux x86_64** (通用) | `.AppImage` 便携镜像 | [my-agent-0.1.1-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
-| 🐧 **Linux** | **Debian / Ubuntu / Deepin** | `.deb` 系统软件包 | [my-agent-0.1.1-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-amd64.deb) | `sudo dpkg -i` 系统级安装 |
-| 🐧 **Linux** | **Linux x86_64** (免安装) | `.zip` 压缩归档包 | [my-agent-0.1.1-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x64.zip) | 适用于无 root 环境 |
+| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.1)                                                                                                                       | 说明                      |
+| :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.1-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.1-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.zip)                 | 解压即用                  |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.1-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.1-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.zip)                     | 解压即用                  |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.1-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.exe)                     | NSIS 引导向导安装         |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.1-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.zip)                     | 解压即可直接运行          |
+| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.1-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
+| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.1-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
+| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.1-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x64.zip)                 | 适用于无 root 环境        |
 
 > [!IMPORTANT]
 > **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  
@@ -50,6 +50,7 @@
 > - 完整更新履历与历史版本详情请参阅 👉 **[在线 ChangeLog 日志](https://kidyfirst.github.io/my-agent/changelog.html)** 或 **[GitHub Releases 全部发布归档](https://github.com/kidyfirst/my-agent/releases)**。
 
 ---
+
 <!-- LATEST_RELEASE_END -->
 
 ## 目录
@@ -731,6 +732,66 @@ flowchart LR
 
 ```
 src/
+├── core/                      # 自研智能体核心层 (Agent Runtime Core)
+│   ├── agent/                 # Agent 核心类定义与 streamText 流式执行管道
+│   ├── controller/            # AgentController 调度容器与 Session 会话类定义
+│   ├── context/               # RequestContext 请求生命周期上下文
+│   ├── tools/                 # 工具适配、参数校验与 JSON Schema 转换 (toModelTool)
+│   ├── memory/                # 核心 Memory 抽象类定义
+│   ├── llm/                   # 统一语言模型解析与动态包装
+│   ├── workspace/             # 工作区解析与环境抽象
+│   └── index.ts               # 核心层对外统一出口
+│
+├── harness/                   # 智能体装配与门面代理层 (Harness Facade)
+│   ├── index.ts               # createMyAgent 入口、adapter 装配与 HarnessProxy 动态代理
+│   ├── instructions.ts        # 动态系统提示词装配 (getDynamicInstructions)
+│   ├── model-resolver.ts      # 模型解析与鉴权凭证绑定 (createModelResolver)
+│   ├── subagents.ts           # 默认子智能体 (explore/plan/execute) 装配
+│   ├── tools.ts               # 动态工具组装与不同运行模式过滤
+│   ├── thinking.ts            # 思考链 (Thinking/Reasoning) 解析与标签过滤
+│   ├── settings.ts            # 工作区与用户设置持久化
+│   └── state.ts               # 会话状态机类型与 Schema 定义
+│
+├── agents/                    # 分级子智能体定义 (Subagents)
+│   ├── explore.ts             # 只读代码探索子智能体 (代码检索、结构分析)
+│   ├── plan.ts                # 只读架构规划子智能体 (设计实现方案)
+│   ├── execute.ts             # 具备写入与终端执行能力的实施子智能体
+│   └── index.ts               # 子智能体导出
+│
+├── prompts/                   # 系统提示词系统 (System Prompts)
+│   ├── base.ts                # 通用基础提示词 (编码准则、Git 安全、沙箱约束)
+│   ├── build.ts               # Build 模式提示词 (实现与验证循环)
+│   ├── plan.ts                # Plan 只读模式提示词
+│   ├── fast.ts                # Fast 快速微调模式提示词
+│   └── index.ts               # buildFullPrompt 提示词装配入口
+│
+├── tools/                     # Agent 宿主扩展工具实现 (Tool Implementations)
+│   ├── shell.ts               # execute_command (进程组管控、超时拦截、实时流式输出)
+│   ├── file-view.ts           # view (文件只读查看、目录树巡检)
+│   ├── write.ts               # write_file (写文件、覆盖、目录递归自动创建)
+│   ├── grep.ts                # search_content (基于 ripgrep/正则的代码内容搜索)
+│   ├── glob.ts                # find_files (文件名与路径通配符模式匹配)
+│   ├── string-replace-lsp.ts  # string_replace_lsp (基于 LSP 的文本精准替换与诊断)
+│   ├── ast-smart-edit.ts      # ast_smart_edit (基于 ast-grep 的语法结构重构)
+│   ├── subagent.ts            # subagent 派生工具 (流式消费子 Agent 事件与结果)
+│   ├── request-sandbox-access.ts # request_sandbox_access (动态沙箱提权提问交互)
+│   ├── navigate-browser.ts    # 基于 Playwright 的网页导航与内容抓取
+│   ├── computer-use.ts        # 基于无头浏览器的视觉操作工具
+│   └── utils.ts               # 路径沙箱限制 (assertPathAllowed) 与并发写文件锁
+│
+├── store/                     # 原生无服务 SQLite 存储引擎 (LibSQL / node:sqlite)
+│   ├── store.ts               # SQLiteStore 主类 (基于 WAL 模式的高性能本地数据库)
+│   ├── memory-store.ts        # SQLiteMemoryStore (线程/消息持久化与观察性记忆存储)
+│   ├── schema.ts              # SQLite DDL 表结构与性能索引定义
+│   ├── types.ts               # 存储配置与领域接口定义
+│   └── index.ts               # 存储层对外导出
+│
+├── memory/                    # 观察性记忆模块 (Observational Memory)
+│   ├── memory.ts              # 继承 MyAgentMemory (消息 CRUD、会话秒级恢复、OM 系统提示注入)
+│   ├── token-counter.ts       # 启发式分词估算器 (len / 4)
+│   ├── types.ts               # ObservationalMemoryConfig / MemoryOptions
+│   └── index.ts               # 记忆层对外导出
+│
 ├── electron/                  # 主进程层 (Main Process)
 │   ├── main.ts                # 应用主生命周期、窗口创建、Harness 初始化与事件转接
 │   ├── preload.ts             # 安全预加载脚本，实现 contextBridge 注入
@@ -781,22 +842,20 @@ src/
 │   ├── types/                 # 渲染进程 TypeScript 类型定义
 │   └── styles/                # 全局样式与主题变量
 │
-├── tools/                     # Agent 宿主扩展工具 (Browser / Computer Use)
-├── store/                     # 原生无服务 SQLite 存储：SQLiteStore、SQLiteMemoryStore、表结构
-│   ├── store.ts               # SQLiteStore 主类（基于 node:sqlite，WAL 模式）
-│   ├── memory-store.ts        # SQLiteMemoryStore：线程/消息/观察式记忆持久化
-│   ├── schema.ts              # SQLite DDL 表结构与索引定义
-│   ├── types.ts               # 存储配置与领域接口定义
-│   └── index.ts               # 对外出口
-├── memory/                    # 记忆模块：Memory 主类、TokenCounter、OM 配置类型
-│   ├── memory.ts              # 继承 MyAgentMemory：线程/消息 CRUD、召回分页、OM 系统提示取数
-│   ├── token-counter.ts       # 启发式分词估算 (len / 4)
-│   ├── types.ts               # MemoryOptions / ObservationalMemoryConfig
-│   └── index.ts               # 对外出口
-├── browser/                   # Playwright 浏览器自动化管理器
+├── mcp/                       # Model Context Protocol (MCP) 客户端与管理
+│   ├── client.ts              # MCP 客户端协议实现 (Stdio / SSE 通信信道)
+│   ├── manager.ts             # MCP 服务器动态发现、生命周期与工具注入
+│   └── types.ts               # MCP 协议标准定义
+│
 ├── lsp/                       # 语言服务器协议 (LSP) 与 AST 智能改写集成
-├── mcp/                       # Model Context Protocol 客户端连接实现
-├── auth/                      # 凭证存储 (AuthStorage) 与 OAuth 适配
-├── permissions.ts             # 权限分类策略定义 (read / edit / execute / mcp / YOLO)
-└── utils/                     # 通用工具函数 (项目探测、路径解析、成本估算)
+│   ├── client.ts              # LSP 客户端与诊断信息收集
+│   ├── manager.ts             # 语言服务器进程生命周期管理
+│   └── server.ts              # TypeScript/JavaScript 等语言服务适配
+│
+├── browser/                   # Playwright 浏览器自动化管理器 (BrowserManager)
+├── hooks/                     # 项目扩展钩子管理 (HookManager / 阶段自动化任务)
+├── acp/                       # Agent Client Protocol 终端管理与事件总线
+├── auth/                      # 凭证存储 (AuthStorage) 与 OAuth 鉴权适配
+├── permissions.ts             # 工具权限分类策略 (read / edit / execute / mcp / YOLO)
+└── utils/                     # 通用工具函数 (项目探测、路径安全、Token 估算)
 ```
