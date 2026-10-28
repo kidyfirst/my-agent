@@ -73,6 +73,12 @@
       - [3.3.4 变更文件卡片与子智能体卡片](#334-变更文件卡片与子智能体卡片)
       - [3.3.5 滚动、空态与层叠](#335-滚动空态与层叠)
     - [3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)](#34-agent-运行与能力层-智能体引擎--srctools)
+      - [3.4.1 核心运行时对象体系 (Harness / HarnessProxy / ActiveSession / Agent)](#341-核心运行时对象体系-harness--harnessproxy--activesession--agent)
+      - [3.4.2 存储引擎与数据库持久化](#342-存储引擎与数据库持久化)
+      - [3.4.3 观察性记忆 (Observational Memory)](#343-观察性记忆-observational-memory)
+      - [3.4.4 Agent ReAct 循环机制与工具流](#344-agent-react-循环机制与工具流)
+      - [3.4.5 扩展工具生态与沙箱安全](#345-扩展工具生态与沙箱安全)
+      - [3.4.6 分级子智能体 (Subagents)](#346-分级子智能体-subagents)
     - [3.5 Memory 记忆模块 (`src/memory/`)](#35-memory-记忆模块-srcmemory)
       - [3.5.1 类继承关系与职责边界](#351-类继承关系与职责边界)
       - [3.5.2 存储域适配与线程/消息 CRUD](#352-存储域适配与线程消息-crud)
@@ -271,28 +277,259 @@ contextBridge.exposeInMainWorld("api", {
 
 ### 3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)
 
-项目通过智能体运行时引擎装配底层 Agent 能力，内部核心组件包括：
+项目通过自主研发的智能体运行时架构装配底层能力，由四大核心实体协同工作，实现模型交互、工具受控调用、多会话隔离与事件流式渲染。
 
-- **存储引擎（Storage Engine）**
-  - 默认自动初始化嵌入式 LibSQL（SQLite）数据库，路径位于系统 AppData 目录，实现 Thread 历史记录、消息列表、Token 用量的本地零配置持久化。
-- **观察性记忆（Observational Memory, OM）**
-  - 解决长时间编码对话中上下文窗口爆炸的痛点：
-  - **Observer 模型**：定期扫描会话中的工具输入与输出，抽取摘要观察记录。
-  - **Reflector 模型**：对高频事实与架构共识进行反思与提炼，动态维护长期记忆上下文。
-  - 具体实现见 [3.5 Memory 记忆模块](#35-memory-记忆模块-srcmemory)。
-- **Agent ReAct 循环机制**
-  - 实例化核心智能体 `codeAgent`，在 `harness.sendMessage()` 中配置 `maxSteps: 1000`。
-  - 模型依据指令思考并自主决策调用工具；工具在宿主运行后将标准输出或异常反馈回模型，模型持续迭代直至完成整体任务。
-- **扩展工具生态 (`src/tools/`, `src/lsp/`, `src/browser/`)**
-  - **基础代码工具**：`view`（查看代码）、`grep`（内容正则搜索）、`glob`（文件匹配）、`execute_command`（受控命令执行）、`write_file`（写文件）。
-  - **AST 智能编辑**：`string_replace_lsp` 基于 LSP 协议实现精确的语法树级别代码替换。
-  - **浏览器自动化**：`navigate-browser` 与 `computer` 基于 Playwright 驱动无头/可视化浏览器进行前端界面回归与操作。
-  - **MCP 外部工具拓展**：动态挂载外部 Model Context Protocol 服务器提供的外部工具。
-- **分级子智能体（Subagents）**
-  - 内置派生不同权限梯队的轻量 Agent：
-    - `explore`：只读探索子智能体，负责代码库检索与依赖分析。
-    - `plan`：只读规划子智能体，负责功能设计与实施方案梳理。
-    - `execute`：写权限执行子智能体，执行具体代码修改并调用任务看板工具。
+#### 3.4.1 核心运行时对象体系 (Harness / HarnessProxy / ActiveSession / Agent)
+
+在运行时架构中，上层（Electron IPC 处理器与前端 UI）并不直接操作单一复杂的底层类，而是通过一个经过代理包装的统一门面对象（`harness`）与整个系统交互。
+
+```mermaid
+graph TD
+    Caller["上层调用者 (Electron IPC / UI Handlers)"] -->|调用统一契约接口| HarnessProxy["HarnessProxy (Proxy 实例)<br>src/harness/index.ts<br>统一门面 / 三级动态委托"]
+
+    subgraph FallbackChain ["三级动态委托与属性降级链 (Proxy Fallback Chain)"]
+        direction TB
+        L1["1. 第一优先级：adapter (高层业务增强适配)<br>• init 上次会话自动恢复<br>• listMessages 双读 SQLite 兜底与耗时对齐<br>• messageQueue 队列读写"]
+        L2["2. 第二优先级：activeSession (Session 实例)<br>• sendMessage() 驱动 ReAct 循环<br>• state / mode / model 状态机<br>• permissions 权限与 _pendingApprovals 审批门禁"]
+        L3["3. 第三优先级：controller (Harness / AgentController 实例)<br>• 全局配置 / 存储引擎 (storage)<br>• 模式配置 (modes) / 子智能体注册表 (subagents)<br>• 会话工厂 (createSession)"]
+
+        L1 -->|未找到时动态降级| L2
+        L2 -->|未找到时动态降级| L3
+    end
+
+    HarnessProxy --> FallbackChain
+    L2 -->|装配与驱动| AgentCore["Agent (智能体能力核心)<br>src/core/agent/agent.ts<br>• instructions 提示词管理<br>• tools 可用工具注册集<br>• stream() TransformStream 流式执行"]
+    L3 -.->|配置注入| AgentCore
+```
+
+##### 1. 四大核心实体的职责边界与类定义契约
+
+| 核心实体                                | 源码位置                                                                                                                             | 核心定位与职责                                                                                                                                                                                               |
+| :-------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`Agent`**                             | [`src/core/agent/agent.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/agent/agent.ts)                              | **原子智能体能力封装体**。管理 System Instructions、Model 解析、Tools 列表注入与 Memory 关联，提供基础流式生成 `stream()`。                                                                                  |
+| **`Harness`** (`AgentController`)       | [`src/core/controller/controller.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts)          | **工作区级调度宿主与 Session 工厂**。持有全局存储（Storage）、持久化记忆（Memory）、模式（Modes）、子智能体注册表（Subagents），负责多 Session 生命周期管理。                                                |
+| **`ActiveSession`** (`Session<TState>`) | [`src/core/controller/controller.ts:296`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts#L296) | **有状态的单项目/工作区分支执行实例**。每个项目或 Git Worktree 对应一个独立的 Session。管理响应式状态、当前 Model/Mode、历史 Thread、工具审批门禁（`_pendingApprovals`），并承载主执行入口 `sendMessage()`。 |
+| **`HarnessProxy`** (`MyAgentHarness`)   | [`src/harness/index.ts:1096`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/harness/index.ts#L1096)                         | **高级多态门面代理**。通过 ES6 `Proxy` 动态聚合 `adapter`、`activeSession` 和 `controller`，对外提供全功能、动态延迟绑定、零样板转发的统一接口。                                                             |
+
+---
+
+##### 2. 核心类与接口定义结构
+
+###### (1) `Agent` 类定义（[`src/core/agent/agent.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/agent/agent.ts)）
+
+```typescript
+export class Agent {
+	id: string
+	name: string
+	description?: string
+	instructions?: any // 字符串或返回字符串的动态函数 (args: { requestContext }) => Promise<string>
+	model?: any // 语言模型实例或解析函数 (args: { requestContext }) => Promise<LanguageModel>
+	tools?: any // 工具映射字典或解析函数 Record<string, Tool>
+	memory?: any // 记忆管理模块
+
+	constructor(config: AgentConfig)
+
+	// 获取并解析当前请求上下文的系统提示词
+	async getInstructions(args?: {
+		requestContext?: RequestContext
+	}): Promise<string>
+	// 动态获取当前请求上下文使用的语言模型
+	async getModel(args?: { requestContext?: RequestContext }): Promise<any>
+	// 列出当前所有可用的工具实例
+	async listTools(args?: {
+		requestContext?: RequestContext
+	}): Promise<Record<string, any>>
+	// 核心流式执行：调用 Vercel AI SDK 的 streamText，并通过内置 TransformStream 统一规范化输出事件流
+	async stream(
+		taskOrPrompt: string | any,
+		options?: AgentStreamOptions,
+	): Promise<{
+		fullStream: ReadableStream<any>
+		textStream: ReadableStream<string>
+		text: Promise<string>
+		getFullOutput: () => Promise<{
+			text: string
+			usage: any
+			finishReason: any
+		}>
+	}>
+}
+```
+
+###### (2) `Harness` / `AgentController` 类定义（[`src/core/controller/controller.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts)）
+
+```typescript
+export class AgentController<TState = any> {
+	readonly id: string
+	readonly agent: Agent // 关联的主 Agent 实例
+	readonly storage: any // 全局存储引擎 (SQLite / LibSQL)
+	readonly memory?: any // 观察性记忆模块 (OM)
+	readonly defaultModeId: string // 默认模式 (如 "build")
+	readonly modes: AgentMode[] // 注册的工作模式列表 (build, plan 等)
+	readonly subagents: HarnessSubagent[] // 注册的子智能体列表 (explore, plan, execute)
+	readonly toolCategoryResolver?: (toolName: string) => string // 工具类别解析器
+
+	constructor(config: HarnessConfig<TState>)
+
+	async init(): Promise<void>
+	// 会话工厂：创建或获取对应工作区/资源的独立状态会话
+	async createSession(options?: {
+		resourceId?: string
+	}): Promise<Session<TState>>
+	getSession(sessionId: string): Session<TState> | undefined
+	listModes(): AgentMode[]
+	async listAvailableModels(): Promise<AvailableModelItem[]>
+}
+```
+
+###### (3) `ActiveSession` (`Session<TState>`) 类定义（[`src/core/controller/controller.ts:296`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts#L296)）
+
+```typescript
+export class Session<TState = any> {
+	readonly id: string
+	readonly resourceId: string
+	readonly controller: AgentController<TState>
+
+	// 状态机与环境配置访问器
+	readonly state: {
+		get: () => TState
+		set: (patch: Partial<TState>) => Promise<void>
+	}
+	readonly mode: {
+		get: () => string
+		switch: (opts: { modeId: string }) => Promise<void>
+	}
+	readonly model: { get: () => any; switch: (modelId: string) => Promise<void> }
+
+	// 历史会话管理
+	readonly thread: {
+		getId: () => string
+		switch: (opts: { threadId: string }) => Promise<void>
+		create: (opts?: {
+			title?: string
+			metadata?: Record<string, unknown>
+		}) => Promise<ThreadLike>
+		list: () => Promise<ThreadLike[]>
+		listMessages: (opts?: { threadId?: string; limit?: number }) => Promise<any>
+		delete: (opts: { threadId: string }) => Promise<void>
+	}
+
+	// 权限门禁与人机审批控制
+	readonly permissions: {
+		getRules: () => {
+			categories: Record<string, string>
+			tools: Record<string, string>
+		}
+		setForCategory: (opts: {
+			category: ToolCategory
+			policy: PermissionPolicy
+		}) => void
+	}
+
+	// 核心任务驱动：装配工具、注入审批拦截、驱动 streamText 循环并广播事件
+	async sendMessage(options: SendMessageOptions): Promise<void>
+	// 异步中断正在运行的任务与进程组
+	async abort(): Promise<void>
+	// 响应工具调用的人工审批 (Approve / Decline)
+	respondToToolApproval(opts: {
+		decision?: "approve" | "decline"
+		toolCallId: string
+	}): void
+	// 订阅当前会话发出的全量生命周期事件 (tool_start, tool_end, message_delta 等)
+	subscribe(listener: (event: HarnessEvent) => void): () => void
+}
+```
+
+###### (4) `HarnessProxy` 与 `adapter` 门面（[`src/harness/index.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/harness/index.ts)）
+
+```typescript
+// 1. adapter: 在会话之上封装高阶业务逻辑与存储兜底
+const adapter: MyAgentHarness = {
+    id: "myagent-code",
+    controller,
+    get activeSession() { return activeSession },
+    async init() {
+        await controller.init()
+        const session = activeSession ?? (await sessionReady)
+        await session.init?.()
+        // 自动恢复上次打开的项目会话 Thread
+        ...
+    },
+    async listMessages(options) {
+        // 先读内存 session，随后双查 SQLite 存储补齐精确的执行耗时 durationMs
+        ...
+    },
+    ...
+}
+
+// 2. harness: 基于 Proxy 构造三级动态查找链
+const harness: MyAgentHarness = new Proxy(adapter, {
+    get(target: MyAgentHarness, prop: string | symbol) {
+        if (prop in target) {
+            return (target as unknown as Record<string | symbol, unknown>)[prop]
+        }
+        if (activeSession && prop in (activeSession as unknown as object)) {
+            const val = (activeSession as unknown as Record<string | symbol, unknown>)[prop]
+            return typeof val === "function" ? val.bind(activeSession) : val
+        }
+        if (prop in (controller as unknown as object)) {
+            const val = (controller as unknown as Record<string | symbol, unknown>)[prop]
+            return typeof val === "function" ? val.bind(controller) : val
+        }
+        return undefined
+    },
+})
+```
+
+---
+
+##### 3. 为什么要在 `adapter` 外包裹一层 `Proxy`？
+
+使用 `Proxy` 带来了四个不可替代的核心架构价值：
+
+1. **解决 `activeSession` 异步延迟挂载的时序问题（Late-bound Dynamic Reference）**：
+   在 `createMyAgent()` 初始化执行时，`activeSession` 依赖 `controller.createSession(...)` 异步 Promise 创建。若使用传统静态拷贝（如 `Object.assign`），在函数返回瞬间 `activeSession` 依然是 `null`，挂在它上面的方法会全量丢失；而 Proxy 在**属性被访问的瞬间动态求值**，一旦异步创建完毕，外部立刻能够透明访问。
+2. **零样板转发（Zero-Boilerplate Delegation）**：
+   `Session` 与 `AgentController` 包含了大量的内部方法与深层状态（如 `permissions`, `thread`, `om` 记忆, `storage` 等）。若不使用 Proxy，开发者就必须在 `adapter` 对象上手工手写数十个千篇一律的转发函数（`foo(...args) { return this.activeSession.foo(...args); }`），维护成本极高；通过 Proxy 实现了全量 API 的**透明自动降级委托**。
+3. **保证 `this` 上下文绑定（Execution Context Binding）**：
+   在属性访问时，Proxy 自动针对函数执行 `.bind(activeSession)` 或 `.bind(controller)`，确保底层方法执行时其内部的 `this` 永远指向原始实例本身，杜绝因上下文丢失导致访问内部私有属性（如 `this._state`, `this._pendingApprovals`）抛出 `TypeError: Cannot read properties of undefined`。
+4. **高层业务覆盖优先（Override & Enrichment）**：
+   Proxy 优先判断 `if (prop in target)`，这使得 `adapter` 能够精准重写关键业务方法（例如 `listMessages` 的 SQLite 补充查询兜底、`init` 的记忆恢复），未重写的方法则无缝透传到底层实现。
+
+---
+
+#### 3.4.2 存储引擎与数据库持久化
+
+默认自动初始化嵌入式 LibSQL（SQLite）数据库，路径位于系统 AppData 目录，实现 Thread 历史记录、消息列表、Token 用量的本地零配置持久化。
+
+#### 3.4.3 观察性记忆 (Observational Memory)
+
+解决长时间编码对话中上下文窗口爆炸的痛点：
+
+- **Observer 模型**：定期扫描会话中的工具输入与输出，抽取摘要观察记录。
+- **Reflector 模型**：对高频事实与架构共识进行反思与提炼，动态维护长期记忆上下文。
+- 具体实现见 [3.5 Memory 记忆模块](#35-memory-记忆模块-srcmemory)。
+
+#### 3.4.4 Agent ReAct 循环机制与工具流
+
+- 实例化核心智能体 `codeAgent`，在 `harness.sendMessage()` 中配置 `maxSteps: 1000`。
+- 模型依据指令思考并自主决策调用工具；工具在宿主运行后将标准输出或异常反馈回模型，模型持续迭代直至完成整体任务。
+
+#### 3.4.5 扩展工具生态与沙箱安全 (`src/tools/`, `src/lsp/`, `src/browser/`)
+
+- **基础代码工具**：`view`（查看代码）、`grep`（内容正则搜索）、`glob`（文件匹配）、`execute_command`（受控命令执行）、`write_file`（写文件）。
+- **AST 智能编辑**：`string_replace_lsp` 基于 LSP 协议实现精确的语法树级别代码替换。
+- **浏览器自动化**：`navigate-browser` 与 `computer` 基于 Playwright 驱动无头/可视化浏览器进行前端界面回归与操作。
+- **MCP 外部工具拓展**：动态挂载外部 Model Context Protocol 服务器提供的外部工具。
+- **沙箱与路径防护**：所有读写与终端操作强制通过 `assertPathAllowed` 限制在 `projectRoot` 内，越界需经 `request_sandbox_access` 提权确认。
+
+#### 3.4.6 分级子智能体 (Subagents)
+
+内置派生不同权限梯队的轻量 Agent：
+
+- `explore`：只读探索子智能体，负责代码库检索与依赖分析。
+- `plan`：只读规划子智能体，负责功能设计与实施方案梳理。
+- `execute`：写权限执行子智能体，执行具体代码修改并调用任务看板工具。
 
 ### 3.5 Memory 记忆模块 (`src/memory/`)
 
