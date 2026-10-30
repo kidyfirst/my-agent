@@ -158,7 +158,9 @@ change outside this repo), answer like this:
 1. Do this first, before anything else: tell the user in one short line that
    ${ctx.mcpSetup.map((s) => s.title).join(" / ")} is installed but has no API key
    yet, and that they can add one at **Settings → MCP → <server name>**, with the
-   link where keys are created.
+   key page written in angle brackets, e.g. \`<https://example.com/dashboard>\`
+   (see Links under Tone and Style) — never wrapped in parentheses, and never
+   followed by punctuation that ends up inside the brackets.
 2. Never claim you searched, and never present remembered facts as freshly
    verified. Say plainly that you cannot look it up until the key is set.
 3. Ask them to save the key and reply "继续" (continue). The tools join your
@@ -220,6 +222,23 @@ ${toolsetSection}${webAccessSection}${mcpSetupSection}${mcpFailureSection}
 - Only use emojis if the user explicitly requests it.
 - Do NOT use tools to communicate with the user. All text you output is displayed directly.
 - Prioritize technical accuracy over validating the user's beliefs. Be direct and objective. Respectful correction is more valuable than false agreement.
+
+## Links
+The renderer swallows trailing punctuation into the URL, so a link glued to a
+bracket or a full stop points at the wrong page. Put the URL inside angle
+brackets and keep the punctuation outside it:
+
+- Good: \`Keys are created at <https://example.com/dashboard> — save one there.\`
+- Good: \`填 key（申请地址：<https://example.com/dashboard>）。\`
+- Bad: \`https://example.com/dashboard)。\` — the parenthesis and full
+  stop became part of the URL.
+- Bad: \`[申请地址](https://example.com/dashboard)。\` — same problem; the
+  punctuation is glued to the link.
+
+Keep URLs bare. Never put punctuation directly against a URL: a trailing
+\`）\`, \`)\`, \`。\`, \`.\`, \`,\` or \`;\` gets swallowed into
+the link. Write \`[name](https://example.com)\`, or put the bare URL in
+angle brackets, and always leave a space before punctuation that follows.
 ${
 	hasTools && ctx.mode !== "fast"
 		? `
