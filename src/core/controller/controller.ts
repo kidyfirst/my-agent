@@ -1084,10 +1084,12 @@ export class Session<TState = any> {
 						const toolContext = { requestContext, toolCallId }
 						let result: any
 						if (typeof origTool.execute === "function") {
-							result = await origTool.execute(
-								{ ...args, context: toolContext },
-								toolContext,
-							)
+							// The execution context travels as the second argument only.
+							// Folding it into `args` leaked an extra `context` key into the
+							// model-supplied arguments, which MCP servers reject against
+							// their own input schema: LangSearch answered
+							// `Unrecognized key: "context"`.
+							result = await origTool.execute(args, toolContext)
 						} else {
 							result = { success: true }
 						}
