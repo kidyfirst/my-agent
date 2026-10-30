@@ -117,16 +117,6 @@ const ARTIFACTS = [
 			en: "Install with `sudo dpkg -i`",
 		},
 	},
-	{
-		platform: "🐧 **Linux**",
-		arch: {
-			zh: "**Linux x86_64** (免安装)",
-			en: "**Linux x86_64** (no install)",
-		},
-		format: { zh: "`.zip` 压缩归档包", en: "`.zip` archive" },
-		suffix: "linux-x64.zip",
-		note: { zh: "适用于无 root 环境", en: "For machines without root" },
-	},
 ]
 
 /** Every string the release block needs, per language. */
