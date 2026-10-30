@@ -1,7 +1,10 @@
 import { execSync } from "node:child_process"
 import type { RequestContext } from "../core/index.js"
+import { DEFAULT_EXECUTION_MODE } from "../core/index.js"
 import { buildFullPrompt } from "../prompts/index.js"
 import { describeToolNames } from "./tools.js"
+import { builtinServersNeedingSetup } from "../mcp/builtin.js"
+import type { McpServerStatus } from "../mcp/types.js"
 
 function getCurrentGitBranch(cwd: string): string | undefined {
 	try {
@@ -33,7 +36,8 @@ export function getDynamicInstructions({
 		harnessContext?.state ??
 		harnessContext?.getState?.() ??
 		{}
-	const modeId = session?.mode?.get?.() ?? harnessContext?.modeId ?? "build"
+	const modeId =
+		session?.mode?.get?.() ?? harnessContext?.modeId ?? DEFAULT_EXECUTION_MODE
 	const projectPath = state?.projectPath ?? process.cwd()
 
 	const promptCtx = {
@@ -57,6 +61,29 @@ export function getDynamicInstructions({
 		workingDir: projectPath,
 		state,
 		toolNames: describeToolNames(modeId),
+		// Tools the connected MCP servers actually registered. Read from the live
+		// manager so a key saved in Settings shows up on the very next turn.
+		mcpToolNames:
+			(harnessContext?.getMcpToolNames?.() as string[] | undefined) ?? [],
+		// Read from disk so a key saved in Settings lands in the very next turn.
+		mcpSetup: builtinServersNeedingSetup().map((server) => ({
+			name: server.name,
+			title: server.title,
+			description: server.description,
+			apiKeyUrl: server.apiKeyUrl,
+		})),
+		// A saved key that the server rejected is a different story from a
+		// missing key, and the model cannot tell them apart on its own.
+		mcpFailures: (
+			(harnessContext?.getMcpServerStatuses?.() ?? []) as McpServerStatus[]
+		)
+			.filter(
+				(status) => status.builtin && status.hasApiKey && !status.connected,
+			)
+			.map((status) => ({
+				title: status.title ?? status.name,
+				error: status.error,
+			})),
 	}
 
 	return buildFullPrompt(promptCtx)

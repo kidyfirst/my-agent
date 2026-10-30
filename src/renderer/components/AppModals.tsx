@@ -5,6 +5,16 @@ import { ModelSelector } from "./ModelSelector"
 import { PlanApproval } from "./PlanApproval"
 import { QuickFileOpen } from "./QuickFileOpen"
 import { ToolApprovalDialog } from "./ToolApprovalDialog"
+import { GraphViewerModal } from "./graph/GraphViewerModal"
+import { Settings } from "./Settings"
+import { AgentDashboard } from "./AgentDashboard"
+import {
+	SessionExportModal,
+	type SessionExportData,
+} from "./SessionExportModal"
+import { SessionReplayModal } from "./SessionReplayModal"
+import { LogConsoleModal } from "./LogConsoleModal"
+import { DEFAULT_EXECUTION_MODE } from "../types/ipc"
 
 import type { AuthManager } from "../hooks/useAuthManager"
 import type { DialogManager } from "../hooks/useDialogManager"
@@ -17,8 +27,20 @@ interface AppModalsProps {
 	tabs: TabManager
 	project: ProjectManager
 	currentModelId: string
+	currentModeId?: string
+	isAgentActive?: boolean
 	onSelectModel: (modelId: string) => void
+	onSelectMode?: (modeId: string) => void
 	commandPaletteItems: CommandItem[]
+	sessionExportData?: SessionExportData | null
+	onCloseExport?: () => void
+	onExportSuccess?: (savedPath: string) => void
+	onExportError?: (msg: string) => void
+	showReplayModal?: boolean
+	onCloseReplay?: () => void
+	onStartReplay?: (filePath: string) => void
+	onReplayError?: (msg: string) => void
+	currentThreadId?: string | null
 }
 
 export function AppModals(props: AppModalsProps) {
@@ -66,7 +88,7 @@ export function AppModals(props: AppModalsProps) {
 					style={{
 						position: "fixed",
 						inset: 0,
-						background: "rgba(0,0,0,0.5)",
+						background: "var(--scrim)",
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
@@ -79,62 +101,94 @@ export function AppModals(props: AppModalsProps) {
 				>
 					<div
 						style={{
-							background: "var(--bg-surface)",
+							background: "var(--bg)",
 							border: "1px solid var(--border)",
 							borderRadius: 12,
-							padding: 24,
+							overflow: "hidden",
 							width: 480,
 							maxWidth: "90vw",
 							display: "flex",
 							flexDirection: "column",
-							gap: 16,
 						}}
 					>
 						<div
-							style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}
+							style={{
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "space-between",
+								padding: "8px 16px",
+								borderBottom: "1px solid var(--border-muted)",
+								background: "var(--bg-surface)",
+								minHeight: 38,
+							}}
 						>
-							Clone from URL
-						</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-							<label
-								style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)" }}
+							<span
+								style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}
 							>
-								Git URL
-							</label>
-							<input
-								type="text"
-								value={project.cloneUrl}
-								onChange={(e) => project.setCloneUrl(e.target.value)}
-								placeholder="https://github.com/user/repo.git"
-								disabled={project.cloning}
-								onFocus={(e) => e.currentTarget.select()}
-								style={{
-									padding: "10px 12px",
-									background: "var(--bg-elevated)",
-									border: "1px solid var(--border)",
-									borderRadius: 8,
-									color: "var(--text)",
-									fontSize: 13,
-									fontFamily: "inherit",
-									outline: "none",
+								Clone from URL
+							</span>
+							<button
+								onClick={() => {
+									if (!project.cloning) {
+										project.setShowCloneModal(false)
+										project.setCloneUrl("")
+										project.setCloneDest("")
+									}
 								}}
-							/>
-						</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-							<label
-								style={{ fontSize: 12, fontWeight: 500, color: "var(--muted)" }}
+								style={{
+									background: "transparent",
+									border: "none",
+									color: "var(--muted)",
+									cursor: "pointer",
+									padding: "4px",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+									borderRadius: 6,
+								}}
+								title="Close (Esc)"
 							>
-								Clone location
-							</label>
-							<div style={{ display: "flex", gap: 8 }}>
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								>
+									<line x1="18" y1="6" x2="6" y2="18" />
+									<line x1="6" y1="6" x2="18" y2="18" />
+								</svg>
+							</button>
+						</div>
+						<div
+							style={{
+								padding: 20,
+								display: "flex",
+								flexDirection: "column",
+								gap: 16,
+							}}
+						>
+							<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+								<label
+									style={{
+										fontSize: 12,
+										fontWeight: 500,
+										color: "var(--muted)",
+									}}
+								>
+									Git URL
+								</label>
 								<input
 									type="text"
-									value={project.cloneDest}
-									onChange={(e) => project.setCloneDest(e.target.value)}
-									placeholder="/path/to/directory"
+									value={project.cloneUrl}
+									onChange={(e) => project.setCloneUrl(e.target.value)}
+									placeholder="https://github.com/user/repo.git"
 									disabled={project.cloning}
+									onFocus={(e) => e.currentTarget.select()}
 									style={{
-										flex: 1,
 										padding: "10px 12px",
 										background: "var(--bg-elevated)",
 										border: "1px solid var(--border)",
@@ -145,72 +199,103 @@ export function AppModals(props: AppModalsProps) {
 										outline: "none",
 									}}
 								/>
+							</div>
+							<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+								<label
+									style={{
+										fontSize: 12,
+										fontWeight: 500,
+										color: "var(--muted)",
+									}}
+								>
+									Clone location
+								</label>
+								<div style={{ display: "flex", gap: 8 }}>
+									<input
+										type="text"
+										value={project.cloneDest}
+										onChange={(e) => project.setCloneDest(e.target.value)}
+										placeholder="/path/to/directory"
+										disabled={project.cloning}
+										style={{
+											flex: 1,
+											padding: "10px 12px",
+											background: "var(--bg-elevated)",
+											border: "1px solid var(--border)",
+											borderRadius: 8,
+											color: "var(--text)",
+											fontSize: 13,
+											fontFamily: "inherit",
+											outline: "none",
+										}}
+									/>
+									<button
+										onClick={project.handleBrowseCloneDest}
+										disabled={project.cloning}
+										style={{
+											padding: "10px 16px",
+											background: "var(--bg-elevated)",
+											color: "var(--text)",
+											border: "1px solid var(--border)",
+											borderRadius: 8,
+											cursor: "pointer",
+											fontSize: 13,
+											fontWeight: 500,
+											whiteSpace: "nowrap",
+										}}
+									>
+										Browse...
+									</button>
+								</div>
+							</div>
+							<div
+								style={{
+									display: "flex",
+									justifyContent: "flex-end",
+									gap: 8,
+									marginTop: 4,
+								}}
+							>
 								<button
-									onClick={project.handleBrowseCloneDest}
+									onClick={() => {
+										project.setShowCloneModal(false)
+										project.setCloneUrl("")
+										project.setCloneDest("")
+									}}
 									disabled={project.cloning}
 									style={{
-										padding: "10px 16px",
-										background: "var(--bg-elevated)",
-										color: "var(--text)",
+										padding: "8px 16px",
+										background: "transparent",
+										color: "var(--muted)",
 										border: "1px solid var(--border)",
 										borderRadius: 8,
 										cursor: "pointer",
 										fontSize: 13,
-										fontWeight: 500,
-										whiteSpace: "nowrap",
 									}}
 								>
-									Browse...
+									Cancel
+								</button>
+								<button
+									onClick={project.handleCloneSubmit}
+									disabled={!cloneReady || project.cloning}
+									style={{
+										padding: "8px 20px",
+										background: cloneReady
+											? "var(--accent)"
+											: "var(--bg-elevated)",
+										color: cloneReady ? "var(--on-accent)" : "var(--dim)",
+										border: "none",
+										borderRadius: 8,
+										cursor:
+											cloneReady && !project.cloning ? "pointer" : "default",
+										fontSize: 13,
+										fontWeight: 600,
+										opacity: project.cloning ? 0.6 : 1,
+									}}
+								>
+									{project.cloning ? "Cloning..." : "Clone repository"}
 								</button>
 							</div>
-						</div>
-						<div
-							style={{
-								display: "flex",
-								justifyContent: "flex-end",
-								gap: 8,
-								marginTop: 4,
-							}}
-						>
-							<button
-								onClick={() => {
-									project.setShowCloneModal(false)
-									project.setCloneUrl("")
-									project.setCloneDest("")
-								}}
-								disabled={project.cloning}
-								style={{
-									padding: "8px 16px",
-									background: "transparent",
-									color: "var(--muted)",
-									border: "1px solid var(--border)",
-									borderRadius: 8,
-									cursor: "pointer",
-									fontSize: 13,
-								}}
-							>
-								Cancel
-							</button>
-							<button
-								onClick={project.handleCloneSubmit}
-								disabled={!cloneReady || project.cloning}
-								style={{
-									padding: "8px 20px",
-									background: cloneReady
-										? "var(--accent)"
-										: "var(--bg-elevated)",
-									color: cloneReady ? "#fff" : "var(--dim)",
-									border: "none",
-									borderRadius: 8,
-									cursor:
-										cloneReady && !project.cloning ? "pointer" : "default",
-									fontSize: 13,
-									fontWeight: 600,
-									opacity: project.cloning ? 0.6 : 1,
-								}}
-							>
-								{project.cloning ? "Cloning..." : "Clone repository"}
-							</button>
 						</div>
 					</div>
 				</div>
@@ -253,7 +338,7 @@ export function AppModals(props: AppModalsProps) {
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
-						background: "rgba(0, 0, 0, 0.5)",
+						background: "var(--scrim)",
 					}}
 					onClick={() => tabs.setPendingCloseTab(null)}
 				>
@@ -356,6 +441,63 @@ export function AppModals(props: AppModalsProps) {
 					onSubmitCode={auth.handleLoginSubmitCode}
 					onCancel={auth.handleLoginCancel}
 					onClose={auth.handleLoginClose}
+				/>
+			)}
+
+			<GraphViewerModal
+				isOpen={Boolean(dialogs.showGraphViewer)}
+				currentModeId={props.currentModeId || DEFAULT_EXECUTION_MODE}
+				isAgentActive={props.isAgentActive}
+				activeGraphNode={dialogs.activeGraphNode}
+				onClose={dialogs.handleCloseGraphViewer}
+				onSelectMode={(modeId) => {
+					props.onSelectMode?.(modeId)
+				}}
+			/>
+
+			{dialogs.showSettings && (
+				<Settings
+					isOpen={dialogs.showSettings}
+					onClose={dialogs.handleCloseSettings}
+					loggedInProviders={auth.loggedInProviders}
+					onLogin={auth.handleLogin}
+					onApiKey={auth.handleApiKey}
+					onLogout={auth.handleLogout}
+					initialSection={dialogs.settingsSection}
+					onSectionChange={dialogs.setSettingsSection}
+				/>
+			)}
+
+			{dialogs.showAgents && (
+				<AgentDashboard
+					isOpen={dialogs.showAgents}
+					onClose={dialogs.handleCloseAgents}
+					onSwitchToAgent={(worktreePath) => {
+						project.handleSwitchProject(worktreePath)
+						dialogs.handleCloseAgents()
+					}}
+				/>
+			)}
+
+			{dialogs.showLogConsole && (
+				<LogConsoleModal onClose={dialogs.handleCloseLogConsole} />
+			)}
+
+			{props.sessionExportData && (
+				<SessionExportModal
+					data={props.sessionExportData}
+					onClose={props.onCloseExport || (() => {})}
+					onExported={props.onExportSuccess}
+					onError={props.onExportError}
+				/>
+			)}
+
+			{props.showReplayModal && (
+				<SessionReplayModal
+					currentThreadId={props.currentThreadId}
+					onClose={props.onCloseReplay || (() => {})}
+					onStartReplay={props.onStartReplay || (() => {})}
+					onError={props.onReplayError}
 				/>
 			)}
 		</>

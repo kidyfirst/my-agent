@@ -1,6 +1,10 @@
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAI } from "@ai-sdk/openai"
-import { ModelRouterLanguageModel, type RequestContext } from "../core/index.js"
+import {
+	ModelRouterLanguageModel,
+	DEFAULT_EXECUTION_MODE,
+	type RequestContext,
+} from "../core/index.js"
 import { opencodeClaudeMaxProvider } from "../providers/claude-max.js"
 import { openaiCodexProvider } from "../providers/openai-codex.js"
 import { AuthStorage } from "../auth/storage.js"
@@ -307,7 +311,8 @@ export function createDynamicModelGetter(
 					: undefined
 
 		if (!modelId) {
-			const modeId = session?.modeId || harnessContext?.modeId || "build"
+			const modeId =
+				session?.modeId || harnessContext?.modeId || DEFAULT_EXECUTION_MODE
 			const settings = loadSettings()
 			modelId = settings.models?.modeDefaults?.[modeId]
 		}

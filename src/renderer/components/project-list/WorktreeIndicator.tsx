@@ -1,31 +1,44 @@
-export function WorktreeIndicator({ color, isSpinning, isGlowing }: { color: string; isSpinning: boolean; isGlowing: boolean }) {
-	if (isSpinning) {
-		return (
-			<span
-				style={{
-					width: 10,
-					height: 10,
-					flexShrink: 0,
-					display: "inline-block",
-					borderRadius: "50%",
-					border: `2px solid transparent`,
-					borderTopColor: color,
-					borderRightColor: color,
-					animation: "wt-spin 0.8s linear infinite",
-				}}
-			/>
-		)
-	}
+import { WorktreeGlyph } from "./WorktreeGlyph"
 
+/**
+ * Worktree mark on a sidebar worktree row.
+ *
+ * It used to be a plain colour dot, which said "this is a worktree" to nobody:
+ * the shape carried no meaning and only the fill was modulated for state. The
+ * row now shows the fork glyph the "New worktree" menu item uses, so the shape
+ * itself identifies a worktree, and the fill of its three nodes carries the
+ * fold state the way the folder glyph carries it on a project row:
+ *
+ *   expanded  -> solid nodes (the branch is "open", its sessions are listed)
+ *   collapsed -> hollow nodes (rings: closed)
+ *
+ * The colour stays the per-worktree hue (same one as the row's left accent),
+ * and the live states are kept: a pulse while an agent runs in this worktree,
+ * a soft glow while it holds unread output.
+ */
+export function WorktreeIndicator({
+	color,
+	isSpinning,
+	isGlowing,
+	expanded,
+	size = 13,
+}: {
+	color: string
+	isSpinning: boolean
+	isGlowing: boolean
+	expanded: boolean
+	size?: number
+}) {
 	return (
-		<span
+		<WorktreeGlyph
+			size={size}
+			color={color}
+			filled={expanded}
 			style={{
-				width: 10,
-				height: 10,
-				borderRadius: "50%",
-				background: color,
-				flexShrink: 0,
-				boxShadow: isGlowing ? `0 0 6px 2px ${color}, 0 0 12px 4px ${color}60` : "none",
+				// Unread worktrees keep the halo the old dot had, just on the
+				// glyph instead of a box-shadow.
+				filter: isGlowing ? `drop-shadow(0 0 3px ${color})` : undefined,
+				animation: isSpinning ? "wt-busy 1.1s ease-in-out infinite" : undefined,
 			}}
 		/>
 	)

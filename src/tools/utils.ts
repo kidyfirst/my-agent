@@ -163,7 +163,7 @@ export function assertPathAllowed(
 				(allowedPaths.length
 					? ` and allowed paths [${allowedPaths.join(", ")}]`
 					: "") +
-				`. Use /sandbox to add additional allowed paths.`,
+				`. Call request_sandbox_access to request permission from the user.`,
 		)
 	}
 }

@@ -13,6 +13,9 @@ import { getDashboardHandlers } from "./dashboard-handlers.js"
 import { getMcpHandlers } from "./mcp-handlers.js"
 import { getSlashCommandHandlers } from "./slash-command-handlers.js"
 import { getUpdateHandlers } from "./update-handlers.js"
+import { getLoggingHandlers } from "./logging-handlers.js"
+import { getRepoHandlers } from "./repo-handlers.js"
+import { getFeedbackHandlers } from "./feedback-handlers.js"
 
 export type {
 	HandlerContext,
@@ -38,5 +41,8 @@ export function getAllHandlers(): Record<string, IpcCommandHandler> {
 		...getMcpHandlers(),
 		...getSlashCommandHandlers(),
 		...getUpdateHandlers(),
+		...getLoggingHandlers(),
+		...getRepoHandlers(),
+		...getFeedbackHandlers(),
 	}
 }

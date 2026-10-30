@@ -3,13 +3,11 @@ import type { AuthManager } from "../hooks/useAuthManager"
 import type { ProjectManager } from "../hooks/useProjectManager"
 import type { TabManager } from "../hooks/useTabManager"
 import type { PermissionMode } from "../hooks/useThreadModelPermissions"
-import { AgentDashboard } from "./AgentDashboard"
 import { BrowserView } from "./BrowserView"
 import { ChatView, type ChatViewProps } from "./ChatView"
 import { DiffEditor } from "./DiffEditor"
 import { EditorInput } from "./EditorInput"
 import { FileEditor } from "./FileEditor"
-import { Settings } from "./Settings"
 import { WelcomeScreen } from "./WelcomeScreen"
 
 type QueueHandlers = ReturnType<
@@ -24,8 +22,21 @@ interface MainContentProps {
 	tasks: ChatViewProps["todos"]
 	activeThreadKey: string
 	currentModelId: string
+	thinkingLevel?: string
+	onSelectThinkingLevel?: (level: string) => void
 	modeId: string
+	onSelectMode?: (modeId: string) => void
+	onOpenGraphViewer?: () => void
+	onOpenModelSelector?: () => void
 	permissionMode: PermissionMode
+	isRecording?: boolean
+	onToggleRecording?: () => void
+	isReplaying?: boolean
+	onStopReplay?: () => void
+	isReplaySession?: boolean
+	replaySource?: string
+	/** The user stopped this thread's run (renderer-only, never persisted). */
+	interrupted?: boolean
 	onSend: (content: string, files?: AttachedFile[]) => void
 	onQueue: (content: string, files?: AttachedFile[]) => void
 	onAbort: () => void
@@ -99,7 +110,7 @@ export function EmptyProjectScreen(props: {
 					style={{
 						fontSize: 26,
 						fontWeight: 700,
-						color: "var(--logo-accent, #059669)",
+						color: "var(--logo-accent)",
 						letterSpacing: -0.5,
 					}}
 				>
@@ -130,7 +141,7 @@ export function EmptyProjectScreen(props: {
 						gap: 10,
 						padding: "12px 28px",
 						background: "var(--accent)",
-						color: "#fff",
+						color: "var(--on-accent)",
 						borderRadius: 8,
 						cursor: "pointer",
 						fontWeight: 600,
@@ -237,7 +248,11 @@ export function MainContent(props: MainContentProps) {
 			/>
 		)
 	}
-	if (project.enrichedProjects.length === 0 && isChatTab(tabs.activeTab)) {
+	if (
+		project.enrichedProjects.length === 0 &&
+		tabs.openThreadTabs.length === 0 &&
+		tabs.activeTab === "chat"
+	) {
 		return (
 			<EmptyProjectScreen
 				onOpenFolder={project.handleOpenFolder}
@@ -247,8 +262,7 @@ export function MainContent(props: MainContentProps) {
 	}
 
 	const activeTab = tabs.activeTab
-	const fileTabOpen =
-		!isChatTab(activeTab) && activeTab !== "settings" && activeTab !== "agents"
+	const fileTabOpen = !isChatTab(activeTab) && activeTab !== "settings"
 
 	return (
 		<>
@@ -271,13 +285,24 @@ export function MainContent(props: MainContentProps) {
 					streamingMessageId={chat.streamingMessageId}
 					todos={props.tasks}
 					onOpenDiff={props.tabs.handleDiffClick}
+					isReplaySession={props.isReplaySession}
+					isActivelyReplaying={props.isReplaying}
+					replaySource={props.replaySource}
+					interrupted={props.interrupted}
 				/>
 				<EditorInput
 					onSend={props.onSend}
 					onQueue={props.onQueue}
 					onAbort={props.onAbort}
 					isAgentActive={chat.isAgentActive}
+					isRecording={props.isRecording}
+					onToggleRecording={props.onToggleRecording}
+					isReplaying={props.isReplaying}
+					onStopReplay={props.onStopReplay}
 					modeId={props.modeId}
+					onSelectMode={props.onSelectMode}
+					onOpenGraphViewer={props.onOpenGraphViewer}
+					onOpenModelSelector={props.onOpenModelSelector}
 					onBuiltinCommand={props.onBuiltinCommand}
 					queue={chat.queuesByThread[props.activeThreadKey] || []}
 					isQueuePaused={chat.isQueuePaused}
@@ -288,29 +313,14 @@ export function MainContent(props: MainContentProps) {
 					onClearQueue={props.onClearQueue}
 					currentModelId={props.currentModelId}
 					onSelectModel={props.onSelectModel}
+					thinkingLevel={props.thinkingLevel}
+					onSelectThinkingLevel={props.onSelectThinkingLevel}
 					permissionMode={props.permissionMode}
 					onSelectPermissionMode={props.onSelectPermissionMode}
+					projectRootPath={props.project.projectInfo?.rootPath ?? null}
+					openFiles={props.tabs.openFiles}
 				/>
 			</div>
-
-			{activeTab === "settings" && (
-				<Settings
-					onClose={tabs.handleCloseOverlayTab}
-					loggedInProviders={auth.loggedInProviders}
-					onLogin={auth.handleLogin}
-					onApiKey={auth.handleApiKey}
-					onLogout={auth.handleLogout}
-					initialSection={tabs.settingsSection}
-					onSectionChange={(s) => tabs.setSettingsSection(s)}
-				/>
-			)}
-
-			{activeTab === "agents" && (
-				<AgentDashboard
-					onClose={tabs.handleCloseOverlayTab}
-					onSwitchToAgent={project.handleSwitchProject}
-				/>
-			)}
 
 			{fileTabOpen &&
 				(activeTab.startsWith("browser:") ? (

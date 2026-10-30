@@ -30,7 +30,7 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
 		return commands.filter(
 			(c) =>
 				c.label.toLowerCase().includes(lower) ||
-				(c.description?.toLowerCase().includes(lower)),
+				c.description?.toLowerCase().includes(lower),
 		)
 	}, [commands, filter])
 
@@ -52,7 +52,9 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
 
 	// Scroll selected item into view
 	useEffect(() => {
-		const el = listRef.current?.querySelector("[data-selected='true']") as HTMLElement | null
+		const el = listRef.current?.querySelector(
+			"[data-selected='true']",
+		) as HTMLElement | null
 		el?.scrollIntoView({ block: "nearest" })
 	}, [selectedIndex])
 
@@ -87,7 +89,7 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.6)",
+				background: "var(--scrim)",
 				display: "flex",
 				alignItems: "flex-start",
 				justifyContent: "center",

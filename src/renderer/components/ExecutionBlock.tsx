@@ -220,16 +220,24 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 	// detailed steps only appear once the user clicks it.
 	const headerLabel = isActive
 		? formattedDuration
-			? `Thinking for ${formattedDuration}`
-			: "Thinking"
+			? `Working for ${formattedDuration}`
+			: "Working"
 		: formattedDuration
 			? `Worked for ${formattedDuration}`
 			: "Worked"
 
 	const isClickable = steps.length > 0 || isActive
+	// When the step list is on screen it already separates the label from the
+	// answer; the gap below the block then only needs to clear the last row.
+	const stepsVisible = steps.length > 0 && (isActive || expanded)
 
 	return (
-		<div style={{ margin: "6px 0 10px 0" }}>
+		// The 8px bottom margin is the gap between the header line and the answer
+		// below it, and it matches the gap the answer's timestamp uses at the
+		// other end of the message. The answer drops its own top padding when it
+		// follows this header (AssistantMessage's `flushTop`), so the two do not
+		// stack into one oversized hole.
+		<div style={{ margin: `6px 0 ${stepsVisible ? 12 : 8}px 0` }}>
 			<div
 				onClick={() => {
 					if (isClickable) setExpanded(!expanded)
@@ -240,7 +248,9 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 					gap: 6,
 					cursor: isClickable ? "pointer" : "default",
 					userSelect: "none",
-					padding: "3px 0",
+					// No bottom padding: the gap under the label is owned by this
+					// block's margin, so it stays consistent with the timestamp.
+					padding: "3px 0 0 0",
 					fontSize: 13,
 					lineHeight: 1,
 					fontWeight: 500,
@@ -248,10 +258,12 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 					transition: "color 0.15s ease",
 				}}
 				onMouseEnter={(e) => {
-					if (isClickable) (e.currentTarget as HTMLElement).style.color = "var(--text)"
+					if (isClickable)
+						(e.currentTarget as HTMLElement).style.color = "var(--text)"
 				}}
 				onMouseLeave={(e) => {
-					if (isClickable) (e.currentTarget as HTMLElement).style.color = "var(--muted)"
+					if (isClickable)
+						(e.currentTarget as HTMLElement).style.color = "var(--muted)"
 				}}
 				title={
 					isClickable
@@ -274,7 +286,7 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 			{steps.length === 0 && isActive && expanded && (
 				<div
 					style={{
-						marginTop: 6,
+						marginTop: 9,
 						paddingLeft: 14,
 						fontSize: 12,
 						color: "var(--dim)",
@@ -292,7 +304,7 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 					onClick={!expanded ? () => setExpanded(true) : undefined}
 					className="scrollbar-none"
 					style={{
-						marginTop: 6,
+						marginTop: 9,
 						paddingLeft: 14,
 						maxHeight: expanded ? "none" : 82,
 						overflowY: "auto",

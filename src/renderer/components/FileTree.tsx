@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useId } from "react"
 import { getFileTypeInfo } from "../utils/fileIcons"
+import { claimMenu, releaseMenu } from "../utils/menuRegistry"
 
 interface FileEntry {
 	name: string
@@ -23,21 +24,21 @@ function FolderIcon({ open }: { open?: boolean }) {
 				height="15"
 				viewBox="0 0 16 16"
 				fill="none"
-				style={{ marginRight: 4, flexShrink: 0 }}
+				style={{ marginRight: 4, flexShrink: 0, color: "var(--dir-icon)" }}
 			>
 				<path
 					d="M1.5 3.5A1 1 0 012.5 2.5H6l1.5 1.5H13a1 1 0 011 1V6H3L1.5 13V3.5z"
-					fill="#60a5fa"
+					fill="currentColor"
 					fillOpacity="0.3"
-					stroke="#60a5fa"
+					stroke="currentColor"
 					strokeWidth="0.8"
 					strokeLinejoin="round"
 				/>
 				<path
 					d="M3 6h11.5L12.5 13H1L3 6z"
-					fill="#60a5fa"
+					fill="currentColor"
 					fillOpacity="0.15"
-					stroke="#60a5fa"
+					stroke="currentColor"
 					strokeWidth="0.8"
 					strokeLinejoin="round"
 				/>
@@ -50,13 +51,13 @@ function FolderIcon({ open }: { open?: boolean }) {
 			height="15"
 			viewBox="0 0 16 16"
 			fill="none"
-			style={{ marginRight: 4, flexShrink: 0 }}
+			style={{ marginRight: 4, flexShrink: 0, color: "var(--dir-icon)" }}
 		>
 			<path
 				d="M1.5 3.5A1 1 0 012.5 2.5H6l1.5 1.5H13a1 1 0 011 1V12.5a1 1 0 01-1 1H2.5a1 1 0 01-1-1V3.5z"
-				fill="#60a5fa"
+				fill="currentColor"
 				fillOpacity="0.2"
-				stroke="#60a5fa"
+				stroke="currentColor"
 				strokeWidth="0.8"
 				strokeLinejoin="round"
 			/>
@@ -238,6 +239,15 @@ function FileNode({
 		x: number
 		y: number
 	} | null>(null)
+	const menuId = useId()
+
+	// Same single-menu rule as ContextMenu: opening any other popover closes
+	// this one instead of leaving two floating menus behind.
+	useEffect(() => {
+		if (!contextMenu) return
+		claimMenu(menuId, () => setContextMenu(null))
+		return () => releaseMenu(menuId)
+	}, [contextMenu, menuId])
 
 	useEffect(() => {
 		if (!contextMenu) return
@@ -293,15 +303,19 @@ function FileNode({
 						position: "fixed",
 						left: contextMenu.x,
 						top: contextMenu.y,
-						background: "var(--bg-elevated)",
+						background: "var(--bg)",
 						border: "1px solid var(--border)",
-						borderRadius: 6,
-						padding: 4,
+						borderRadius: 12,
+						padding: 6,
 						zIndex: 200,
-						boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+						boxShadow: "var(--shadow-popover)",
+						display: "flex",
+						flexDirection: "column",
+						gap: 2,
 					}}
 				>
 					<button
+						type="button"
 						onClick={() => {
 							window.api.invoke({
 								type: "openInEditor",
@@ -310,23 +324,26 @@ function FileNode({
 							})
 							setContextMenu(null)
 						}}
+						title="Open in Editor"
 						style={{
 							display: "block",
 							width: "100%",
-							padding: "6px 12px",
+							padding: "7px 10px",
 							fontSize: 12,
 							color: "var(--text)",
 							textAlign: "left",
 							cursor: "pointer",
-							borderRadius: 4,
+							borderRadius: 8,
 							background: "transparent",
+							border: "none",
 							whiteSpace: "nowrap",
+							transition: "background-color 0.1s, color 0.1s",
 						}}
 						onMouseEnter={(e) => {
-							e.currentTarget.style.background = "var(--accent)" + "22"
+							e.currentTarget.style.backgroundColor = "var(--bg-hover)"
 						}}
 						onMouseLeave={(e) => {
-							e.currentTarget.style.background = "transparent"
+							e.currentTarget.style.backgroundColor = "transparent"
 						}}
 					>
 						Open in Editor

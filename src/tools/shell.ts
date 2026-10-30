@@ -154,7 +154,7 @@ Usage notes:
 						content: [
 							{
 								type: "text" as const,
-								text: `Error: cwd "${resolvedCwd}" is outside the project root "${root}". Use /sandbox to add additional allowed paths.`,
+								text: `Error: cwd "${resolvedCwd}" is outside the project root "${root}". Call request_sandbox_access to request permission from the user to access this directory.`,
 							},
 						],
 						isError: true,

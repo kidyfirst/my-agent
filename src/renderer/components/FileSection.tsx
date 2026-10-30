@@ -100,9 +100,7 @@ export function FileSection({
 							textAlign: "left",
 							cursor: "pointer",
 							gap: 6,
-							background: isActive
-								? "var(--selected-bg)"
-								: "transparent",
+							background: isActive ? "var(--selected-bg)" : "transparent",
 							border: "none",
 							borderLeft: isActive
 								? "2px solid var(--accent)"
@@ -168,18 +166,14 @@ export function FileSection({
 							style={{
 								fontSize: 13,
 								color:
-									sectionType === "staged"
-										? "var(--error)"
-										: "var(--success)",
+									sectionType === "staged" ? "var(--error)" : "var(--success)",
 								cursor: "pointer",
 								padding: "0 2px",
 								fontWeight: 700,
 								flexShrink: 0,
 								lineHeight: 1,
 							}}
-							title={
-								sectionType === "staged" ? "Unstage" : "Stage"
-							}
+							title={sectionType === "staged" ? "Unstage" : "Stage"}
 						>
 							{sectionType === "staged" ? "\u2212" : "+"}
 						</span>

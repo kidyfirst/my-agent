@@ -8,11 +8,7 @@ interface GitSectionProps {
 	update: (key: keyof SettingsState, value: unknown) => void
 }
 
-export function GitSection({
-	state,
-	setState,
-	update,
-}: GitSectionProps) {
+export function GitSection({ state, setState, update }: GitSectionProps) {
 	return (
 		<>
 			<SectionHeader title="Pull Requests" />
@@ -35,9 +31,8 @@ export function GitSection({
 						lineHeight: 1.4,
 					}}
 				>
-					Custom instructions the agent follows
-					when creating pull requests (e.g.
-					format, reviewers, labels, conventions)
+					Custom instructions the agent follows when creating pull requests
+					(e.g. format, reviewers, labels, conventions)
 				</div>
 				<textarea
 					value={state.prInstructions}
@@ -52,18 +47,12 @@ export function GitSection({
 								: prev,
 						)
 					}}
-					onBlur={() =>
-						update(
-							"prInstructions",
-							state.prInstructions,
-						)
-					}
+					onBlur={() => update("prInstructions", state.prInstructions)}
 					placeholder={`Example:\n- Always include a "Test plan" section\n- Add the "team/frontend" label\n- Tag @grayson for review`}
 					rows={6}
 					style={{
 						width: "100%",
-						background:
-							"var(--bg-elevated)",
+						background: "var(--bg-elevated)",
 						color: "var(--text)",
 						border: "1px solid var(--border)",
 						borderRadius: 6,

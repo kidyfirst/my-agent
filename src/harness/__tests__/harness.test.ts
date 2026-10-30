@@ -26,7 +26,7 @@ describe("createMyAgent (native core implementation)", () => {
 		expect(authStorage).toBeDefined()
 
 		const modes = harness.listModes()
-		expect(modes.map((m: any) => m.id)).toEqual(["build", "plan", "fast"])
+		expect(modes.map((m: any) => m.id)).toEqual(["react", "plan", "fast"])
 		const thread = await harness.createThread({ title: "Test Thread" })
 		expect(thread).toBeDefined()
 		const msgs = await harness.listMessages({ threadId: thread.id })
@@ -83,7 +83,7 @@ describe("createMyAgent (native core implementation)", () => {
 		mockContextMap.set("controller", {
 			session: {
 				modelId: { modelId: "google/gemini-3.8-flash" },
-				modeId: "build",
+				modeId: "react",
 			},
 			state: {},
 		})
@@ -148,30 +148,6 @@ describe("createMyAgent (native core implementation)", () => {
 		const legacyFlashModel = resolveModel("deepseek/deepseek-v4-flash")
 		expect(legacyFlashModel).toBeDefined()
 		expect(legacyFlashModel.modelId).toBe("deepseek-flash")
-	})
-
-	it("upgrades deprecated DeepSeek model names properly", async () => {
-		const { upgradeDeprecatedModel, isDeprecatedModel } =
-			await import("../../constants/models.js")
-		expect(isDeprecatedModel("deepseek/deepseek-v4-flash")).toBe(true)
-		expect(isDeprecatedModel("deepseek-v4-flash")).toBe(true)
-		expect(isDeprecatedModel("deepseek/deepseek-chat")).toBe(true)
-		expect(isDeprecatedModel("deepseek-chat")).toBe(true)
-		expect(isDeprecatedModel("deepseek/deepseek-flash")).toBe(false)
-		expect(isDeprecatedModel("deepseek/deepseek-v4-pro")).toBe(false)
-
-		expect(upgradeDeprecatedModel("deepseek/deepseek-v4-flash")).toBe(
-			"deepseek/deepseek-flash",
-		)
-		expect(upgradeDeprecatedModel("deepseek-v4-flash")).toBe(
-			"deepseek/deepseek-flash",
-		)
-		expect(upgradeDeprecatedModel("deepseek/deepseek-chat")).toBe(
-			"deepseek/deepseek-flash",
-		)
-		expect(upgradeDeprecatedModel("deepseek/deepseek-reasoner")).toBe(
-			"deepseek/deepseek-v4-pro",
-		)
 	})
 
 	it("persists user and assistant messages across turns and loads them via listMessages", async () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import type { TokenUsage, Message } from "../types/ipc"
+import { DEFAULT_EXECUTION_MODE } from "../types/ipc"
 import type { ToolState } from "../types/chat"
 
 interface ContextFile {
@@ -50,7 +51,7 @@ export function ContextPanel({
 	threadTitle = "Current Session",
 	currentThreadModelId = "deepseek-v4-pro",
 	currentThreadPermission = "default",
-	modeId = "build",
+	modeId = DEFAULT_EXECUTION_MODE,
 	tokenUsage,
 	messages = [],
 	tools,
@@ -332,8 +333,7 @@ export function ContextPanel({
 								background:
 									filter === tab.id ? "var(--bg-surface)" : "transparent",
 								color: filter === tab.id ? "var(--text)" : "var(--muted)",
-								boxShadow:
-									filter === tab.id ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+								boxShadow: filter === tab.id ? "var(--shadow-sm)" : "none",
 								transition: "all 0.15s ease",
 							}}
 						>
@@ -570,9 +570,7 @@ export function ContextPanel({
 												fontSize: 10,
 												fontWeight: 600,
 												color:
-													usagePercent > 80
-														? "var(--danger, #ef4444)"
-														: "var(--text)",
+													usagePercent > 80 ? "var(--error)" : "var(--text)",
 											}}
 										>
 											{currentTokens.toLocaleString()} /{" "}
@@ -600,9 +598,9 @@ export function ContextPanel({
 												width: `${Math.max(1, usagePercent)}%`,
 												background:
 													usagePercent > 80
-														? "var(--danger, #ef4444)"
+														? "var(--error)"
 														: usagePercent > 50
-															? "var(--warning, #eab308)"
+															? "var(--warning)"
 															: "var(--accent)",
 												borderRadius: 3,
 												transition: "width 0.3s ease",
@@ -1289,7 +1287,7 @@ export function ContextPanel({
 																			padding: "4px 10px",
 																			fontSize: 10,
 																			background: "var(--accent)",
-																			color: "#fff",
+																			color: "var(--on-accent)",
 																			borderRadius: 4,
 																			border: "none",
 																			cursor: "pointer",

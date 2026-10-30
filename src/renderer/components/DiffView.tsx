@@ -162,7 +162,7 @@ function CollapsedSection({
 				gap: 8,
 				width: "100%",
 				padding: "4px 0",
-				background: "rgba(56, 189, 248, 0.06)",
+				background: "color-mix(in srgb, var(--diff-hunk) 6%, transparent)",
 				border: "none",
 				borderTop: "1px solid var(--border-muted)",
 				borderBottom: "1px solid var(--border-muted)",
@@ -187,15 +187,15 @@ function DiffLineRow({ line }: { line: DiffLine }) {
 	let gutterColor = "var(--dim)"
 
 	if (line.type === "add") {
-		bg = "rgba(34, 197, 94, 0.10)"
+		bg = "var(--diff-add-bg)"
 		color = "var(--text)"
-		gutterBg = "rgba(34, 197, 94, 0.20)"
+		gutterBg = "color-mix(in srgb, var(--diff-add) 20%, transparent)"
 		gutterChar = "+"
 		gutterColor = "var(--diff-add)"
 	} else if (line.type === "del") {
-		bg = "rgba(239, 68, 68, 0.10)"
+		bg = "var(--diff-del-bg)"
 		color = "var(--text)"
-		gutterBg = "rgba(239, 68, 68, 0.20)"
+		gutterBg = "color-mix(in srgb, var(--diff-del) 20%, transparent)"
 		gutterChar = "-"
 		gutterColor = "var(--diff-del)"
 	}
@@ -330,9 +330,7 @@ function SideBySideHalf({
 					opacity: 0.3,
 					overflow: "hidden",
 					borderRight:
-						side === "left"
-							? "1px solid var(--border-muted)"
-							: undefined,
+						side === "left" ? "1px solid var(--border-muted)" : undefined,
 				}}
 			>
 				<span style={{ width: 44, flexShrink: 0 }} />
@@ -348,13 +346,13 @@ function SideBySideHalf({
 	let gutterColor = "var(--dim)"
 
 	if (line.type === "add") {
-		bg = "rgba(34, 197, 94, 0.10)"
-		gutterBg = "rgba(34, 197, 94, 0.20)"
+		bg = "var(--diff-add-bg)"
+		gutterBg = "color-mix(in srgb, var(--diff-add) 20%, transparent)"
 		gutterChar = "+"
 		gutterColor = "var(--diff-add)"
 	} else if (line.type === "del") {
-		bg = "rgba(239, 68, 68, 0.10)"
-		gutterBg = "rgba(239, 68, 68, 0.20)"
+		bg = "var(--diff-del-bg)"
+		gutterBg = "color-mix(in srgb, var(--diff-del) 20%, transparent)"
 		gutterChar = "-"
 		gutterColor = "var(--diff-del)"
 	}
@@ -372,9 +370,7 @@ function SideBySideHalf({
 				lineHeight: "20px",
 				overflow: "hidden",
 				borderRight:
-					side === "left"
-						? "1px solid var(--border-muted)"
-						: undefined,
+					side === "left" ? "1px solid var(--border-muted)" : undefined,
 			}}
 		>
 			<span
@@ -512,10 +508,7 @@ export function DiffView({
 				return (
 					<div key={i}>
 						{seg.lines.map((line, j) => (
-							<DiffLineRow
-								key={seg.startIdx + j}
-								line={line}
-							/>
+							<DiffLineRow key={seg.startIdx + j} line={line} />
 						))}
 					</div>
 				)

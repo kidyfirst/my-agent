@@ -13,6 +13,12 @@ export interface RecentProject {
 	name: string
 	rootPath: string
 	lastOpened: string
+	/**
+	 * When the project was first added. The sidebar orders projects by this so
+	 * that opening a session never reshuffles the list; `lastOpened` keeps
+	 * changing and is only used to restore the last active project on startup.
+	 */
+	addedAt?: string
 	lastThreadId?: string
 }
 
@@ -21,7 +27,7 @@ export function loadRecentProjects(): Array<RecentProject> {
 		const data = fs.readFileSync(getRecentProjectsPath(), "utf-8")
 		const list = JSON.parse(data)
 		if (!Array.isArray(list)) return []
-		return list.filter(
+		const filtered = list.filter(
 			(p) =>
 				p &&
 				typeof p.rootPath === "string" &&
@@ -30,6 +36,21 @@ export function loadRecentProjects(): Array<RecentProject> {
 				p.name &&
 				p.name.trim() !== "",
 		)
+		// Deduplicate by normalized rootPath while preserving earlier entries
+		const seen = new Set<string>()
+		const deduped: RecentProject[] = []
+		for (const p of filtered) {
+			const norm = path.resolve(p.rootPath)
+			if (seen.has(norm)) continue
+			seen.add(norm)
+			deduped.push({ ...p, rootPath: norm })
+		}
+		// Sort by lastOpened descending (most recent first)
+		return deduped.sort((a, b) => {
+			const timeA = a.lastOpened ? new Date(a.lastOpened).getTime() : 0
+			const timeB = b.lastOpened ? new Date(b.lastOpened).getTime() : 0
+			return timeB - timeA
+		})
 	} catch {
 		return []
 	}
@@ -46,34 +67,50 @@ function writeRecentProjects(projects: Array<RecentProject>): void {
 	}
 }
 
+export function getLastActiveProject(): RecentProject | null {
+	const projects = loadRecentProjects()
+	return projects.length > 0 ? projects[0] : null
+}
+
 export function saveRecentProject(
 	projectPath: string,
 	name: string,
 	lastThreadId?: string,
 ) {
 	if (!projectPath || projectPath === "/" || !projectPath.trim()) return
-	const safeName = (name && name.trim()) || path.basename(projectPath)
+	const safePath = path.resolve(projectPath)
+	const safeName = (name && name.trim()) || path.basename(safePath)
 	if (!safeName) return
 
 	const projects = loadRecentProjects()
-	const existing = projects.find((p) => p.rootPath === projectPath)
-	if (existing) {
-		existing.lastOpened = new Date().toISOString()
-		// Only set name if existing has no name
-		if (!existing.name) {
-			existing.name = safeName
+	const existingIdx = projects.findIndex(
+		(p) => path.resolve(p.rootPath) === safePath,
+	)
+	let target: RecentProject
+	if (existingIdx !== -1) {
+		target = projects.splice(existingIdx, 1)[0]
+		target.rootPath = safePath
+		// Captured once: legacy entries fall back to their previous `lastOpened`,
+		// which is the closest available proxy for "when it was added".
+		target.addedAt = target.addedAt || target.lastOpened
+		target.lastOpened = new Date().toISOString()
+		if (safeName && (!target.name || target.name.trim() === "")) {
+			target.name = safeName
 		}
-		if (lastThreadId) {
-			existing.lastThreadId = lastThreadId
+		if (lastThreadId && lastThreadId.trim() !== "") {
+			target.lastThreadId = lastThreadId
 		}
 	} else {
-		projects.push({
+		const now = new Date().toISOString()
+		target = {
 			name: safeName,
-			rootPath: projectPath,
-			lastOpened: new Date().toISOString(),
-			...(lastThreadId ? { lastThreadId } : {}),
-		})
+			rootPath: safePath,
+			addedAt: now,
+			lastOpened: now,
+			...(lastThreadId && lastThreadId.trim() !== "" ? { lastThreadId } : {}),
+		}
 	}
+	projects.unshift(target)
 	if (projects.length > 20) projects.length = 20
 	writeRecentProjects(projects)
 }
@@ -83,50 +120,72 @@ export function saveRecentProjectLastThread(
 	lastThreadId: string,
 ) {
 	if (!projectPath || projectPath === "/" || !projectPath.trim()) return
-	const safeName = path.basename(projectPath)
+	const safePath = path.resolve(projectPath)
+	const safeName = path.basename(safePath)
 	if (!safeName) return
 
 	const projects = loadRecentProjects()
-	const existing = projects.find((p) => p.rootPath === projectPath)
-	if (existing) {
-		existing.lastThreadId = lastThreadId
-		existing.lastOpened = new Date().toISOString()
+	const existingIdx = projects.findIndex(
+		(p) => path.resolve(p.rootPath) === safePath,
+	)
+	let target: RecentProject
+	if (existingIdx !== -1) {
+		target = projects.splice(existingIdx, 1)[0]
+		target.rootPath = safePath
+		target.addedAt = target.addedAt || target.lastOpened
+		if (lastThreadId && lastThreadId.trim() !== "") {
+			target.lastThreadId = lastThreadId
+		}
+		target.lastOpened = new Date().toISOString()
 	} else {
-		projects.push({
+		const now = new Date().toISOString()
+		target = {
 			name: safeName,
-			rootPath: projectPath,
-			lastOpened: new Date().toISOString(),
+			rootPath: safePath,
+			addedAt: now,
+			lastOpened: now,
 			lastThreadId,
-		})
+		}
 	}
+	projects.unshift(target)
+	if (projects.length > 20) projects.length = 20
 	writeRecentProjects(projects)
 }
 
 export function getRecentProjectLastThread(projectPath: string): string | null {
+	const safePath = path.resolve(projectPath)
 	const projects = loadRecentProjects()
-	const existing = projects.find((p) => p.rootPath === projectPath)
+	const existing = projects.find((p) => path.resolve(p.rootPath) === safePath)
 	return existing?.lastThreadId || null
 }
 
 export function renameRecentProject(projectPath: string, newName: string) {
 	if (!projectPath || projectPath === "/" || !newName.trim()) return
+	const safePath = path.resolve(projectPath)
 	const projects = loadRecentProjects()
-	const existing = projects.find((p) => p.rootPath === projectPath)
+	const existing = projects.find((p) => path.resolve(p.rootPath) === safePath)
 	if (existing) {
 		existing.name = newName.trim()
 	} else {
-		projects.push({
+		const now = new Date().toISOString()
+		projects.unshift({
 			name: newName.trim(),
-			rootPath: projectPath,
-			lastOpened: new Date().toISOString(),
+			rootPath: safePath,
+			addedAt: now,
+			lastOpened: now,
 		})
 	}
 	writeRecentProjects(projects)
 }
 
 export function removeRecentProject(projectPath: string) {
-	const projects = loadRecentProjects().filter(
-		(p) => p.rootPath !== projectPath,
-	)
+	const safePath = path.resolve(projectPath).replace(/\/+$/, "").toLowerCase()
+	const projects = loadRecentProjects().filter((p) => {
+		const r = path
+			.resolve(p.rootPath || (p as any).path || "")
+			.replace(/\/+$/, "")
+			.toLowerCase()
+		return r !== safePath
+	})
 	writeRecentProjects(projects)
 }

@@ -45,10 +45,42 @@ body.light-theme {
 
 	/* Mode colors */
 	--mode-build: #7c3aed;
+	--mode-react: #7c3aed;
 	--mode-plan: #2563eb;
 	--mode-fast: #059669;
 	--mode-observe: #d97706;
 	--mode-reflect: #db2777;
+
+	/* Graph visualization */
+	--graph-node-start-bg: rgba(37, 99, 235, 0.12);
+	--graph-node-start-text: #2563eb;
+	--graph-node-start-border: #3b82f6;
+	--graph-node-llm-bg: rgba(109, 40, 217, 0.12);
+	--graph-node-llm-text: #6d28d9;
+	--graph-node-llm-border: #8b5cf6;
+	--graph-node-tool-bg: rgba(217, 119, 6, 0.12);
+	--graph-node-tool-text: #b45309;
+	--graph-node-tool-border: #f59e0b;
+	--graph-node-condition-bg: rgba(219, 39, 119, 0.12);
+	--graph-node-condition-text: #db2777;
+	--graph-node-condition-border: #ec4899;
+	--graph-node-plan-bg: rgba(2, 132, 199, 0.12);
+	--graph-node-plan-text: #0284c7;
+	--graph-node-plan-border: #0ea5e9;
+	--graph-node-review-bg: rgba(13, 148, 136, 0.12);
+	--graph-node-review-text: #0d9488;
+	--graph-node-review-border: #14b8a6;
+	--graph-node-human-bg: rgba(220, 38, 38, 0.12);
+	--graph-node-human-text: #dc2626;
+	--graph-node-human-border: #ef4444;
+	--graph-node-end-bg: rgba(22, 163, 74, 0.12);
+	--graph-node-end-text: #16a34a;
+	--graph-node-end-border: #22c55e;
+
+	--graph-edge-default: #94a3b8;
+	--graph-edge-active: var(--accent);
+	--graph-edge-loop: #d97706;
+	--graph-edge-bypass: #059669;
 
 	/* Diff */
 	--diff-add: #16a34a;
@@ -65,6 +97,38 @@ body.light-theme {
 	--scrollbar-track: transparent;
 	--scrollbar-thumb: rgba(0, 0, 0, 0.16);
 	--scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+
+	/* Modals, popovers & overlays */
+	--scrim: rgba(0, 0, 0, 0.55);
+	--scrim-subtle: rgba(15, 23, 42, 0.18);
+	--shadow-modal:
+		0 24px 52px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(15, 23, 42, 0.1);
+	--shadow-popover: 0 10px 28px rgba(15, 23, 42, 0.14);
+	--shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.12);
+	/* Text/icons drawn on top of an accent or brand-colored surface. */
+	--on-accent: #ffffff;
+	/* Second stop of the accent gradient used by dialog title tiles. */
+	--accent-2: #8b5cf6;
+	/* Session replay accent (indigo, kept distinct from the app accent). */
+	--replay: #6366f1;
+	/* Purple used by the "thinking level on" badge. */
+	--thinking-accent: #a855f7;
+	/* Primary blue call to action (composer send, update prompt). */
+	--action: #1a73e8;
+	--action-hover: #1557b0;
+	/* Third-party issue tracker accent (Linear). */
+	--issue: #5e6ad2;
+	/* Third-party language marks — identical in both themes. */
+	--brand-react: #00d8ff;
+	--brand-typescript: #3178c6;
+	--brand-javascript: #eab308;
+
+	/* Code / raw output surface */
+	--code-bg: #000000;
+	--code-text: #e5e5e5;
+
+	/* Typography */
+	--font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
 
 	/* Brand & Logo */
 	--logo-accent: #059669;
@@ -116,10 +180,42 @@ body.dark-theme {
 
 	/* Mode colors */
 	--mode-build: #7f45e0;
+	--mode-react: #7f45e0;
 	--mode-plan: #2563eb;
 	--mode-fast: #059669;
 	--mode-observe: #fdac53;
 	--mode-reflect: #ff69cc;
+
+	/* Graph visualization */
+	--graph-node-start-bg: rgba(59, 130, 246, 0.2);
+	--graph-node-start-text: #60a5fa;
+	--graph-node-start-border: #3b82f6;
+	--graph-node-llm-bg: rgba(139, 92, 246, 0.2);
+	--graph-node-llm-text: #a78bfa;
+	--graph-node-llm-border: #8b5cf6;
+	--graph-node-tool-bg: rgba(245, 158, 11, 0.2);
+	--graph-node-tool-text: #fbbf24;
+	--graph-node-tool-border: #f59e0b;
+	--graph-node-condition-bg: rgba(236, 72, 153, 0.2);
+	--graph-node-condition-text: #f472b6;
+	--graph-node-condition-border: #ec4899;
+	--graph-node-plan-bg: rgba(14, 165, 233, 0.2);
+	--graph-node-plan-text: #38bdf8;
+	--graph-node-plan-border: #0ea5e9;
+	--graph-node-review-bg: rgba(20, 184, 166, 0.2);
+	--graph-node-review-text: #2dd4bf;
+	--graph-node-review-border: #14b8a6;
+	--graph-node-human-bg: rgba(239, 68, 68, 0.2);
+	--graph-node-human-text: #f87171;
+	--graph-node-human-border: #ef4444;
+	--graph-node-end-bg: rgba(34, 197, 94, 0.2);
+	--graph-node-end-text: #4ade80;
+	--graph-node-end-border: #22c55e;
+
+	--graph-edge-default: #71717a;
+	--graph-edge-active: var(--accent);
+	--graph-edge-loop: #f59e0b;
+	--graph-edge-bypass: #10b981;
 
 	/* Diff */
 	--diff-add: #22c55e;
@@ -137,8 +233,37 @@ body.dark-theme {
 	--scrollbar-thumb: rgba(255, 255, 255, 0.18);
 	--scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 
+	/* Modals, popovers & overlays */
+	--scrim: rgba(0, 0, 0, 0.65);
+	--scrim-subtle: rgba(0, 0, 0, 0.45);
+	--shadow-modal:
+		0 24px 52px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.35);
+	--shadow-popover: 0 10px 28px rgba(0, 0, 0, 0.5);
+	--shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.5);
+	/* Text/icons drawn on top of an accent or brand-colored surface. */
+	--on-accent: #ffffff;
+	/* Second stop of the accent gradient used by dialog title tiles. */
+	--accent-2: #8b5cf6;
+	/* Session replay accent (indigo, kept distinct from the app accent). */
+	--replay: #818cf8;
+	/* Purple used by the "thinking level on" badge. */
+	--thinking-accent: #c084fc;
+	/* Primary blue call to action (composer send, update prompt). */
+	--action: #3b82f6;
+	--action-hover: #2563eb;
+	/* Third-party issue tracker accent (Linear). */
+	--issue: #a5b4fc;
+	/* Third-party language marks — identical in both themes. */
+	--brand-react: #00d8ff;
+	--brand-typescript: #3178c6;
+	--brand-javascript: #eab308;
+
+	/* Code / raw output surface */
+	--code-bg: #000000;
+	--code-text: #e5e5e5;
+
 	/* Brand & Logo */
-	--logo-accent: #00FF41;
+	--logo-accent: #00ff41;
 }
 
 * {
@@ -155,12 +280,7 @@ body,
 	background: var(--bg);
 	color: var(--text);
 	font-family:
-		"SF Mono",
-		"Menlo",
-		"Monaco",
-		"Cascadia Code",
-		"Consolas",
-		monospace;
+		"SF Mono", "Menlo", "Monaco", "Cascadia Code", "Consolas", monospace;
 	font-size: 13px;
 	line-height: 1.5;
 	-webkit-font-smoothing: antialiased;
@@ -283,4 +403,48 @@ textarea {
 input::placeholder,
 textarea::placeholder {
 	color: var(--dim);
+}
+
+/* React Flow Controls theme adaptations */
+.react-flow__controls {
+	background: var(--bg-surface) !important;
+	border: 1px solid var(--border) !important;
+	border-radius: 8px !important;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+	overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+	background: var(--bg-surface) !important;
+	border-bottom: 1px solid var(--border-muted) !important;
+	color: var(--text) !important;
+	fill: var(--text) !important;
+	transition:
+		background 0.15s ease,
+		color 0.15s ease,
+		fill 0.15s ease !important;
+}
+
+.react-flow__controls-button:last-child {
+	border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+	background: var(--bg-hover) !important;
+	color: var(--accent) !important;
+	fill: var(--accent) !important;
+}
+
+.react-flow__controls-button svg {
+	fill: currentColor !important;
+}
+
+.react-flow__controls-button:disabled {
+	opacity: 0.4 !important;
+	cursor: not-allowed !important;
+}
+
+/* Hide React Flow attribution watermark */
+.react-flow__attribution {
+	display: none !important;
 }

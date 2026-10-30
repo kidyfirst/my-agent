@@ -5,11 +5,20 @@ import type { Message } from "../types/ipc"
 import { extractMessageDetails } from "../utils/messageParser"
 import { FilesChangedBar } from "./FilesChangedBar"
 import { ImagePreviewModal } from "./ImagePreviewModal"
+import { MessageFeedback } from "./MessageFeedback"
 
 interface AssistantMessageProps {
 	message: Message & { isStreaming?: boolean }
 	onOpenDiff?: (path: string) => void
 	isAgentActive?: boolean
+	/**
+	 * True when this answer sits directly under its turn header (the collapsed
+	 * "Worked for 3.9s" line). The header already supplies the gap, so the
+	 * answer drops its own top padding and first-paragraph margin — otherwise
+	 * the two stack and the answer floats well below the header while the
+	 * timestamp underneath stays tight.
+	 */
+	flushTop?: boolean
 }
 
 interface CodeBlockProps {
@@ -53,7 +62,7 @@ function CodeBlock({ children, className }: CodeBlockProps) {
 					borderBottom: "1px solid var(--border-muted)",
 					fontSize: 11,
 					color: "var(--muted)",
-					fontFamily: "var(--font-mono, 'SF Mono', Monaco, monospace)",
+					fontFamily: "var(--font-mono)",
 					userSelect: "none",
 				}}
 			>
@@ -136,7 +145,7 @@ function CodeBlock({ children, className }: CodeBlockProps) {
 					border: "none",
 					fontSize: 12,
 					lineHeight: 1.5,
-					fontFamily: "var(--font-mono, 'SF Mono', Monaco, monospace)",
+					fontFamily: "var(--font-mono)",
 				}}
 			>
 				<code className={className} style={{ background: "none", padding: 0 }}>
@@ -151,9 +160,9 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 	message,
 	onOpenDiff,
 	isAgentActive,
+	flushTop = false,
 }: AssistantMessageProps) {
 	const [showThinking, setShowThinking] = useState(false)
-	const [copiedAnswer, setCopiedAnswer] = useState(false)
 	const [previewImage, setPreviewImage] = useState<string | null>(null)
 
 	const { text, thinking, isStreamingThinking, hasRedactedThinking } =
@@ -186,21 +195,13 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 
 	const timeStr = formatTime(message.createdAt)
 
-	const handleCopyAnswer = async () => {
-		if (!displayText) return
-		try {
-			await navigator.clipboard.writeText(displayText)
-			setCopiedAnswer(true)
-			setTimeout(() => setCopiedAnswer(false), 2000)
-		} catch (err) {
-			console.error("Failed to copy assistant answer:", err)
-		}
-	}
-
 	return (
 		<div
+			className={
+				flushTop ? "assistant-message assistant-flush-top" : "assistant-message"
+			}
 			style={{
-				padding: "8px 0",
+				padding: flushTop ? "0 0 8px 0" : "8px 0",
 				lineHeight: 1.6,
 				minWidth: 0,
 				maxWidth: "100%",
@@ -232,7 +233,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 								width: 6,
 								height: 6,
 								borderRadius: "50%",
-								background: "#8b5cf6",
+								background: "var(--accent-2)",
 								flexShrink: 0,
 								animation: isActivelyStreaming
 									? "pulse 1.2s ease-in-out infinite"
@@ -263,9 +264,9 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 									background: "var(--bg-surface)",
 									border: "1px solid var(--border-muted)",
 									borderRadius: 6,
-									color: "var(--thinking-text, var(--muted))",
+									color: "var(--thinking-text)",
 									fontSize: 12,
-									fontFamily: "var(--font-mono, monospace)",
+									fontFamily: "var(--font-mono)",
 									lineHeight: 1.5,
 									whiteSpace: "pre-wrap",
 									wordBreak: "break-word",
@@ -309,7 +310,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 			{displayText && (
 				<div
 					className={isError ? "markdown-body is-error" : "markdown-body"}
-					style={isError ? { color: "var(--error, #ef4444)" } : undefined}
+					style={isError ? { color: "var(--error)" } : undefined}
 				>
 					<Markdown
 						remarkPlugins={[remarkGfm]}
@@ -394,7 +395,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 						.markdown-body.is-error h1,
 						.markdown-body.is-error h2,
 						.markdown-body.is-error h3 {
-							color: var(--error, #ef4444);
+							color: var(--error);
 						}
 						.markdown-body h1, .markdown-body h2, .markdown-body h3 {
 							color: var(--text);
@@ -405,6 +406,9 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 						.markdown-body h2 { font-size: 15px; }
 						.markdown-body h3 { font-size: 14px; }
 						.markdown-body p { margin: 6px 0; }
+						/* Under a turn header the header owns the gap, so the first
+						   block must not add a paragraph margin of its own. */
+						.assistant-flush-top .markdown-body > :first-child { margin-top: 0; }
 						.markdown-body ul, .markdown-body ol {
 							padding-left: 20px;
 							margin: 6px 0;
@@ -442,7 +446,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							background: var(--bg-surface);
 							padding: 2px 5px;
 							border-radius: 4px;
-							font-family: var(--font-mono, 'SF Mono', Monaco, 'Cascadia Code', monospace);
+							font-family: var(--font-mono);
 							font-size: 12px;
 							overflow-wrap: anywhere;
 							word-break: break-word;
@@ -461,7 +465,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 				/>
 			)}
 
-			{/* Assistant footer toolbar: timestamp + copy entire answer */}
+			{/* Assistant footer: timestamp + action pill (copy / helpful / bad response) */}
 			{(displayText ||
 				(message.changedFiles && message.changedFiles.length > 0)) &&
 				!isActivelyStreaming && (
@@ -469,79 +473,22 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 						style={{
 							display: "flex",
 							alignItems: "center",
-							gap: 8,
+							gap: 10,
 							marginTop: 8,
-							fontSize: 11,
-							color: "var(--dim)",
-							userSelect: "none",
 						}}
 					>
-						{timeStr && <span>{timeStr}</span>}
-						<button
-							type="button"
-							onClick={handleCopyAnswer}
-							title={copiedAnswer ? "Copied" : "Copy response"}
-							aria-label={copiedAnswer ? "Copied" : "Copy response"}
-							style={{
-								background: "none",
-								border: "none",
-								padding: "2px 6px",
-								cursor: "pointer",
-								display: "inline-flex",
-								alignItems: "center",
-								gap: 4,
-								color: copiedAnswer ? "var(--success)" : "var(--dim)",
-								borderRadius: 4,
-								fontSize: 11,
-								transition: "color 0.15s, background-color 0.15s",
-							}}
-							onMouseEnter={(e) => {
-								e.currentTarget.style.color = copiedAnswer
-									? "var(--success)"
-									: "var(--text)"
-								e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.color = copiedAnswer
-									? "var(--success)"
-									: "var(--dim)"
-								e.currentTarget.style.backgroundColor = "transparent"
-							}}
-						>
-							{copiedAnswer ? (
-								<>
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<polyline points="20 6 9 17 4 12" />
-									</svg>
-									<span>Copied</span>
-								</>
-							) : (
-								<>
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-									</svg>
-								</>
-							)}
-						</button>
+						{timeStr && (
+							<span
+								style={{
+									fontSize: 11,
+									color: "var(--dim)",
+									userSelect: "none",
+								}}
+							>
+								{timeStr}
+							</span>
+						)}
+						<MessageFeedback text={displayText} />
 					</div>
 				)}
 

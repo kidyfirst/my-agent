@@ -3,6 +3,10 @@ import * as os from "os"
 import * as fs from "fs"
 import type { IpcCommandHandler } from "./types.js"
 import { buildFullPrompt } from "../../prompts/index.js"
+import { DEFAULT_EXECUTION_MODE } from "../../core/index.js"
+import { builtinServersNeedingSetup } from "../../mcp/builtin.js"
+import { describeToolNames } from "../../harness/tools.js"
+import { getToolCategory } from "../../permissions.js"
 
 export function getContextHandlers(): Record<string, IpcCommandHandler> {
 	return {
@@ -11,9 +15,16 @@ export function getContextHandlers(): Record<string, IpcCommandHandler> {
 				const session = ctx.getActiveSession()
 				const projectRoot = session.projectRoot
 				const state = session.harness.getState?.() ?? {}
-				const modeId = session.harness.getCurrentModeId?.() ?? "build"
+				const modeId =
+					session.harness.getCurrentModeId?.() ?? DEFAULT_EXECUTION_MODE
 				const modelId = session.harness.getCurrentModelId?.()
 				const dateStr = new Date().toISOString().split("T")[0]
+				const mcpStatuses = session.mcpManager?.getServerStatuses() ?? []
+				const mcpToolNames = Object.keys(
+					session.mcpManager?.getTools() ?? {},
+				).filter(
+					(name) => modeId !== "fast" || getToolCategory(name) === "read",
+				)
 				const prompt = buildFullPrompt({
 					projectPath: projectRoot,
 					projectName: state.projectName || path.basename(projectRoot),
@@ -28,6 +39,26 @@ export function getContextHandlers(): Record<string, IpcCommandHandler> {
 						currentModelId: modelId,
 					},
 					workingDir: projectRoot,
+					// Mirror the live turn: the preview has to show the same toolset
+					// the model receives, MCP tools included (and, in Fast mode, only
+					// the ones the read-only filter keeps).
+					toolNames: describeToolNames(modeId),
+					mcpToolNames,
+					mcpSetup: builtinServersNeedingSetup().map((server) => ({
+						name: server.name,
+						title: server.title,
+						description: server.description,
+						apiKeyUrl: server.apiKeyUrl,
+					})),
+					mcpFailures: mcpStatuses
+						.filter(
+							(status) =>
+								status.builtin && status.hasApiKey && !status.connected,
+						)
+						.map((status) => ({
+							title: status.title ?? status.name,
+							error: status.error,
+						})),
 				})
 				return { prompt }
 			} catch (err: any) {

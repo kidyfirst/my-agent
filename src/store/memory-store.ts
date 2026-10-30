@@ -1,6 +1,7 @@
 import crypto from "node:crypto"
 import type { DatabaseSync } from "node:sqlite"
 import { INIT_SQL } from "./schema.js"
+import { runMigrations, getUserVersion } from "./migrations.js"
 import type {
 	StorageThreadType,
 	StorageListThreadsInput,
@@ -19,13 +20,15 @@ export class SQLiteMemoryStore {
 	}
 
 	async init(): Promise<void> {
-		// 1. Initialize schema & indexes
+		// 1. Initialize schema & indexes (full current schema)
 		this.db.exec(INIT_SQL)
 
-		// 2. Schema migration: Ensure durationMs column exists on myagent_messages
-		try {
-			this.db.exec("ALTER TABLE myagent_messages ADD COLUMN durationMs INTEGER")
-		} catch {}
+		// 2. Versioned migrations via PRAGMA user_version
+		runMigrations(this.db)
+	}
+
+	getUserVersion(): number {
+		return getUserVersion(this.db)
 	}
 
 	// ==================== Thread Operations ====================
@@ -59,9 +62,10 @@ export class SQLiteMemoryStore {
 		const whereClauses: string[] = []
 		const params: any[] = []
 
-		if (args.filter?.resourceId) {
+		const targetResourceId = args.filter?.resourceId || (args as any).resourceId
+		if (targetResourceId) {
 			whereClauses.push("resourceId = ?")
-			params.push(args.filter.resourceId)
+			params.push(targetResourceId)
 		}
 
 		if (args.filter?.metadata && Object.keys(args.filter.metadata).length > 0) {

@@ -1,7 +1,24 @@
+import * as path from "path"
+import * as os from "os"
+import * as fs from "fs"
 import type { IpcCommandHandler, HandlerContext } from "./types.js"
 import { normalizeControllerMessage } from "../../harness/index.js"
+import {
+	sessionRecordingManager,
+	deriveReplayScript,
+	createReplayModel,
+	reconstructMessagesFromRecording,
+	replayPlaybackKey,
+	beginSessionReplay,
+	endSessionReplay,
+	runtimeMetadata,
+	isReplayRunActive,
+} from "../../core/recorder/index.js"
 import { safeSend } from "../helpers.js"
-import { saveRecentProjectLastThread } from "../../utils/recent-projects.js"
+import {
+	loadRecentProjects,
+	saveRecentProjectLastThread,
+} from "../../utils/recent-projects.js"
 import {
 	captureGitSnapshot,
 	diffBetweenSnapshots,
@@ -15,10 +32,7 @@ import {
 	saveTaskChanges,
 	saveTaskDuration,
 } from "../task-changes-store.js"
-import {
-	CURATED_CHAT_MODELS,
-	isDeprecatedModel,
-} from "../../constants/models.js"
+import { CURATED_CHAT_MODELS } from "../../constants/models.js"
 import {
 	TOOL_CATEGORIES,
 	DEFAULT_POLICIES,
@@ -26,6 +40,80 @@ import {
 	type ToolCategory,
 	type PermissionPolicy,
 } from "../../permissions.js"
+
+function validateRecordingFile(filePath?: string): {
+	valid: boolean
+	reason?: string
+	eventCount: number
+} {
+	if (!filePath || !fs.existsSync(filePath)) {
+		return { valid: false, reason: "No recording file found", eventCount: 0 }
+	}
+	try {
+		const stat = fs.statSync(filePath)
+		if (stat.size === 0) {
+			return { valid: false, reason: "Recording file is empty", eventCount: 0 }
+		}
+		const content = fs.readFileSync(filePath, "utf8").trim()
+		if (!content) {
+			return {
+				valid: false,
+				reason: "Recording content is empty",
+				eventCount: 0,
+			}
+		}
+		let events: any[] = []
+		if (content.startsWith("[")) {
+			events = JSON.parse(content)
+		} else {
+			const lines = content
+				.split("\n")
+				.map((l) => l.trim())
+				.filter(Boolean)
+			for (const line of lines) {
+				events.push(JSON.parse(line))
+			}
+		}
+		const hasAction = events.some(
+			(e) =>
+				e.type === "run/start" ||
+				e.type === "step/start" ||
+				e.type === "assistant/stream" ||
+				e.type === "tool/result",
+		)
+		if (events.length === 0 || !hasAction) {
+			return {
+				valid: false,
+				reason: "Recording has no interaction steps",
+				eventCount: events.length,
+			}
+		}
+		return { valid: true, eventCount: events.length }
+	} catch (err: any) {
+		return {
+			valid: false,
+			reason: err?.message || "Corrupted recording data",
+			eventCount: 0,
+		}
+	}
+}
+
+function isActiveProject(ctx: HandlerContext): boolean {
+	if (!ctx.activeSessionPath) return false
+	const recent = loadRecentProjects()
+	const normActive = path
+		.resolve(ctx.activeSessionPath)
+		.replace(/\/+$/, "")
+		.toLowerCase()
+	return recent.some((r) => {
+		const normRoot = path.resolve(r.rootPath).replace(/\/+$/, "").toLowerCase()
+		return (
+			normRoot === normActive ||
+			normActive.startsWith(normRoot + "/") ||
+			normActive.startsWith(normRoot + "\\")
+		)
+	})
+}
 
 function isUsableChatModel(modelId: string): boolean {
 	const id = modelId.toLowerCase()
@@ -69,8 +157,6 @@ function isUsableChatModel(modelId: string): boolean {
 	if (id.includes("moderation") || id.includes("search") || id.includes("edit"))
 		return false
 	// Exclude deprecated models that return 404 for new users
-	if (isDeprecatedModel(modelId)) return false
-	// Exclude legacy OpenAI completions
 	if (
 		id.includes("text-davinci") ||
 		id.includes("text-curie") ||
@@ -105,6 +191,36 @@ function beginTaskSnapshot(root: string): GitSnapshot | null {
 	const baseline = captureGitSnapshot(root)
 	currentTaskSnapshot = { root, baseline }
 	return baseline.tree ? baseline : null
+}
+
+/**
+ * Write a batch of thread-metadata values in one go (falling back to
+ * one-by-one writes), ignoring the ones the storage layer refuses. Metadata is
+ * decoration here — a failure must never abort a replay.
+ */
+async function writeThreadMetadata(
+	threadId: string,
+	ctrl: any,
+	entries: Array<[string, unknown]>,
+): Promise<void> {
+	if (!threadId) return
+	const values: Record<string, unknown> = {}
+	for (const [key, value] of entries) {
+		if (value === undefined) continue
+		values[key] = value
+	}
+	if (Object.keys(values).length === 0) return
+	try {
+		if (typeof ctrl?.writeThreadMetadataValues === "function") {
+			await ctrl.writeThreadMetadataValues({ threadId, values })
+			return
+		}
+		for (const [key, value] of Object.entries(values)) {
+			await ctrl?.writeThreadMetadataValue?.({ threadId, key, value })
+		}
+	} catch (e) {
+		console.warn("[replay] failed to write thread metadata:", e)
+	}
 }
 
 export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
@@ -351,31 +467,70 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				.harness.followUp({ content: command.content })
 		},
 		switchMode: async (command, ctx) => {
-			await ctx
-				.getActiveSession()
-				.harness.switchMode({ modeId: command.modeId })
+			const s = ctx.getActiveSession()
+			await s.harness.switchMode({ modeId: command.modeId })
+			const threadId =
+				(command.threadId as string) || s.harness.getCurrentThreadId()
+			if (threadId) {
+				const ctrl = (s.harness as any).controller
+				await ctrl?.writeThreadMetadataValue?.({
+					threadId,
+					key: "modeId",
+					value: command.modeId,
+				})
+			}
 		},
 		switchModel: async (command, ctx) => {
-			await ctx.getActiveSession().harness.switchModel({
+			const s = ctx.getActiveSession()
+			await s.harness.switchModel({
 				modelId: command.modelId,
 				scope: command.scope,
 				modeId: command.modeId,
 			})
+			const threadId =
+				(command.threadId as string) || s.harness.getCurrentThreadId()
+			if (threadId) {
+				const ctrl = (s.harness as any).controller
+				await ctrl?.writeThreadMetadataValue?.({
+					threadId,
+					key: "modelId",
+					value: command.modelId,
+				})
+			}
 		},
 		switchThread: async (command, ctx) => {
 			const s = ctx.getActiveSession()
 			await s.harness.switchThread({ threadId: command.threadId })
 			await ctx.ensureAuthenticatedModel(s.harness, s.authStorage)
 			if (s.projectRoot && command.threadId) {
-				saveRecentProjectLastThread(s.projectRoot, command.threadId)
+				const recent = loadRecentProjects()
+				const exists = recent.some(
+					(r) =>
+						path.resolve(r.rootPath).replace(/\/+$/, "").toLowerCase() ===
+						path.resolve(s.projectRoot).replace(/\/+$/, "").toLowerCase(),
+				)
+				if (exists) {
+					saveRecentProjectLastThread(s.projectRoot, command.threadId)
+				}
 			}
 		},
 		createThread: async (command, ctx) => {
 			const s = ctx.getActiveSession()
-			const thread = await s.harness.createThread({ title: command.title })
+			const thread = await s.harness.createThread({
+				title: command.title,
+				metadata: command.metadata,
+			})
 			await ctx.ensureAuthenticatedModel(s.harness, s.authStorage)
 			if (s.projectRoot && thread?.id) {
-				saveRecentProjectLastThread(s.projectRoot, thread.id)
+				const recent = loadRecentProjects()
+				const exists = recent.some(
+					(r) =>
+						path.resolve(r.rootPath).replace(/\/+$/, "").toLowerCase() ===
+						path.resolve(s.projectRoot).replace(/\/+$/, "").toLowerCase(),
+				)
+				if (exists) {
+					saveRecentProjectLastThread(s.projectRoot, thread.id)
+				}
 			}
 			return thread
 		},
@@ -425,11 +580,20 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			if (s.projectRoot) {
 				const current = s.harness.getCurrentThreadId()
 				if (current) {
-					saveRecentProjectLastThread(s.projectRoot, current)
+					const recent = loadRecentProjects()
+					const exists = recent.some(
+						(r) =>
+							path.resolve(r.rootPath).replace(/\/+$/, "").toLowerCase() ===
+							path.resolve(s.projectRoot).replace(/\/+$/, "").toLowerCase(),
+					)
+					if (exists) {
+						saveRecentProjectLastThread(s.projectRoot, current)
+					}
 				}
 			}
 		},
 		getMessages: async (command, ctx) => {
+			if (!command.threadId && !isActiveProject(ctx)) return []
 			const h = ctx.getActiveSession().harness
 			const threadId = command.threadId || h.getCurrentThreadId()
 			if (!threadId) return []
@@ -467,7 +631,16 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					id: m.id,
 					name: m.name,
 					color: m.color,
+					topology: m.topology,
 				}))
+		},
+		getModeGraph: async (command, ctx) => {
+			const s = ctx.getActiveSession()
+			return s.harness.getModeGraph?.({ modeId: (command as any).modeId })
+		},
+		listExecutionModes: async (_command, ctx) => {
+			const s = ctx.getActiveSession()
+			return s.harness.listExecutionModes?.() ?? []
 		},
 		getState: async (_command, ctx) => {
 			const session = ctx.getActiveSession()
@@ -478,6 +651,13 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		getSession: async (_command, ctx) => {
+			if (!isActiveProject(ctx)) {
+				return {
+					currentThreadId: null,
+					currentModeId: "fast",
+					threads: [],
+				}
+			}
 			const h = ctx.getActiveSession().harness
 			const session = await h.getSession()
 			await h.loadOMProgress?.().catch(() => {})
@@ -500,6 +680,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			return { success: true }
 		},
 		listThreads: async (_command, ctx) => {
+			if (!isActiveProject(ctx)) return []
 			return await ctx.getActiveSession().harness.listThreads()
 		},
 		getTokenUsage: async (_command, ctx) => {
@@ -557,6 +738,505 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				}
 			}
 			return Array.from(modelMap.values())
+		},
+		toggleSessionRecording: async (command, ctx) => {
+			let threadId = (command.threadId as string) || undefined
+			let projectPath = (command.projectPath as string) || undefined
+			let active: any = null
+			try {
+				active = ctx.getActiveSession()
+				if (!threadId)
+					threadId = active?.harness?.getCurrentThreadId() || undefined
+				if (!projectPath)
+					projectPath =
+						active?.projectRoot || ctx.activeSessionPath || undefined
+			} catch {}
+
+			const enabled =
+				typeof command.enabled === "boolean" ? command.enabled : undefined
+			const isCurrentlyRecording = sessionRecordingManager.isRecording(
+				threadId,
+				projectPath,
+			)
+			const willStart = enabled !== undefined ? enabled : !isCurrentlyRecording
+
+			if (willStart) {
+				const ctrl = active?.harness?.controller
+				const isRunning = ctrl?.isRunning
+					? ctrl.isRunning()
+					: Boolean(ctrl?._isRunning)
+				if (isRunning) {
+					return {
+						isRecording: false,
+						valid: false,
+						error: "任务执行中，不允许录制",
+						threadId,
+						...sessionRecordingManager.getStatus(),
+					}
+				}
+			}
+
+			const isRecording = sessionRecordingManager.toggleRecording(
+				threadId,
+				projectPath,
+				enabled,
+			)
+			const status = sessionRecordingManager.getStatus()
+
+			safeSend(ctx.mainWindow, "harness:event", {
+				type: "session_recording_changed",
+				threadId,
+				projectPath,
+				isRecording,
+				recordingThreads: status.recordingThreads,
+				recordingProjects: status.recordingProjects,
+				worktreePath: ctx.activeSessionPath,
+			})
+
+			let valid = true
+			let error: string | undefined
+			let reason: string | undefined
+			let filePath: string | undefined
+			let eventCount = 0
+			let size = 0
+
+			if (!isRecording) {
+				const sessionsDir =
+					process.env.MYAGENT_SESSIONS_DIR ||
+					path.join(os.homedir(), ".myagent", "sessions")
+				const recordings = sessionRecordingManager.listRecordings(
+					sessionsDir,
+					threadId,
+				)
+				const latestRec =
+					recordings[0] ||
+					sessionRecordingManager.listRecordings(sessionsDir)[0]
+				const validation = validateRecordingFile(latestRec?.filePath)
+
+				if (!validation.valid) {
+					valid = false
+					error = "record failed"
+					reason = validation.reason
+				} else {
+					valid = true
+					filePath = latestRec.filePath
+					eventCount = validation.eventCount
+					size = latestRec.size
+				}
+			}
+
+			return {
+				isRecording,
+				valid,
+				error,
+				reason,
+				filePath,
+				threadId,
+				eventCount,
+				size,
+				recordingThreads: status.recordingThreads,
+				recordingProjects: status.recordingProjects,
+			}
+		},
+		exportSessionRecording: async (command, ctx) => {
+			const sessionsDir =
+				process.env.MYAGENT_SESSIONS_DIR ||
+				path.join(os.homedir(), ".myagent", "sessions")
+			let threadId = (command.threadId as string) || undefined
+			try {
+				if (!threadId)
+					threadId =
+						ctx.getActiveSession()?.harness?.getCurrentThreadId() || undefined
+			} catch {}
+
+			let sourcePath = command.filePath as string | undefined
+			if (!sourcePath && threadId) {
+				const recs = sessionRecordingManager.listRecordings(
+					sessionsDir,
+					threadId,
+				)
+				if (recs.length > 0) sourcePath = recs[0].filePath
+			}
+			if (!sourcePath) {
+				const recs = sessionRecordingManager.listRecordings(sessionsDir)
+				if (recs.length > 0) sourcePath = recs[0].filePath
+			}
+
+			if (!sourcePath || !fs.existsSync(sourcePath)) {
+				throw new Error("No recording file found to export.")
+			}
+
+			const format = command.format === "jsonl" ? "jsonl" : "json"
+			const { dialog, shell } = await import("electron")
+			const dateStr = new Date()
+				.toISOString()
+				.replace(/[:.]/g, "-")
+				.slice(0, 19)
+			const defaultExportName = `session-recording-${threadId || "export"}-${dateStr}.${format}`
+			const saveRes = await dialog.showSaveDialog(ctx.mainWindow!, {
+				title: "Export Session Recording Data",
+				defaultPath: path.join(os.homedir(), "Downloads", defaultExportName),
+				filters:
+					format === "json"
+						? [
+								{ name: "JSON (*.json)", extensions: ["json"] },
+								{ name: "JSON Lines (*.jsonl)", extensions: ["jsonl"] },
+								{ name: "All Files", extensions: ["*"] },
+							]
+						: [
+								{ name: "JSON Lines (*.jsonl)", extensions: ["jsonl"] },
+								{ name: "JSON (*.json)", extensions: ["json"] },
+								{ name: "All Files", extensions: ["*"] },
+							],
+			})
+
+			if (saveRes.canceled || !saveRes.filePath) {
+				return { cancelled: true }
+			}
+
+			const rawContent = fs.readFileSync(sourcePath, "utf8")
+			if (saveRes.filePath.endsWith(".json")) {
+				let events: any[] = []
+				const trimmed = rawContent.trim()
+				if (trimmed.startsWith("[")) {
+					try {
+						events = JSON.parse(trimmed)
+					} catch {}
+				} else {
+					events = trimmed
+						.split("\n")
+						.map((l) => l.trim())
+						.filter(Boolean)
+						.map((l) => {
+							try {
+								return JSON.parse(l)
+							} catch {
+								return l
+							}
+						})
+				}
+				fs.writeFileSync(
+					saveRes.filePath,
+					JSON.stringify(events, null, 2),
+					"utf8",
+				)
+			} else {
+				const trimmed = rawContent.trim()
+				if (trimmed.startsWith("[")) {
+					try {
+						const events = JSON.parse(trimmed)
+						if (Array.isArray(events)) {
+							const jsonl =
+								events.map((e) => JSON.stringify(e)).join("\n") + "\n"
+							fs.writeFileSync(saveRes.filePath, jsonl, "utf8")
+						} else {
+							fs.writeFileSync(saveRes.filePath, rawContent, "utf8")
+						}
+					} catch {
+						fs.writeFileSync(saveRes.filePath, rawContent, "utf8")
+					}
+				} else {
+					fs.writeFileSync(saveRes.filePath, rawContent, "utf8")
+				}
+			}
+
+			try {
+				shell.showItemInFolder(saveRes.filePath)
+			} catch {}
+
+			safeSend(ctx.mainWindow, "harness:event", {
+				type: "session_recording_exported",
+				threadId,
+				filePath: saveRes.filePath,
+				worktreePath: ctx.activeSessionPath,
+			})
+
+			return {
+				success: true,
+				filePath: saveRes.filePath,
+			}
+		},
+		selectRecordingFile: async (_command, ctx) => {
+			const { dialog } = await import("electron")
+			const res = await dialog.showOpenDialog(ctx.mainWindow!, {
+				title: "Select Recording File to Replay",
+				filters: [
+					{
+						name: "Recording Files (*.json, *.jsonl)",
+						extensions: ["json", "jsonl"],
+					},
+					{ name: "JSON (*.json)", extensions: ["json"] },
+					{ name: "JSON Lines (*.jsonl)", extensions: ["jsonl"] },
+					{ name: "All Files", extensions: ["*"] },
+				],
+				properties: ["openFile"],
+			})
+			if (res.canceled || !res.filePaths[0]) {
+				return { canceled: true }
+			}
+			const filePath = res.filePaths[0]
+			const stat = fs.statSync(filePath)
+			return {
+				canceled: false,
+				filePath,
+				fileName: path.basename(filePath),
+				size: stat.size,
+			}
+		},
+		getSessionRecordingStatus: async (_command, _ctx) => {
+			return sessionRecordingManager.getStatus()
+		},
+		listSessionRecordings: async (command, ctx) => {
+			const sessionsDir =
+				process.env.MYAGENT_SESSIONS_DIR ||
+				path.join(os.homedir(), ".myagent", "sessions")
+			let threadId = (command.threadId as string) || undefined
+			if (!threadId) {
+				try {
+					threadId =
+						ctx.getActiveSession()?.harness?.getCurrentThreadId() || undefined
+				} catch {}
+			}
+			return sessionRecordingManager.listRecordings(sessionsDir, threadId)
+		},
+		startSessionReplay: async (command, ctx) => {
+			let filePath = command.filePath as string | undefined
+			const sessionsDir =
+				process.env.MYAGENT_SESSIONS_DIR ||
+				path.join(os.homedir(), ".myagent", "sessions")
+			let threadId = (command.threadId as string) || ""
+			if (!threadId) {
+				try {
+					threadId = ctx.getActiveSession()?.harness?.getCurrentThreadId() || ""
+				} catch {}
+			}
+
+			if (!filePath && threadId) {
+				const recordings = sessionRecordingManager.listRecordings(
+					sessionsDir,
+					threadId,
+				)
+				if (recordings.length > 0) {
+					filePath = recordings[0].filePath
+				}
+			}
+
+			if (!filePath || !fs.existsSync(filePath)) {
+				throw new Error(
+					`Recording file not found: ${filePath || "no recording found for thread"}`,
+				)
+			}
+
+			const content = fs.readFileSync(filePath, "utf8")
+			const script = deriveReplayScript(content)
+			const replayModel = createReplayModel(script, {
+				speed: command.speed || "instant",
+				// The same file must be replayable more than once: wrap instead of
+				// throwing once the last recorded step has been used.
+				onExhausted: "wrap",
+			})
+			const s = ctx.getActiveSession()
+			const ctrl = (s?.harness as any)?.controller
+
+			if (!threadId && s?.harness?.createThread) {
+				try {
+					const title = `Replay: ${path.basename(filePath, path.extname(filePath))}`
+					const newThread = await s.harness.createThread({
+						title,
+						metadata: { isReplay: true, replayFile: path.basename(filePath) },
+					})
+					threadId = newThread?.id || ""
+				} catch (e) {
+					console.error("Failed to create thread for replay:", e)
+				}
+			}
+
+			// How many playbacks this thread has had once this one is written, and
+			// whether writing the reconstructed block failed.
+			let playbackIndex = 1
+			let replayError: string | null = null
+
+			if (threadId) {
+				// A replay only reconstructs the transcript, so it must never lend
+				// its offline model to a run that is already streaming — that run
+				// would answer the user's real prompt with the recorded reply and
+				// leave a duplicate answer next to the reconstruction.
+				const liveSession = (s?.harness as any)?.activeSession ?? null
+				const runActive = isReplayRunActive(liveSession)
+				if (!runActive) {
+					sessionRecordingManager.setReplayModel(threadId, replayModel)
+				}
+
+				// This replay is a reconstruction, so no run consumes the recorded
+				// runtime: switching model/mode/permission would only rattle the
+				// composer's pickers (and, if a run happened to be streaming, would
+				// change *that* run's settings). The snapshot is taken before
+				// anything is written so the restore still has something to hand
+				// back if a replay state outlives this call.
+				const recordedRuntime = script.runtime ?? script.session?.runtime
+				if (recordedRuntime) {
+					beginSessionReplay(liveSession, threadId, recordedRuntime, {
+						apply: false,
+					})
+				}
+
+				try {
+					await writeThreadMetadata(threadId, ctrl, [
+						["replayFile", path.basename(filePath)],
+					])
+
+					// Reconstruct recorded messages and save into thread memory store.
+					// The messages must carry the thread's real resourceId — the
+					// message query filters on it, so a hardcoded "default" made the
+					// whole replay invisible.
+					const resourceId =
+						(ctrl as any)?.resourceId ||
+						(s?.harness as any)?.resourceId ||
+						"default"
+					let store = await ctrl?.getMemoryStore?.()
+					if (
+						!store &&
+						typeof (s?.harness as any)?.getMemoryStore === "function"
+					) {
+						store = await (s.harness as any).getMemoryStore()
+					}
+					if (!store && (s?.harness as any)?.storage) {
+						const st = (s.harness as any).storage
+						store =
+							typeof st.getStore === "function"
+								? await st.getStore("memory")
+								: st
+					}
+
+					// Inspect what is already in the thread before inserting: an earlier
+					// playback of the same file stays where it is, and this one is
+					// appended after the whole conversation (otherwise the new block
+					// would interleave with the old one, or with live messages).
+					let existingMessages: any[] = []
+					if (typeof store?.listMessages === "function") {
+						try {
+							const existing = await store.listMessages({
+								threadId,
+								orderBy: { field: "createdAt", direction: "ASC" },
+							})
+							existingMessages = existing?.messages || []
+						} catch (e) {
+							console.warn("Failed to read existing messages:", e)
+						}
+					}
+
+					// How many playbacks this thread already holds. Reported back so the
+					// toast can say "Replay #3" instead of looking like a no-op.
+					const knownPlaybacks = new Set<string>()
+					for (const message of existingMessages) {
+						if (typeof message?.id !== "string") continue
+						if (!message.id.startsWith("replay-")) continue
+						knownPlaybacks.add(replayPlaybackKey(message.id) ?? "legacy")
+					}
+					playbackIndex = knownPlaybacks.size + 1
+
+					// Each playback gets a fresh id space. Without it a second replay of
+					// the same file writes rows with identical ids, which the message
+					// store upserts into the *existing* rows: the transcript stays
+					// byte-identical and the new playback is invisible.
+					const playbackId = `pb${Date.now().toString(36)}${Math.random()
+						.toString(36)
+						.slice(2, 5)}`
+					const reconstructedMessages = reconstructMessagesFromRecording(
+						content,
+						threadId,
+						resourceId,
+						existingMessages.length > 0 ? Date.now() : undefined,
+						{ playbackId },
+					)
+
+					if (store?.saveMessages && reconstructedMessages.length > 0) {
+						// Append. Replaying the same recording several times is a
+						// legitimate review workflow — each pass has to show up as its
+						// own block, so nothing from the previous playback is removed.
+						await store.saveMessages({ messages: reconstructedMessages })
+					}
+				} catch (e) {
+					replayError = e instanceof Error ? e.message : String(e)
+					console.error("Failed to write thread replay metadata / messages:", e)
+				}
+			}
+
+			// A replay here is a *reconstruction*, not a live run: once the
+			// recorded block is in the thread there is nothing left to stream, so
+			// the session must not stay parked on the recorded model/mode/
+			// permission (nor keep the "replaying" badge lit). Only a caller that
+			// really drives a run keeps the replay state alive, in which case the
+			// controller's `finally` finishes it once that run ends.
+			const stillRunning = threadId
+				? isReplayRunActive((s?.harness as any)?.activeSession)
+				: false
+
+			safeSend(ctx.mainWindow, "harness:event", {
+				type: "session_replay_started",
+				threadId,
+				filePath,
+				replayFile: path.basename(filePath),
+				stepCount: script.entries.length,
+				worktreePath: ctx.activeSessionPath,
+			})
+
+			if (threadId && !stillRunning) {
+				await writeThreadMetadata(threadId, ctrl, [["isReplay", false]])
+				const { restored } = endSessionReplay(
+					(s?.harness as any)?.activeSession,
+					threadId,
+				)
+				await writeThreadMetadata(threadId, ctrl, runtimeMetadata(restored))
+				safeSend(ctx.mainWindow, "harness:event", {
+					type: "session_replay_stopped",
+					threadId,
+					worktreePath: ctx.activeSessionPath,
+				})
+			} else if (threadId) {
+				await writeThreadMetadata(threadId, ctrl, [["isReplay", true]])
+			}
+
+			return {
+				success: true,
+				filePath,
+				stepCount: script.entries.length,
+				threadId,
+				// Tells the renderer the replay already completed, so it does not
+				// light the sidebar badge for a replay that is over.
+				finished: !stillRunning,
+				// Lets the renderer say "Replay #3" instead of leaving the user
+				// unsure whether the second pass actually ran.
+				playbackIndex,
+				// Non-null when the transcript could not be written at all.
+				error: replayError,
+			}
+		},
+		stopSessionReplay: async (command, ctx) => {
+			let threadId = (command.threadId as string) || ""
+			if (!threadId) {
+				try {
+					threadId = ctx.getActiveSession()?.harness?.getCurrentThreadId() || ""
+				} catch {}
+			}
+			if (threadId) {
+				const s = ctx.getActiveSession()
+				const ctrl = (s?.harness as any)?.controller
+				const liveSession = (s?.harness as any)?.activeSession ?? null
+				// Stopping by hand has to undo the same switch the replay made:
+				// otherwise the session stays on the recorded mode / permission.
+				const { restored } = endSessionReplay(liveSession, threadId)
+				await writeThreadMetadata(threadId, ctrl, [
+					...runtimeMetadata(restored),
+					["isReplay", false],
+				])
+			}
+			safeSend(ctx.mainWindow, "harness:event", {
+				type: "session_replay_stopped",
+				threadId,
+				worktreePath: ctx.activeSessionPath,
+			})
+			return { success: true, threadId }
 		},
 	}
 }

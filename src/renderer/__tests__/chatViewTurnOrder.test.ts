@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest"
-import { organizeTurnItems, type RenderItem } from "../components/ChatView"
+import {
+	organizeTurnItems,
+	groupItemsIntoTurns,
+	isReplayTurn,
+	decideDuplicateUser,
+	isDuplicateReplayAnswer,
+	type RenderItem,
+} from "../components/ChatView"
 import type { Message } from "../types/ipc"
 
 describe("organizeTurnItems - Turn Order and Placement", () => {
@@ -263,5 +270,240 @@ describe("organizeTurnItems - Turn Order and Placement", () => {
 			"execution",
 			"assistant",
 		])
+	})
+
+	describe("groupItemsIntoTurns - Sticky Isolation", () => {
+		it("groups multiple turns so each turn contains its own user message as a sticky boundary", () => {
+			const u1 = createUserItem("u1", "First question")
+			const a1 = createAssistantItem("a1", "First answer")
+			const u2 = createUserItem("u2", "Second question")
+			const a2 = createAssistantItem("a2", "Second answer")
+			const u3 = createUserItem("u3", "Third question")
+			const a3 = createAssistantItem("a3", "Third answer")
+
+			const items = organizeTurnItems([u1, a1, u2, a2, u3, a3])
+			const turns = groupItemsIntoTurns(items)
+
+			expect(turns).toHaveLength(3)
+			expect(turns[0].userItem?.data.id).toBe("u1")
+			expect(turns[0].items.map((i) => i.type)).toEqual(["assistant"])
+
+			expect(turns[1].userItem?.data.id).toBe("u2")
+			expect(turns[1].items.map((i) => i.type)).toEqual(["assistant"])
+
+			expect(turns[2].userItem?.data.id).toBe("u3")
+			expect(turns[2].items.map((i) => i.type)).toEqual(["assistant"])
+		})
+
+		it("handles system notices before turns without userItem", () => {
+			const sys: RenderItem = {
+				type: "system",
+				key: "sys-1",
+				data: { id: "sys-1", role: "system", content: "Init" } as Message,
+			}
+			const u1 = createUserItem("u1", "Hello")
+			const a1 = createAssistantItem("a1", "Hi")
+
+			const turns = groupItemsIntoTurns([sys, u1, a1])
+
+			expect(turns).toHaveLength(2)
+			expect(turns[0].userItem).toBeUndefined()
+			expect(turns[0].items[0].type).toBe("system")
+
+			expect(turns[1].userItem?.data.id).toBe("u1")
+			expect(turns[1].items[0].type).toBe("assistant")
+		})
+	})
+})
+
+describe("isReplayTurn", () => {
+	const userItem = (id: string): RenderItem => ({
+		type: "user",
+		key: `msg-${id}`,
+		data: {
+			id,
+			role: "user",
+			content: [{ type: "text", text: "在么" }],
+			createdAt: new Date().toISOString(),
+		} as Message,
+	})
+
+	const assistantItem = (id: string): RenderItem => ({
+		type: "assistant",
+		key: `msg-${id}-text-0`,
+		data: {
+			id,
+			role: "assistant",
+			content: [{ type: "text", text: "在。" }],
+			isStreaming: false,
+			createdAt: new Date().toISOString(),
+		} as Message & { isStreaming: boolean },
+	})
+
+	it("flags a turn whose user message came from a recording", () => {
+		const turns = groupItemsIntoTurns([
+			userItem("replay-user-run-1-0"),
+			assistantItem("replay-assistant-run-1-0"),
+		])
+		expect(isReplayTurn(turns[0])).toBe(true)
+	})
+
+	it("flags a recording without a captured prompt via its assistant message", () => {
+		const turns = groupItemsIntoTurns([
+			assistantItem("replay-assistant-run-1-0"),
+		])
+		expect(isReplayTurn(turns[0])).toBe(true)
+	})
+
+	it("leaves live turns unmarked", () => {
+		const turns = groupItemsIntoTurns([
+			userItem("u-live"),
+			assistantItem("a-live"),
+		])
+		expect(isReplayTurn(turns[0])).toBe(false)
+	})
+
+	it("keeps a replayed prompt as its own turn when grouping two identical prompts", () => {
+		// `decideDuplicateUser` already collapses the live/replay pair upstream, so
+		// grouping only ever sees one of them. Should both reach this point, they must
+		// stay separate turns instead of silently merging into the live one.
+		const turns = groupItemsIntoTurns([
+			userItem("u-live"),
+			userItem("replay-user-run-1-0"),
+			assistantItem("replay-assistant-run-1-0"),
+		])
+		expect(turns).toHaveLength(2)
+		expect(turns[1].userItem?.data.id).toBe("replay-user-run-1-0")
+		expect(isReplayTurn(turns[1])).toBe(true)
+	})
+})
+
+describe("decideDuplicateUser", () => {
+	const user = (id: string, text: string): Message =>
+		({
+			id,
+			role: "user",
+			content: [{ type: "text", text }],
+			createdAt: new Date().toISOString(),
+		}) as Message
+
+	it("keeps distinct prompts", () => {
+		expect(decideDuplicateUser(user("u1", "在么"), user("u2", "在吗"))).toBe(
+			"keep",
+		)
+	})
+
+	it("replaces a live prompt with the replayed copy of the same prompt", () => {
+		// The exact production case: the user had already sent "在么", then replayed a
+		// recording of that same prompt. One bubble must survive, and it must be the
+		// replayed one so the turn stays inside a single replay outline.
+		expect(
+			decideDuplicateUser(
+				user("u-live", "在么"),
+				user("replay-user-r1-0", "在么"),
+			),
+		).toBe("replace-previous")
+	})
+
+	it("keeps a live prompt typed again after a replayed one", () => {
+		// Sending the same text again after a replay is a real new send — dropping
+		// it would look like the message vanished.
+		expect(
+			decideDuplicateUser(
+				user("replay-user-r1-0", "在么"),
+				user("u-live", "在么"),
+			),
+		).toBe("keep")
+	})
+
+	it("keeps two replayed prompts (two recorded runs)", () => {
+		expect(
+			decideDuplicateUser(
+				user("replay-user-r1-0", "在么"),
+				user("replay-user-r2-0", "在么"),
+			),
+		).toBe("keep")
+	})
+
+	it("collapses a double-sent live prompt", () => {
+		expect(decideDuplicateUser(user("u1", "在么"), user("u2", "在么"))).toBe(
+			"skip",
+		)
+	})
+
+	it("ignores a non-user previous item", () => {
+		expect(decideDuplicateUser(undefined, user("u1", "在么"))).toBe("keep")
+	})
+})
+
+describe("isDuplicateReplayAnswer", () => {
+	const answer = (id: string, text = "在。"): Message =>
+		({
+			id,
+			role: "assistant",
+			content: [{ type: "text", text }],
+			createdAt: new Date().toISOString(),
+		}) as Message
+
+	it("detects a live answer that repeats the replayed one", () => {
+		expect(
+			isDuplicateReplayAnswer(
+				answer("replay-assistant-r1-0"),
+				answer("a-live"),
+			),
+		).toBe(true)
+	})
+
+	it("never collapses two live answers", () => {
+		expect(isDuplicateReplayAnswer(answer("a1"), answer("a2"))).toBe(false)
+	})
+
+	it("keeps answers that differ", () => {
+		expect(
+			isDuplicateReplayAnswer(
+				answer("replay-assistant-r1-0", "在。"),
+				answer("a-live", "在。有什么可以帮你的？"),
+			),
+		).toBe(false)
+	})
+
+	it("keeps answers carrying tool calls", () => {
+		const withTool = {
+			id: "a-live",
+			role: "assistant",
+			content: [
+				{ type: "text", text: "在。" },
+				{
+					type: "tool-call",
+					toolCallId: "t1",
+					toolName: "read_file",
+					input: {},
+				},
+			],
+			createdAt: new Date().toISOString(),
+		} as unknown as Message
+		expect(
+			isDuplicateReplayAnswer(answer("replay-assistant-r1-0"), withTool),
+		).toBe(false)
+	})
+
+	it("keeps the same answer from two different playbacks", () => {
+		// Replaying one recording twice writes the same text with a different
+		// per-playback id suffix. Those are two passes, not a duplicate answer.
+		expect(
+			isDuplicateReplayAnswer(
+				answer("replay-assistant-r1-0-pbmg2k1"),
+				answer("replay-assistant-r1-0-pbn9x2"),
+			),
+		).toBe(false)
+	})
+
+	it("still collapses a replayed answer duplicated inside one playback", () => {
+		expect(
+			isDuplicateReplayAnswer(
+				answer("replay-assistant-r1-0-pbmg2k1"),
+				answer("replay-assistant-r1-1-pbmg2k1"),
+			),
+		).toBe(true)
 	})
 })

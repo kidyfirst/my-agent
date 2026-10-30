@@ -33,6 +33,24 @@ export interface McpServerStatus {
 	toolNames: string[]
 	/** Error message if connection failed */
 	error?: string
+	/** Shipped with the app rather than declared in a config file */
+	builtin?: boolean
+	/** Display name for a built-in server */
+	title?: string
+	/** Remote endpoint, when the server is HTTP-based */
+	url?: string
+	/** One line for the settings row */
+	description?: string
+	/** Where the user creates a key */
+	apiKeyUrl?: string
+	docsUrl?: string
+	/** Credential is already stored */
+	hasApiKey?: boolean
+	/**
+	 * Built-in server that is listed but cannot connect yet because no API key
+	 * was saved. Distinct from `error`: it is a to-do for the user, not a fault.
+	 */
+	needsApiKey?: boolean
 }
 
 export interface MCPClientOptions {

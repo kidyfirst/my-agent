@@ -1,6 +1,25 @@
 # My Agent 项目架构与模块实现说明
 
+<div align="center">
+
+**简体中文** ｜ [English](README_EN.md)
+
+</div>
+
 本项目是一个基于 **Electron**、**React** 构建的桌面级智能编码助手。项目采用多进程解耦架构，结合现代自主 Agent 的 ReAct 循环与观察性记忆机制，支持多工作区会话隔离、工具流式执行与多面板 IDE 协同交互。
+
+<!-- FEEDBACK_BADGES_START — 与 src/utils/feedback.ts 的 FEEDBACK_BADGES 保持一致 -->
+
+<div align="center">
+
+![Helpful](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fkidyfirst%2Fmy-agent-likes&query=%24.value&label=likes&color=FF8C42&style=flat&cacheSeconds=300)
+![Bad response](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fabacus.jasoncameron.dev%2Fget%2Fkidyfirst%2Fmy-agent-bad&query=%24.value&label=bad%20response&color=6b7280&style=flat&cacheSeconds=300)
+
+<sub>每条回复下方都有 复制 · 👍 Helpful · 👎 Bad response。点赞是匿名的：不登录、不落库、不上报身份，只让上面两个公开计数器 +1；重启应用后高亮消失，只留下总数。</sub>
+
+</div>
+
+<!-- FEEDBACK_BADGES_END -->
 
 ---
 
@@ -16,24 +35,24 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#全平台客户端下载)
 [![ChangeLog](https://img.shields.io/badge/ChangeLog-%E7%89%88%E6%9C%AC%E6%97%A5%E5%BF%97-blueviolet)](https://kidyfirst.github.io/my-agent/changelog.html)
 
-**当前最新稳定版本：`v0.1.1`**  
+**当前最新稳定版本：`v0.1.2`**  
 🌐 **[访问官方在线下载站 (GitHub Pages)](https://kidyfirst.github.io/my-agent/)** ｜ 📋 **[查看版本更新日志 (ChangeLog)](https://kidyfirst.github.io/my-agent/changelog.html)** ｜ 📦 **[GitHub Releases 资产归档](https://github.com/kidyfirst/my-agent/releases)**
 
 </div>
 
 ### 全平台客户端下载
 
-| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.1)                                                                                                                       | 说明                      |
+| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.2)                                                                                                                       | 说明                      |
 | :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
-| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.1-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
-| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.1-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-arm64.zip)                 | 解压即用                  |
-| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.1-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
-| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.1-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-mac-x64.zip)                     | 解压即用                  |
-| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.1-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.exe)                     | NSIS 引导向导安装         |
-| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.1-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-win-x64.zip)                     | 解压即可直接运行          |
-| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.1-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
-| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.1-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
-| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.1-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.1/my-agent-0.1.1-linux-x64.zip)                 | 适用于无 root 环境        |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.2-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.2-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-mac-arm64.zip)                 | 解压即用                  |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.2-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.2-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-mac-x64.zip)                     | 解压即用                  |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.2-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-win-x64.exe)                     | NSIS 引导向导安装         |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.2-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-win-x64.zip)                     | 解压即可直接运行          |
+| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.2-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
+| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.2-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
+| 🐧 **Linux**    | **Linux x86_64** (免安装)             | `.zip` 压缩归档包    | [my-agent-0.1.2-linux-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.2/my-agent-0.1.2-linux-x64.zip)                 | 适用于无 root 环境        |
 
 > [!IMPORTANT]
 > **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  
@@ -53,13 +72,30 @@
 
 <!-- LATEST_RELEASE_END -->
 
-## 目录
+<!-- TIP_JAR_START — 二维码就是 src/renderer/assets/alipay-qr.png，同一份文件，别再放副本 -->
 
-- [📥 客户端下载与版本日志 (ChangeLog)](#-客户端下载与版本日志-changelog)
+## ☕ 打赏猫球
+
+<div align="center">
+
+如果你觉得项目对你有帮助，打赏猫球吧 🐱
+
+<img src="src/renderer/assets/alipay-qr.png" width="200" alt="支付宝收款二维码" />
+
+<sub>支付宝扫一扫 · 金额随意，不打赏也一样好用</sub>
+
+</div>
+
+<!-- TIP_JAR_END -->
+
+---
+
+## 目录
 
 - [My Agent 项目架构与模块实现说明](#my-agent-项目架构与模块实现说明)
   - [📥 客户端下载与版本日志 (ChangeLog)](#-客户端下载与版本日志-changelog)
     - [全平台客户端下载](#全平台客户端下载)
+  - [☕ 打赏猫球](#-打赏猫球)
   - [目录](#目录)
   - [1. 整体架构设计](#1-整体架构设计)
     - [核心设计原则](#核心设计原则)
@@ -75,11 +111,20 @@
       - [3.3.5 滚动、空态与层叠](#335-滚动空态与层叠)
     - [3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)](#34-agent-运行与能力层-智能体引擎--srctools)
       - [3.4.1 核心运行时对象体系 (Harness / HarnessProxy / ActiveSession / Agent)](#341-核心运行时对象体系-harness--harnessproxy--activesession--agent)
+        - [1. 四大核心实体的职责边界与类定义契约](#1-四大核心实体的职责边界与类定义契约)
+        - [2. 核心类与接口定义结构](#2-核心类与接口定义结构)
+          - [(1) `Agent` 类定义（\[`src/core/agent/agent.ts`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/agent/agent.ts)）](#1-agent-类定义srccoreagentagenttsfileuserstimlyugitcodegithubmastra-code-uisrccoreagentagentts)
+          - [(2) `Harness` / `AgentController` 类定义（\[`src/core/controller/controller.ts`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts)）](#2-harness--agentcontroller-类定义srccorecontrollercontrollertsfileuserstimlyugitcodegithubmastra-code-uisrccorecontrollercontrollerts)
+          - [(3) `ActiveSession` (`Session<TState>`) 类定义（\[`src/core/controller/controller.ts:296`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts#L296)）](#3-activesession-sessiontstate-类定义srccorecontrollercontrollerts296fileuserstimlyugitcodegithubmastra-code-uisrccorecontrollercontrollertsl296)
+          - [(4) `HarnessProxy` 与 `adapter` 门面（\[`src/harness/index.ts`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/harness/index.ts)）](#4-harnessproxy-与-adapter-门面srcharnessindextsfileuserstimlyugitcodegithubmastra-code-uisrcharnessindexts)
+        - [3. 为什么要在 `adapter` 外包裹一层 `Proxy`？](#3-为什么要在-adapter-外包裹一层-proxy)
       - [3.4.2 存储引擎与数据库持久化](#342-存储引擎与数据库持久化)
       - [3.4.3 观察性记忆 (Observational Memory)](#343-观察性记忆-observational-memory)
       - [3.4.4 Agent ReAct 循环机制与工具流](#344-agent-react-循环机制与工具流)
-      - [3.4.5 扩展工具生态与沙箱安全](#345-扩展工具生态与沙箱安全)
+      - [3.4.5 扩展工具生态与沙箱安全 (`src/tools/`, `src/lsp/`, `src/browser/`)](#345-扩展工具生态与沙箱安全-srctools-srclsp-srcbrowser)
       - [3.4.6 分级子智能体 (Subagents)](#346-分级子智能体-subagents)
+      - [3.4.7 执行模式与图调度 (`src/core/graph/`)](#347-执行模式与图调度-srccoregraph)
+      - [3.4.8 会话录制与离线回放 (`src/core/recorder/`)](#348-会话录制与离线回放-srccorerecorder)
     - [3.5 Memory 记忆模块 (`src/memory/`)](#35-memory-记忆模块-srcmemory)
       - [3.5.1 类继承关系与职责边界](#351-类继承关系与职责边界)
       - [3.5.2 存储域适配与线程/消息 CRUD](#352-存储域适配与线程消息-crud)
@@ -122,16 +167,21 @@ flowchart TD
 
     subgraph AgentRuntime ["4. Agent 运行与能力引擎 (智能体引擎 / MyAgent Core)"]
         Harness["Harness 编排与事件总线"]
+        ModeGraph["执行模式图调度 (ReAct / Plan & Solve / Fast)"]
         ReActLoop["Agent ReAct 自主循环 (maxSteps: 1000)"]
         MemoryOM["Observational Memory (观察与反思动态压缩)"]
         StorageEngine["LibSQL / SQLite 数据库存储"]
         ToolRegistry["核心工具集 (File, Grep, LSP, Playwright, MCP)"]
         SubagentEngine["分层子智能体 (explore, plan, execute)"]
+        Recorder["录制 / 回放引擎 (JSONL, ReplayLanguageModel)"]
     end
 
     Hooks <--> |"window.api 上下文隔离"| ContextBridge
     IPCTunnel <--> |"IPC 双向消息通道"| IPCRegistry
     IPCRegistry <--> |"Harness 调度与事件总线"| Harness
+    Harness --> ModeGraph
+    ModeGraph --> ReActLoop
+    Harness --> Recorder
 ```
 
 ### 核心设计原则
@@ -140,6 +190,8 @@ flowchart TD
 2. **多 Worktree 会话隔离（Session Isolation）**：针对同一仓库的多个 Git 分支/工作区（Worktree），主进程分别实例化独立的 `WorktreeSession` 与 `Harness` 实例，保证会话、终端与状态互不干扰。
 3. **自主 ReAct 循环而非静态工作流**：摒弃死板的 DAG 工作流，依托 LLM 的推理-行动循环（Think $\to$ Tool Call $\to$ Observe $\to$ Loop），实现灵活的代码检索、规划与改写。
 4. **长上下文动态记忆压缩（Observational Memory）**：内置观察者与反思者模型，动态压缩长对话中的大量工具调用日志，防止上下文超出模型限制。
+5. **模式即执行图（Mode as Graph）**：ReAct / Plan & Solve / Fast 三套执行模式分别对应独立的图定义，切模式即换整张调度图与工具集，而非只改提示词。
+6. **可录制、可回放（Record & Replay）**：每次运行可落盘为紧凑 JSONL，回放时不触网、不落盘改动，配合运行时快照完整还原当时的模型、模式与权限上下文。
 
 ---
 
@@ -532,6 +584,53 @@ const harness: MyAgentHarness = new Proxy(adapter, {
 - `plan`：只读规划子智能体，负责功能设计与实施方案梳理。
 - `execute`：写权限执行子智能体，执行具体代码修改并调用任务看板工具。
 
+#### 3.4.7 执行模式与图调度 (`src/core/graph/`)
+
+同一个模型、同一套工具，可以按任务性质切换三种**执行模式（Execution Mode）**。模式不是提示词开关，而是**整张执行图的替换**：每种模式注册一份独立的 `AgentGraphDefinition`（含拓扑描述 `topology` 与 `buildGraph(ctx)` 工厂），由 `modeId` 在运行时选择。
+
+| 模式 ID | 界面名称         | 执行图形态                                                                                                 | 适用场景                                 |
+| :------ | :--------------- | :--------------------------------------------------------------------------------------------------------- | :--------------------------------------- |
+| `react` | **ReAct**        | 单图自主循环：LLM 推理 → 工具调用 → 观察反馈 → 再推理，直至产出最终回答                                    | 绝大多数真实改码任务（界面默认）         |
+| `plan`  | **Plan & Solve** | 两阶段图：先生成结构化计划（`PlanStep[]` / 任务看板），再逐项执行并按完成度回填状态                        | 大型重构、多文件特性开发，需要先看清路线 |
+| `fast`  | **Fast**         | 单节点直连流式响应，仅挂载**只读工具**（读文件 / 代码搜索 / 网页检索），不提供任何写入、编辑或终端执行能力 | 问答、解释代码、查资料等轻量请求         |
+
+实现要点：
+
+- **枚举与别名**：`src/core/graph/types.ts` 定义 `ExecutionMode`（`REACT` / `FAST` / `PLAN`）；`GraphRegistry` 把 `build` 注册为 `react` 的别名（注册表自身的兜底 `defaultModeId` 仍是 `"build"`，最终解析到的就是 ReAct 图），因此旧的会话记录与录制文件不会失效。
+- **调度入口**：`Harness.sendMessage()` 依据 `modeId` 选择图定义并构建该次运行的 StateGraph，因此 `maxSteps`、可用工具集、是否输出计划都由模式决定（例如 Plan 模式额外挂载任务看板工具）。
+- **按线程记忆**：渲染层把所选模式存在 `modesByThread[threadKey]`，并与线程元数据一起持久化；切换线程会自动恢复成该线程上次使用的模式，不会出现「A 线程在 Plan、B 线程被一起改掉」。
+- **Fast 的只读边界**：Fast 图用 `selectReadOnlyTools()`（`src/core/graph/readonly-tools.ts`）按权限分类过滤工具——只保留 `read` 类，因此 `write_file` / `string_replace_lsp` / `ast_smart_edit` / `execute_command` / MCP 工具都不会出现在模型面前；同时 `describeToolNames("fast")` 只登记 `view` / `search_content` / `find_files` / `request_sandbox_access`，提示词与真实工具集不会漂移。图内以 `stopWhen: stepCountIs(8)` 允许少量工具回合后强制成文。
+- **可观测**：Agent Dashboard 与 Context 面板都会读 `modeId`，顶部状态条也实时显示当前模式；录制回放会把模式写进 `RecordedRuntime`，见下节。
+
+#### 3.4.8 会话录制与离线回放 (`src/core/recorder/`)
+
+把一次真实运行**完整录制成文件**，之后不调模型、不碰文件系统，原样重放整轮对话——用于问题复现、回归对比与演示。
+
+```
+src/core/recorder/
+├── session-recorder.ts    # 边写边落盘的 JSONL 记录器
+├── recording-manager.ts   # 单例管理器：录制器生命周期 + 录制文件枚举
+├── replay.ts              # 录制脚本加载 / 校验 / ReplayLanguageModel
+├── replay-runtime.ts      # 回放时的工具与运行时替身
+├── types.ts               # SessionEvent / RecordedRuntime / ReplayScript 类型
+└── index.ts
+```
+
+**录制**
+
+- 触发：Composer 的录制按钮 → IPC `toggleSessionRecording`；执行中不允许开启（否则会录到半截 run），停止时会调用 `validateRecordingFile` 校验文件可用性。
+- 落盘位置：`~/.myagent/sessions/<threadId>/<runId>.jsonl`（可用环境变量 `MYAGENT_SESSIONS_DIR` 覆盖）；启动时创建目录，追加写入，崩溃也不会丢已写入的部分。
+- 事件流：`session`（版本、cwd、模型、runtime 快照）→ `run/start` → `step/start` → `assistant/stream` → `tool/result` → … → `run/end`。
+- **紧凑聚合**：`assistant/stream` 不是逐 chunk 全存，而是按索引聚合为 `text-chunks` / `reasoning-chunks` / `tool-call-chunks`，并记录每个 chunk 之间的毫秒间隔 `dt: number[]`。这样既保留了「打字机节奏」和 DeepSeek 的 `reasoning_content` 思考链，文件体积又只有原始流的零头。
+- **环境快照**：`RecordedRuntime` 记录 `modelId`、`modeId`、`permissionMode`、`thinkingLevel`，以及解析后的权限规则（分类策略 + 工具覆盖）与会话授权（`grants`）。没有它，回放会用「当前」的模型/模式/权限去跑，出现 Plan 模式隐藏了录制里用到的写工具、`read-only` 拒绝录制里跑过的命令、`auto-approve` 跳过录制里本该弹的审批等问题。
+
+**回放**
+
+- `ReplayLanguageModel` 实现 `LanguageModelV2` 接口，把录制好的流按原始 `dt` 时序吐给 Agent——**零网络请求、零 token 消耗**；工具调用同样被 `createReplayTools()` 换成录制结果的替身，不会真的改文件或执行命令。
+- 支持即时（`instant`）与按倍速播放、`wrap` 循环重复播放。
+- 进入回放时按 `RecordedRuntime` 还原模式与权限，并把会话授权注入，避免卡在等待一个不会到人的审批弹窗。
+- 界面上通过 `SessionReplayModal` 选择或拖放录制文件即可开始，回放中的标签页会显示 Replay 状态，可随时停止回到正常会话。
+
 ### 3.5 Memory 记忆模块 (`src/memory/`)
 
 `src/memory/` 是项目自研的 `Memory` 实现：它继承 `src/core` 的 `MyAgentMemory`，把线程/消息持久化、上下文召回与观察性记忆（OM）压缩统一收敛到一个可直接注入 `AgentController` 的实例中。
@@ -739,6 +838,8 @@ src/
 │   ├── tools/                 # 工具适配、参数校验与 JSON Schema 转换 (toModelTool)
 │   ├── memory/                # 核心 Memory 抽象类定义
 │   ├── llm/                   # 统一语言模型解析与动态包装
+│   ├── graph/                 # 执行模式图定义 (ReAct / Plan & Solve / Fast) 与调度
+│   ├── recorder/              # 会话录制 (JSONL) 与离线回放 (ReplayLanguageModel)
 │   ├── workspace/             # 工作区解析与环境抽象
 │   └── index.ts               # 核心层对外统一出口
 │
@@ -760,9 +861,9 @@ src/
 │
 ├── prompts/                   # 系统提示词系统 (System Prompts)
 │   ├── base.ts                # 通用基础提示词 (编码准则、Git 安全、沙箱约束)
-│   ├── build.ts               # Build 模式提示词 (实现与验证循环)
-│   ├── plan.ts                # Plan 只读模式提示词
-│   ├── fast.ts                # Fast 快速微调模式提示词
+│   ├── build.ts               # ReAct 模式提示词 (实现与验证循环，对应 modeId=react)
+│   ├── plan.ts                # Plan & Solve 模式提示词 (先规划后执行)
+│   ├── fast.ts                # Fast 模式提示词 (直连流式 + 只读工具边界)
 │   └── index.ts               # buildFullPrompt 提示词装配入口
 │
 ├── tools/                     # Agent 宿主扩展工具实现 (Tool Implementations)

@@ -5,12 +5,15 @@ import { ExecutionBlock, ExecutionStep, ExecutionTool } from "./ExecutionBlock"
 import { SubagentExecution } from "./SubagentExecution"
 import { TodoProgress } from "./TodoProgress"
 import { AsciiLogo } from "./AsciiLogo"
+import { InterruptedNotice } from "./InterruptedNotice"
 import type { Message, MessageContent } from "../types/ipc"
 import {
 	normalizeMessageContent,
 	extractThinkingFromText,
 } from "../utils/messageParser"
 import { isUserMessage, getMessageText } from "../types/chat"
+import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
+import { shouldPinToBottom } from "../utils/chatScroll"
 
 export interface ChatViewProps {
 	messages: Message[]
@@ -55,6 +58,14 @@ export interface ChatViewProps {
 		activeForm: string
 	}>
 	onOpenDiff?: (path: string) => void
+	isReplaySession?: boolean
+	isActivelyReplaying?: boolean
+	replaySource?: string
+	/**
+	 * The user stopped this thread's run. Ephemeral by design: nothing about a
+	 * stop is stored, so this note lives only as long as the renderer says so.
+	 */
+	interrupted?: boolean
 }
 
 export type RenderItem =
@@ -103,6 +114,152 @@ export type RenderItem =
 			data: Message
 	  }
 
+export type TurnGroup = {
+	key: string
+	userItem?: Extract<RenderItem, { type: "user" }>
+	items: RenderItem[]
+}
+
+/**
+ * Group items into turns so each turn acts as the containing block for its UserMessage.
+ * In CSS, a position:sticky element is constrained to the boundary of its containing block.
+ * When a new turn scrolls into view, the previous turn container pushes its UserMessage
+ * out of the viewport, ensuring strictly ONE user message is sticky at any time with no overlaps.
+ */
+export function groupItemsIntoTurns(cleanedItems: RenderItem[]): TurnGroup[] {
+	const turns: TurnGroup[] = []
+	let currentTurn: TurnGroup | null = null
+
+	for (const item of cleanedItems) {
+		if (item.type === "user") {
+			currentTurn = {
+				key: `turn-${item.key}`,
+				userItem: item,
+				items: [],
+			}
+			turns.push(currentTurn)
+		} else if (item.type === "system") {
+			currentTurn = null
+			turns.push({
+				key: `sys-${item.key}`,
+				items: [item],
+			})
+		} else if (currentTurn) {
+			currentTurn.items.push(item)
+		} else {
+			// Items before the first user message (e.g. system items)
+			turns.push({
+				key: `pre-${item.key}`,
+				items: [item],
+			})
+		}
+	}
+	return turns
+}
+
+/**
+ * A turn belongs to a replay when any message in it came from the recorded reconstruction.
+ * Those turns get their own outlined container so a replay of a few runs is visually
+ * distinguishable from the live conversation around it.
+ */
+export function isReplayTurn(turn: TurnGroup): boolean {
+	if (turn.userItem && isReplayMessage(turn.userItem.data)) return true
+	return turn.items.some((item) => {
+		if (item.type === "user") return isReplayMessage(item.data)
+		if (item.type === "assistant") return isReplayMessage(item.data)
+		return false
+	})
+}
+
+/**
+ * Which playback a replayed turn belongs to. Several passes over the same
+ * recording each get their own block, and this key is what tells them apart.
+ */
+export function replayTurnPlaybackKey(turn: TurnGroup): string | null {
+	const ids: Array<string | null | undefined> = []
+	if (turn.userItem) ids.push((turn.userItem.data as Message)?.id)
+	for (const item of turn.items) {
+		if (item.type === "user" || item.type === "assistant") {
+			ids.push((item.data as Message)?.id)
+		}
+	}
+	for (const id of ids) {
+		const key = getReplayPlaybackKey(id)
+		if (key) return key
+	}
+	return null
+}
+
+/**
+ * A replayed answer plus a byte-identical live answer right after it means the
+ * live run was still pointed at the replay model — the session was answered
+ * twice from the same recording. Only the replayed copy belongs on screen.
+ */
+export function isDuplicateReplayAnswer(
+	a: Message | undefined,
+	b: Message | undefined,
+): boolean {
+	if (!a || !b) return false
+	if (a.role !== "assistant" || b.role !== "assistant") return false
+	if (a.id === b.id) return false
+	if (!isReplayMessage(a) && !isReplayMessage(b)) return false
+	// Two playbacks of the same recording produce identical answers; they are not
+	// duplicates of each other, and collapsing them would hide the second pass.
+	const keyA = getReplayPlaybackKey(a.id)
+	const keyB = getReplayPlaybackKey(b.id)
+	if (keyA && keyB && keyA !== keyB) return false
+	const textA = getMessageText(a)
+	const textB = getMessageText(b)
+	if (!textA || textA !== textB) return false
+	// Answers carrying tool calls are distinct executions even with equal text.
+	const hasToolPart = (m: Message) => {
+		const blocks = normalizeMessageContent(m.content, (m as any).text)
+		return blocks.some((c) => {
+			if (!c || typeof c !== "object") return false
+			const t = String((c as any).type || "")
+				.toLowerCase()
+				.replace(/[-_]/g, "")
+			return t === "toolcall" || t === "tooluse" || t === "toolinvocation"
+		})
+	}
+	return !hasToolPart(a) && !hasToolPart(b)
+}
+
+/**
+ * How to treat a user message that repeats the previous one. A replay landing on
+ * a thread that already holds the same prompt must not create a second turn, so
+ * the replayed bubble wins and the live duplicate is dropped.
+ */
+export type DuplicateUserDecision = "keep" | "skip" | "replace-previous"
+
+export function decideDuplicateUser(
+	previous: Message | undefined,
+	next: Message,
+): DuplicateUserDecision {
+	if (!previous) return "keep"
+	if (!isUserMessage(previous) || !isUserMessage(next)) return "keep"
+	const prevText = getMessageText(previous)
+	const nextText = getMessageText(next)
+	if (!prevText || !nextText || prevText !== nextText) return "keep"
+
+	const prevIsReplay = isReplayMessage(previous)
+	const nextIsReplay = isReplayMessage(next)
+	if (nextIsReplay && !prevIsReplay) {
+		// Reconstruction appends the recorded block after the live conversation, so
+		// the replayed prompt lands right behind the identical live prompt. Keep one
+		// bubble — the replayed one — and the turn stays a single outline.
+		return "replace-previous"
+	}
+	if (prevIsReplay && !nextIsReplay) {
+		// A live prompt after a replayed one is a real new send (the user typed the
+		// same thing again); never swallow it.
+		return "keep"
+	}
+	// Two replayed prompts are two recorded runs and both stay; two live ones
+	// are a double-send and collapse.
+	return nextIsReplay ? "keep" : "skip"
+}
+
 export function ChatView({
 	messages,
 	tools,
@@ -112,21 +269,31 @@ export function ChatView({
 	streamingMessageId,
 	todos,
 	onOpenDiff,
+	isReplaySession,
+	isActivelyReplaying,
+	replaySource,
+	interrupted,
 }: ChatViewProps) {
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const isAutoScroll = useRef(true)
 
-	// Auto-scroll on new messages or tool updates
+	// Auto-scroll on new messages or tool updates. A message the user just sent
+	// always belongs in view: reading history first must not push the fresh
+	// bubble below the fold, or the send looks ignored until the answer streams.
 	useEffect(() => {
-		if (isAutoScroll.current && scrollRef.current) {
+		const pin = isAutoScroll.current || shouldPinToBottom(messages)
+		if (pin && scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight
 			requestAnimationFrame(() => {
-				if (isAutoScroll.current && scrollRef.current) {
+				if (
+					(isAutoScroll.current || shouldPinToBottom(messages)) &&
+					scrollRef.current
+				) {
 					scrollRef.current.scrollTop = scrollRef.current.scrollHeight
 				}
 			})
 		}
-	}, [messages.length, messages, tools, subagents, isAgentActive])
+	}, [messages.length, messages, tools, subagents, isAgentActive, interrupted])
 
 	const handleScroll = () => {
 		if (!scrollRef.current) return
@@ -183,13 +350,15 @@ export function ChatView({
 
 			if (isUser) {
 				const lastItem = items[items.length - 1]
-				if (lastItem && lastItem.type === "user") {
-					const lastText = getMessageText(lastItem.data)
-					const currentText = getMessageText(msg)
-					if (lastText && currentText && lastText === currentText) {
-						// Guard against duplicate consecutive user bubble
-						continue
-					}
+				const decision = decideDuplicateUser(
+					lastItem && lastItem.type === "user"
+						? (lastItem.data as Message)
+						: undefined,
+					msg,
+				)
+				if (decision === "skip") continue
+				if (decision === "replace-previous") {
+					items.pop()
 				}
 				items.push({ type: "user", key: `msg-${msg.id}`, data: msg })
 			} else if (isSystem) {
@@ -235,9 +404,14 @@ export function ChatView({
 						const lastItem = items[items.length - 1]
 						if (lastItem && lastItem.type === "execution") {
 							for (const s of currentSteps) {
-								const existingStep = lastItem.data.steps.find((st) => st.id === s.id)
+								const existingStep = lastItem.data.steps.find(
+									(st) => st.id === s.id,
+								)
 								if (existingStep) {
-									if (s.type === "thinking" && existingStep.type === "thinking") {
+									if (
+										s.type === "thinking" &&
+										existingStep.type === "thinking"
+									) {
 										existingStep.text = s.text
 										existingStep.durationSec = s.durationSec
 										existingStep.isStreaming = s.isStreaming
@@ -607,6 +781,18 @@ export function ChatView({
 				!item.data.isActive
 			) {
 				continue
+			} else if (
+				item.type === "assistant" &&
+				prev &&
+				prev.type === "assistant" &&
+				isDuplicateReplayAnswer(prev.data as Message, item.data as Message)
+			) {
+				// The same answer written twice — once by the replay, once by a run
+				// that was still pointed at the replay model. Keep the replayed copy
+				// so the turn shows one answer inside one outline.
+				if (isReplayMessage(item.data as Message)) {
+					baseItems[baseItems.length - 1] = item
+				}
 			} else {
 				baseItems.push(item)
 			}
@@ -620,6 +806,131 @@ export function ChatView({
 		agentStartedAt,
 		streamingMessageId,
 	])
+
+	const renderedTurns = useMemo(() => {
+		return groupItemsIntoTurns(cleanedItems)
+	}, [cleanedItems])
+
+	// Playbacks stack, so number them. Without a number a second pass over the
+	// same recording looks exactly like the first one, which reads as "replay
+	// did nothing".
+	const replayPassByKey = useMemo(() => {
+		const passes = new Map<string, number>()
+		let next = 0
+		for (const turn of renderedTurns) {
+			if (!isReplayTurn(turn)) continue
+			const key = replayTurnPlaybackKey(turn)
+			if (!key || passes.has(key)) continue
+			passes.set(key, ++next)
+		}
+		return passes
+	}, [renderedTurns])
+
+	// A replay ends as soon as its recorded block is reconstructed, so the
+	// thread's "isReplay" flag is already false by the time this renders. Keep
+	// the explanatory banner for any thread that *contains* replayed turns.
+	const hasReplayTurns = useMemo(
+		() => renderedTurns.some((turn) => isReplayTurn(turn)),
+		[renderedTurns],
+	)
+	const showReplayBanner = Boolean(isReplaySession || hasReplayTurns)
+
+	// `insideReplayTurn` also covers live messages that ended up inside a replayed
+	// turn (a replay of the same prompt replaces the live bubble in place).
+	// `afterHeader` marks an answer sitting right under its turn header, which
+	// hands the gap between them to that header instead of adding its own.
+	const renderItem = (
+		item: RenderItem,
+		insideReplayTurn = false,
+		afterHeader = false,
+	) => {
+		switch (item.type) {
+			case "user":
+				return (
+					<UserMessage
+						key={item.key}
+						message={item.data as Message}
+						// Pinning uses negative side margins and an opaque background,
+						// which is exactly what painted over the outline. Keep replayed
+						// prompts in the normal flow so the border stays intact.
+						pinned={!insideReplayTurn && !isReplayMessage(item.data as Message)}
+					/>
+				)
+			case "execution":
+				return (
+					<div key={item.key}>
+						<ExecutionBlock
+							isActive={item.data.isActive}
+							steps={item.data.steps}
+							durationMs={item.data.durationMs}
+							startedAt={item.data.startedAt}
+						/>
+					</div>
+				)
+			case "assistant": {
+				const assistantMsg = item.data as Message & {
+					isStreaming: boolean
+				}
+				return (
+					<AssistantMessage
+						key={item.key}
+						message={assistantMsg}
+						onOpenDiff={onOpenDiff}
+						isAgentActive={isAgentActive}
+						flushTop={afterHeader}
+					/>
+				)
+			}
+			case "subagent":
+				return <SubagentExecution key={item.key} subagent={item.data} />
+			case "system": {
+				const sysMsg = item.data as Message
+				const sysContent = normalizeMessageContent(
+					sysMsg.content,
+					(sysMsg as any).text,
+				)
+				const sysText =
+					sysContent
+						.map((c) =>
+							String(
+								(c as any).text ?? (c as any).content ?? (c as any).value ?? "",
+							),
+						)
+						.join("") ||
+					(typeof sysMsg.content === "string" ? sysMsg.content : "")
+
+				return (
+					<div
+						key={item.key}
+						style={{
+							padding: "8px 12px",
+							margin: "8px 0",
+							background: "var(--system-reminder-bg)",
+							border: "1px solid var(--border-muted)",
+							borderRadius: 6,
+							fontSize: 12,
+							color: "var(--muted)",
+							lineHeight: 1.5,
+						}}
+					>
+						<div
+							style={{
+								fontWeight: 600,
+								fontSize: 11,
+								marginBottom: 2,
+								textTransform: "uppercase",
+								letterSpacing: "0.5px",
+								color: "var(--dim)",
+							}}
+						>
+							System Notice
+						</div>
+						<div style={{ whiteSpace: "pre-wrap" }}>{sysText}</div>
+					</div>
+				)
+			}
+		}
+	}
 
 	return (
 		<div
@@ -653,94 +964,192 @@ export function ChatView({
 					minHeight: "100%",
 				}}
 			>
-				{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
-
-				{cleanedItems.map((item) => {
-					switch (item.type) {
-						case "user":
-							return (
-								<UserMessage key={item.key} message={item.data as Message} />
-							)
-						case "execution":
-							return (
-								<div key={item.key}>
-									<ExecutionBlock
-										isActive={item.data.isActive}
-										steps={item.data.steps}
-										durationMs={item.data.durationMs}
-										startedAt={item.data.startedAt}
-									/>
-								</div>
-							)
-						case "assistant": {
-							const assistantMsg = item.data as Message & {
-								isStreaming: boolean
-							}
-							return (
-								<AssistantMessage
-									key={item.key}
-									message={assistantMsg}
-									onOpenDiff={onOpenDiff}
-									isAgentActive={isAgentActive}
-								/>
-							)
-						}
-						case "subagent":
-							return <SubagentExecution key={item.key} subagent={item.data} />
-						case "system": {
-							const sysMsg = item.data as Message
-							const sysContent = normalizeMessageContent(
-								sysMsg.content,
-								(sysMsg as any).text,
-							)
-							const sysText =
-								sysContent
-									.map((c) =>
-										String(
-											(c as any).text ??
-												(c as any).content ??
-												(c as any).value ??
-												"",
-										),
-									)
-									.join("") ||
-								(typeof sysMsg.content === "string" ? sysMsg.content : "")
-
-							return (
+				{showReplayBanner && (
+					<div
+						style={{
+							marginBottom: 16,
+							padding: "10px 16px",
+							borderRadius: 10,
+							background: isActivelyReplaying
+								? "color-mix(in srgb, var(--replay) 12%, transparent)"
+								: "color-mix(in srgb, var(--replay) 8%, transparent)",
+							border:
+								"1px solid color-mix(in srgb, var(--replay) 30%, transparent)",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "space-between",
+							gap: 12,
+						}}
+					>
+						<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+							<div
+								style={{
+									width: 24,
+									height: 24,
+									borderRadius: "50%",
+									background:
+										"color-mix(in srgb, var(--replay) 20%, transparent)",
+									color: "var(--replay)",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+									fontSize: 10,
+									fontWeight: 700,
+									flexShrink: 0,
+								}}
+							>
+								▶
+							</div>
+							<div>
 								<div
-									key={item.key}
 									style={{
-										padding: "8px 12px",
-										margin: "8px 0",
-										background: "var(--system-reminder-bg)",
-										border: "1px solid var(--border-muted)",
-										borderRadius: 6,
-										fontSize: 12,
-										color: "var(--muted)",
-										lineHeight: 1.5,
+										fontSize: 13,
+										fontWeight: 600,
+										color: "var(--text)",
 									}}
 								>
-									<div
+									{isActivelyReplaying ? "Replay Running" : "Session Replay"}
+									<span
 										style={{
-											fontWeight: 600,
-											fontSize: 11,
-											marginBottom: 2,
-											textTransform: "uppercase",
+											fontSize: 9,
+											fontWeight: 700,
+											color: "var(--replay)",
+											background:
+												"color-mix(in srgb, var(--replay) 15%, transparent)",
+											padding: "1px 5px",
+											borderRadius: 3,
+											marginLeft: 8,
 											letterSpacing: "0.5px",
-											color: "var(--dim)",
 										}}
 									>
-										System Notice
-									</div>
-									<div style={{ whiteSpace: "pre-wrap" }}>{sysText}</div>
+										OFFLINE
+									</span>
 								</div>
-							)
-						}
-					}
+								<div
+									style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}
+								>
+									{isActivelyReplaying
+										? "Currently streaming execution from recorded data. No tokens are consumed."
+										: "This conversation was reproduced from recorded session events."}
+								</div>
+							</div>
+						</div>
+						{replaySource && (
+							<span
+								title={replaySource}
+								style={{
+									fontSize: 10,
+									fontFamily: "monospace",
+									background: "var(--bg)",
+									border:
+										"1px solid color-mix(in srgb, var(--replay) 25%, transparent)",
+									color: "var(--replay)",
+									padding: "3px 8px",
+									borderRadius: 4,
+									maxWidth: 200,
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+								}}
+							>
+								{replaySource}
+							</span>
+						)}
+					</div>
+				)}
+
+				{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
+
+				{renderedTurns.map((turn) => {
+					const replayTurn = isReplayTurn(turn)
+					const playbackKey = replayTurn ? replayTurnPlaybackKey(turn) : null
+					const playbackPass = playbackKey
+						? replayPassByKey.get(playbackKey)
+						: undefined
+					return (
+						<div
+							key={turn.key}
+							style={{
+								display: "flex",
+								flexDirection: "column",
+								...(replayTurn
+									? {
+											position: "relative",
+											// The outline is a sibling overlay rather than a
+											// border on the box: a child's opaque background
+											// would otherwise paint over the border line.
+											margin: "14px 0",
+											padding: "12px 14px 6px",
+											borderRadius: 12,
+											// Every playback writes fresh message ids, so replaying
+											// the same file remounts this block and replays the
+											// fade — otherwise a second replay looks like nothing
+											// happened because the transcript is identical.
+											animation: "replay-turn-in 260ms ease-out both",
+										}
+									: null),
+							}}
+						>
+							{replayTurn && (
+								<span
+									aria-hidden="true"
+									style={{
+										position: "absolute",
+										inset: 0,
+										borderRadius: 12,
+										border:
+											"1px solid color-mix(in srgb, var(--replay) 45%, transparent)",
+										pointerEvents: "none",
+										zIndex: 30,
+									}}
+								/>
+							)}
+							{replayTurn && (
+								<span
+									title="Reproduced from a recorded session — no API calls"
+									style={{
+										position: "absolute",
+										top: -8,
+										right: 12,
+										fontSize: 9,
+										fontWeight: 700,
+										letterSpacing: "0.5px",
+										color: "var(--replay)",
+										background: "var(--bg)",
+										border:
+											"1px solid color-mix(in srgb, var(--replay) 40%, transparent)",
+										borderRadius: 999,
+										padding: "1px 7px",
+										lineHeight: 1.4,
+										pointerEvents: "none",
+										zIndex: 31,
+									}}
+								>
+									{`▶ REPLAY${
+										playbackPass && playbackPass > 1 ? ` #${playbackPass}` : ""
+									}`}
+								</span>
+							)}
+							{turn.userItem && renderItem(turn.userItem, replayTurn)}
+							{turn.items.map((item, i) =>
+								renderItem(
+									item,
+									replayTurn,
+									turn.items[i - 1]?.type === "execution",
+								),
+							)}
+						</div>
+					)
 				})}
 
 				{/* Todo progress */}
 				{todos.length > 0 && <TodoProgress todos={todos} />}
+
+				{/* The run ended because the user stopped it; closing the turn here
+				    keeps the truncated answer from reading like a crash. Shown the
+				    moment Stop is pressed — waiting for the harness to confirm the
+				    abort would put the note a round trip behind the click. */}
+				{interrupted && <InterruptedNotice />}
 
 				<style>{`
 				@keyframes pulse {
@@ -750,6 +1159,14 @@ export function ChatView({
 				@keyframes blink {
 					0%, 100% { opacity: 1; }
 					50% { opacity: 0; }
+				}
+				@keyframes replay-turn-in {
+					from { opacity: 0; transform: translateY(6px); }
+					to { opacity: 1; transform: none; }
+				}
+				@keyframes interrupt-note-in {
+					from { opacity: 0; transform: translateY(-2px); }
+					to { opacity: 1; transform: none; }
 				}
 			`}</style>
 
@@ -864,9 +1281,7 @@ export function organizeTurnItems(cleanedItems: RenderItem[]): RenderItem[] {
 					},
 				}
 			} else {
-				const existingIds = new Set(
-					currentTurnExec.data.steps.map((s) => s.id),
-				)
+				const existingIds = new Set(currentTurnExec.data.steps.map((s) => s.id))
 				for (const s of item.data.steps) {
 					if (!existingIds.has(s.id)) {
 						existingIds.add(s.id)

@@ -6,6 +6,8 @@
  * Session-scoped grants let the user approve a category once per session.
  */
 
+import { isReadOnlyMcpToolName } from "./mcp/tool-names.js"
+
 // ---------------------------------------------------------------------------
 // Categories
 // ---------------------------------------------------------------------------
@@ -84,10 +86,17 @@ const ALWAYS_ALLOW_TOOLS = new Set([
  * Always-allowed tools resolve to "read" so the approval gate auto-allows them
  * in every mode ("read" is "allow" in all built-in policies) instead of falling
  * through to the gate's "ask" default.
+ *
+ * An MCP tool that only looks something up (`<server>_web_search`) resolves to
+ * "read" for the same reason: it cannot change the workspace, so gating it
+ * behind an approval click — and hiding it from read-only modes — is wrong.
  */
 export function getToolCategory(toolName: string): ToolCategory {
 	if (ALWAYS_ALLOW_TOOLS.has(toolName)) return "read"
-	return TOOL_CATEGORY_MAP[toolName] ?? "mcp"
+	const mapped = TOOL_CATEGORY_MAP[toolName]
+	if (mapped) return mapped
+	if (isReadOnlyMcpToolName(toolName)) return "read"
+	return "mcp"
 }
 // ---------------------------------------------------------------------------
 // Policies

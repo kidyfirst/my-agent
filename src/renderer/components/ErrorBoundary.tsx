@@ -43,25 +43,31 @@ export class ErrorBoundary extends Component<Props, State> {
 						flexDirection: "column",
 						alignItems: "center",
 						justifyContent: "center",
-						background: "var(--bg, #1a1b26)",
-						color: "var(--text, #c0caf5)",
-						fontFamily: "var(--font-mono, monospace)",
+						background: "var(--bg)",
+						color: "var(--text)",
+						fontFamily: "var(--font-mono)",
 					}}
 				>
 					<div
 						style={{
 							maxWidth: 600,
 							width: "100%",
-							background: "var(--bg-elevated, #24283b)",
+							background: "var(--bg-elevated)",
 							padding: 24,
 							borderRadius: 8,
-							border: "1px solid var(--border-muted, #414868)",
+							border: "1px solid var(--border-muted)",
 						}}
 					>
-						<h3 style={{ margin: "0 0 12px", color: "var(--error, #f7768e)" }}>
+						<h3 style={{ margin: "0 0 12px", color: "var(--error)" }}>
 							Something went wrong
 						</h3>
-						<p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--muted, #7aa2f7)" }}>
+						<p
+							style={{
+								margin: "0 0 16px",
+								fontSize: 13,
+								color: "var(--muted)",
+							}}
+						>
 							{this.state.error?.message || "An unexpected error occurred."}
 						</p>
 						{this.state.errorInfo?.componentStack && (
@@ -69,7 +75,7 @@ export class ErrorBoundary extends Component<Props, State> {
 								style={{
 									margin: "0 0 16px",
 									padding: 12,
-									background: "var(--bg-surface, #1f2335)",
+									background: "var(--bg-surface)",
 									borderRadius: 4,
 									fontSize: 11,
 									overflowX: "auto",
@@ -83,8 +89,8 @@ export class ErrorBoundary extends Component<Props, State> {
 							onClick={this.handleReset}
 							style={{
 								padding: "8px 16px",
-								background: "var(--accent, #7aa2f7)",
-								color: "#fff",
+								background: "var(--accent)",
+								color: "var(--on-accent)",
 								border: "none",
 								borderRadius: 4,
 								cursor: "pointer",

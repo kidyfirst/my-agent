@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import type { EnrichedProject } from "../types/project-list"
 import type { RightSidebarTab } from "../components/RightSidebar"
 import type { ProjectInfo } from "../types/project"
+import { hasGitRepo } from "../utils/project-list"
 
 interface UseKeyboardShortcutsArgs {
 	activeTab: string
@@ -16,6 +17,7 @@ interface UseKeyboardShortcutsArgs {
 	handleOpenFolder: () => void
 	handleCloseTab: (tabId: string) => void
 	handleSwitchProject: (path: string) => void
+	onToggleSettings?: () => void
 }
 
 export function useKeyboardShortcuts({
@@ -31,6 +33,7 @@ export function useKeyboardShortcuts({
 	handleOpenFolder,
 	handleCloseTab,
 	handleSwitchProject,
+	onToggleSettings,
 }: UseKeyboardShortcutsArgs) {
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -53,6 +56,8 @@ export function useKeyboardShortcuts({
 				setRightSidebarVisible((v) => !v)
 			}
 			if (isMod && e.shiftKey && e.key === "G") {
+				// Git panel only exists for git-backed projects.
+				if (!hasGitRepo(projectInfo)) return
 				e.preventDefault()
 				setRightSidebarVisible(true)
 				setRightSidebarTab("git")
@@ -63,7 +68,11 @@ export function useKeyboardShortcuts({
 			}
 			if (isMod && e.key === ",") {
 				e.preventDefault()
-				setActiveTab(activeTab === "settings" ? "chat" : "settings")
+				if (onToggleSettings) {
+					onToggleSettings()
+				} else {
+					setActiveTab(activeTab === "settings" ? "chat" : "settings")
+				}
 			}
 			if (isMod && e.key === "w" && activeTab !== "chat") {
 				e.preventDefault()

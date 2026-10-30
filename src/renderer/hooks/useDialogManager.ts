@@ -31,6 +31,18 @@ export function useDialogManager() {
 	const [showModelSelector, setShowModelSelector] = useState(false)
 	const [showCommandPalette, setShowCommandPalette] = useState(false)
 	const [showQuickFileOpen, setShowQuickFileOpen] = useState(false)
+	const [showGraphViewer, setShowGraphViewer] = useState(false)
+	const [showSettings, setShowSettings] = useState(false)
+	const [showAgents, setShowAgents] = useState(false)
+	const [showLogConsole, setShowLogConsole] = useState(false)
+	const [settingsSection, setSettingsSection] = useState<string | undefined>(
+		undefined,
+	)
+	const [activeGraphNode, setActiveGraphNode] = useState<{
+		nodeId: string
+		nodeLabel: string
+		modeId: string
+	} | null>(null)
 
 	const handleApprove = useCallback(async (toolCallId: string) => {
 		await window.api.invoke({ type: "approveToolCall", toolCallId })
@@ -94,6 +106,54 @@ export function useDialogManager() {
 		setShowModelSelector(true)
 	}, [])
 
+	const handleOpenGraphViewer = useCallback(() => {
+		setShowGraphViewer(true)
+	}, [])
+
+	const handleCloseGraphViewer = useCallback(() => {
+		setShowGraphViewer(false)
+	}, [])
+
+	const handleOpenSettings = useCallback((section?: string) => {
+		if (section) setSettingsSection(section)
+		setShowSettings(true)
+	}, [])
+
+	const handleCloseSettings = useCallback(() => {
+		setShowSettings(false)
+	}, [])
+
+	const handleToggleSettings = useCallback((section?: string) => {
+		setShowSettings((prev) => {
+			if (!prev && section) setSettingsSection(section)
+			return !prev
+		})
+	}, [])
+
+	const handleOpenAgents = useCallback(() => {
+		setShowAgents(true)
+	}, [])
+
+	const handleCloseAgents = useCallback(() => {
+		setShowAgents(false)
+	}, [])
+
+	const handleToggleAgents = useCallback(() => {
+		setShowAgents((prev) => !prev)
+	}, [])
+
+	const handleOpenLogConsole = useCallback(() => {
+		setShowLogConsole(true)
+	}, [])
+
+	const handleCloseLogConsole = useCallback(() => {
+		setShowLogConsole(false)
+	}, [])
+
+	const handleToggleLogConsole = useCallback(() => {
+		setShowLogConsole((prev) => !prev)
+	}, [])
+
 	return {
 		pendingApproval,
 		setPendingApproval,
@@ -107,6 +167,29 @@ export function useDialogManager() {
 		setShowCommandPalette,
 		showQuickFileOpen,
 		setShowQuickFileOpen,
+		showGraphViewer,
+		setShowGraphViewer,
+		showSettings,
+		setShowSettings,
+		showAgents,
+		setShowAgents,
+		handleOpenAgents,
+		handleCloseAgents,
+		handleToggleAgents,
+		showLogConsole,
+		setShowLogConsole,
+		handleOpenLogConsole,
+		handleCloseLogConsole,
+		handleToggleLogConsole,
+		settingsSection,
+		setSettingsSection,
+		handleOpenSettings,
+		handleCloseSettings,
+		handleToggleSettings,
+		activeGraphNode,
+		setActiveGraphNode,
+		handleOpenGraphViewer,
+		handleCloseGraphViewer,
 		handleApprove,
 		handleDecline,
 		handleAlwaysAllow,

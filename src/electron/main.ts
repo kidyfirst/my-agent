@@ -24,6 +24,7 @@ import {
 	Menu,
 	dialog,
 	nativeImage,
+	nativeTheme,
 	session,
 } from "electron"
 import * as path from "path"
@@ -39,7 +40,6 @@ import {
 	createNavigateBrowserTool,
 	createComputerUseTool,
 } from "../tools/index.js"
-import { getAppDataDir } from "../utils/project.js"
 import { getToolCategory, TOOL_CATEGORIES } from "../permissions.js"
 import type { ToolCategory } from "../permissions.js"
 
@@ -48,6 +48,7 @@ import { PlaywrightBrowserManager } from "../browser/playwright-manager.js"
 
 // Extracted modules
 import { ElectronStateManager } from "./electron-state.js"
+import { parseExternalUrl } from "./external-links.js"
 import type { WorktreeSession, AgentTiming } from "./ipc/types.js"
 import { getAllHandlers } from "./ipc/index.js"
 import { checkForUpdates } from "./updater/updater.js"
@@ -63,23 +64,14 @@ import {
 	setMainWindowRef,
 	safeSend,
 } from "./helpers.js"
+import { initLogging, setLogStreaming, shutdownLogging } from "./logging.js"
+import { logger } from "../core/logger/index.js"
 
 // Suppress benign AI SDK warning banners
 ;(globalThis as any).AI_SDK_LOG_WARNINGS = false
 
-process.on("uncaughtException", (err) => {
-	if (
-		err?.message?.includes("Object has been destroyed") ||
-		err?.message?.includes("Render frame was disposed")
-	) {
-		console.warn(
-			"[main] Suppressed IPC send to destroyed window/webContents:",
-			err.message,
-		)
-		return
-	}
-	console.error("[main] Uncaught exception:", err)
-})
+// Scoped logging helpers: `log.info("<scope>", "message", data)`.
+const log = logger
 
 // =============================================================================
 // Resolve __dirname for ESM
@@ -108,8 +100,25 @@ let mainWindow: BrowserWindow | null = null
 const sessions = new Map<string, WorktreeSession>()
 let activeSessionPath: string = process.cwd()
 
+// =============================================================================
+// Developer logging — loaded before anything else so startup problems are
+// captured. Disabled by default (`logging.json` in the app data directory).
+// =============================================================================
+initLogging({ getWindow: () => mainWindow })
+log.info("boot", "main process starting", {
+	execPath: process.execPath,
+	cwd: process.cwd(),
+	argv: process.argv.slice(1),
+	versions: process.versions,
+})
+
 function getActiveSession(): WorktreeSession {
-	return sessions.get(activeSessionPath)!
+	if (activeSessionPath && sessions.has(activeSessionPath)) {
+		return sessions.get(activeSessionPath)!
+	}
+	const first = sessions.values().next().value
+	if (first) return first
+	throw new Error("No active session available")
 }
 
 // Per-session agent timing and token tracking for the Agent Dashboard
@@ -123,6 +132,8 @@ const sessionTimings = new Map<string, AgentTiming>()
 // Create Harness via createMyAgent
 // =============================================================================
 async function createHarness(projectPath: string) {
+	const startedAt = Date.now()
+	log.info("session", "creating harness", { project: projectPath })
 	const browserManager = new PlaywrightBrowserManager()
 	const navigateBrowserTool = createNavigateBrowserTool(browserManager)
 	const computerUseTool = createComputerUseTool(browserManager)
@@ -135,6 +146,13 @@ async function createHarness(projectPath: string) {
 				computer: computerUseTool,
 			},
 		})
+	log.info("session", "harness ready", {
+		project: projectPath,
+		ms: Date.now() - startedAt,
+		model: (harness as any).getCurrentModelId?.(),
+		mode: (harness as any).getCurrentModeId?.(),
+		mcpServers: mcpManager?.hasServers?.() ?? false,
+	})
 
 	if (storageWarning) {
 		console.warn("[storage]", storageWarning)
@@ -181,33 +199,201 @@ function registerIpcHandlers() {
 	const handlers = getAllHandlers()
 
 	ipcMain.handle("harness:command", async (_event, command) => {
-		const handler = handlers[command.type]
+		const type = String(command?.type ?? "unknown")
+		const handler = handlers[type]
 		if (!handler) {
-			console.warn("Unknown IPC command:", command.type)
+			log.warn("ipc", "unknown command", { type })
 			return null
 		}
-		return handler(command, {
-			getActiveSession,
-			mainWindow,
-			sessions,
-			activeSessionPath,
-			setActiveSessionPath: (p: string) => {
-				activeSessionPath = p
-			},
-			sessionTimings,
-			cleanupSession,
-			bridgeAllEvents,
-			createHarness,
-			ensureAuthenticatedModel,
-			generateThreadTitle,
-			deleteThread,
-		})
+		const startedAt = Date.now()
+		// Building the summary costs a little; skip it unless the level wants it.
+		const detailWanted =
+			log.getConfig().level === "debug" || log.getConfig().level === "trace"
+		if (detailWanted) {
+			log.debug("ipc", `→ ${type}`, { args: summarizeCommand(command) })
+		}
+		try {
+			const result = await handler(command, {
+				getActiveSession,
+				mainWindow,
+				sessions,
+				activeSessionPath,
+				setActiveSessionPath: (p: string) => {
+					activeSessionPath = p
+				},
+				sessionTimings,
+				cleanupSession,
+				bridgeAllEvents,
+				createHarness,
+				ensureAuthenticatedModel,
+				generateThreadTitle,
+				deleteThread,
+			})
+			if (detailWanted) {
+				log.debug("ipc", `← ${type}`, {
+					ms: Date.now() - startedAt,
+					result: summarizeResult(result),
+				})
+			}
+			return result
+		} catch (error) {
+			// The UI shows the failure; the log has to carry the stack and inputs
+			// so a report can be reproduced.
+			log.error("ipc", `✖ ${type}`, {
+				ms: Date.now() - startedAt,
+				args: summarizeCommand(command),
+				error,
+			})
+			throw error
+		}
 	})
+}
+
+const REDACTED_KEYS = /token|key|secret|password|authorization/i
+
+/** Keep IPC logs readable: trim long payloads, drop credentials, cap depth. */
+function summarizeCommand(command: any): unknown {
+	if (!command || typeof command !== "object") return command
+	const out: Record<string, unknown> = {}
+	for (const [key, value] of Object.entries(command)) {
+		if (key === "type") continue
+		if (REDACTED_KEYS.test(key)) {
+			out[key] = "[redacted]"
+			continue
+		}
+		if (typeof value === "string" && value.length > 300) {
+			out[key] = `${value.slice(0, 300)}… (+${value.length - 300} chars)`
+			continue
+		}
+		if (Array.isArray(value) && value.length > 12) {
+			out[key] = `[${value.length} items]`
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+function summarizeResult(result: unknown): unknown {
+	if (result == null) return result
+	if (typeof result === "string") {
+		return result.length > 200 ? `${result.slice(0, 200)}…` : result
+	}
+	if (Array.isArray(result)) return `[${result.length} items]`
+	if (typeof result === "object") {
+		const keys = Object.keys(result as Record<string, unknown>)
+		return keys.length > 8 ? `{${keys.slice(0, 8).join(",")},…}` : result
+	}
+	return result
 }
 
 // =============================================================================
 // Bridge Harness events to renderer (all sessions, tagged with worktreePath)
 // =============================================================================
+
+/**
+ * Turn a harness event into a log line. These are the steps a support report
+ * usually needs ("it stopped after the second tool call"), so they are recorded
+ * even when the renderer decides not to show them.
+ */
+function logHarnessEvent(sessionPath: string, event: any): void {
+	const project = path.basename(sessionPath || "") || sessionPath
+	const threadId = event?.threadId as string | undefined
+	const base = { project, threadId }
+	switch (event?.type) {
+		case "agent_start":
+			log.info("agent", "run started", {
+				...base,
+				modelId: event.modelId,
+				modeId: event.modeId,
+			})
+			break
+		case "agent_end":
+			if (event.error) {
+				log.error("agent", "run failed", { ...base, error: event.error })
+			} else {
+				log.info("agent", "run finished", {
+					...base,
+					durationMs: event.durationMs,
+				})
+			}
+			break
+		case "tool_start":
+			log.info("tool", `▶ ${event.toolName}`, {
+				...base,
+				toolCallId: event.toolCallId,
+				args: event.args,
+			})
+			break
+		case "tool_end":
+			if (event.isError) {
+				log.error("tool", `✖ ${event.toolName}`, {
+					...base,
+					toolCallId: event.toolCallId,
+					result: event.result,
+				})
+			} else {
+				log.debug("tool", `✔ ${event.toolName}`, {
+					...base,
+					toolCallId: event.toolCallId,
+					result: event.result,
+				})
+			}
+			break
+		case "tool_approval_required":
+			log.info("permission", "approval required", {
+				...base,
+				toolName: event.toolName,
+				args: event.args,
+			})
+			break
+		case "error":
+			log.error("agent", "error event", { ...base, error: event.error })
+			break
+		case "message_start":
+			log.debug("agent", "message start", {
+				...base,
+				messageId: event.messageId,
+			})
+			break
+		case "message_end":
+			log.debug("agent", "message end", { ...base, messageId: event.messageId })
+			break
+		case "mode_changed":
+			log.info("runtime", "mode changed", { ...base, modeId: event.modeId })
+			break
+		case "model_changed":
+			log.info("runtime", "model changed", { ...base, modelId: event.modelId })
+			break
+		case "permission_mode_changed":
+			log.info("runtime", "permission mode changed", {
+				...base,
+				permissionMode: event.permissionMode,
+			})
+			break
+		case "thread_created":
+		case "thread_changed":
+		case "thread_deleted":
+		case "thread_title_updated":
+			log.info("thread", event.type, {
+				...base,
+				threadId: event.threadId ?? event.thread?.id,
+			})
+			break
+		case "session_replay_started":
+		case "session_replay_stopped":
+		case "session_recording_changed":
+		case "session_recording_exported":
+			log.info("replay", event.type, {
+				...base,
+				file: event.filePath ?? event.replayFile,
+			})
+			break
+		default:
+			log.trace("event", String(event?.type ?? "unknown"), base)
+	}
+}
+
 function bridgeAllEvents(window: BrowserWindow) {
 	for (const [sessionPath, session] of sessions) {
 		if (session.unsubscribe) {
@@ -216,6 +402,10 @@ function bridgeAllEvents(window: BrowserWindow) {
 		}
 		session.unsubscribe = session.harness.subscribe((event) => {
 			if (window.isDestroyed()) return
+
+			// Every harness event is a step the user might need to inspect later,
+			// so record it before the UI gets a chance to swallow it.
+			logHarnessEvent(sessionPath, event)
 
 			const serialized = { ...event } as Record<string, unknown>
 			if (event.type === "error" && event.error instanceof Error) {
@@ -354,6 +544,7 @@ function bridgeAllEvents(window: BrowserWindow) {
 function cleanupSession(sessionPath: string) {
 	const session = sessions.get(sessionPath)
 	if (!session) return
+	log.info("session", "cleaning up session", { project: sessionPath })
 	if (session.unsubscribe) {
 		try {
 			session.unsubscribe()
@@ -376,6 +567,7 @@ function cleanupSession(sessionPath: string) {
 // Create Window
 // =============================================================================
 function createWindow() {
+	log.info("boot", "creating main window")
 	const iconPath = path.join(__dirname, "../../resources/icon.png")
 	const appIcon = nativeImage.createFromPath(iconPath)
 
@@ -387,7 +579,13 @@ function createWindow() {
 		minHeight: 400,
 		titleBarStyle: "hiddenInset",
 		trafficLightPosition: { x: 12, y: 12 },
-		backgroundColor: "#ffffff",
+		// Fallback only: the renderer paints the splash before this is ever
+		// visible. Match the OS skin so even the fallback frame is not white.
+		backgroundColor: nativeTheme.shouldUseDarkColors ? "#09090b" : "#ffffff",
+		// The renderer paints the boot splash itself, so wait for that first
+		// frame: showing the window earlier is exactly the empty box the splash
+		// exists to hide.
+		show: false,
 		icon: appIcon,
 		webPreferences: {
 			preload: path.join(__dirname, "../preload/preload.cjs"),
@@ -396,6 +594,21 @@ function createWindow() {
 			sandbox: false,
 		},
 	})
+
+	const win = mainWindow
+	win.once("ready-to-show", () => {
+		log.info("boot", "window ready-to-show")
+		win.show()
+	})
+	// A renderer that never paints (dev server down, failed load) must not
+	// leave the app running without a window.
+	const revealTimer = setTimeout(() => {
+		if (!win.isVisible()) {
+			log.warn("boot", "window reveal fallback")
+			win.show()
+		}
+	}, 4000)
+	win.once("closed", () => clearTimeout(revealTimer))
 
 	mainWindow.on("focus", () => {
 		safeSend(mainWindow, "window-focus")
@@ -416,17 +629,63 @@ function createWindow() {
 		}
 	})
 
-	// Prevent links in the renderer from navigating the main window away from the app.
+	// Links must never navigate the app window away from itself. Ordinary web
+	// links go to the user's own browser — that is what clicking a link in an
+	// answer or in Settings means; only non-web schemes still fall back to the
+	// in-app handler.
 	const rendererOrigin = process.env.ELECTRON_RENDERER_URL || ""
+	const openLink = (url: string) => {
+		const external = parseExternalUrl(url)
+		if (external) {
+			void shell.openExternal(external)
+			return
+		}
+		safeSend(mainWindow, "open-url", url)
+	}
+
 	mainWindow.webContents.on("will-navigate", (event, url) => {
 		if (rendererOrigin && url.startsWith(rendererOrigin)) return
 		event.preventDefault()
-		safeSend(mainWindow, "open-url", url)
+		openLink(url)
 	})
 
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-		safeSend(mainWindow, "open-url", url)
+		openLink(url)
 		return { action: "deny" }
+	})
+
+	// Renderer console output never reaches the main process on its own. Record
+	// it here so a UI-side exception shows up in the same log file as the run
+	// that caused it.
+	mainWindow.webContents.on("console-message", (details) => {
+		const { level, message, lineNumber, sourceId } = details
+		const scope = `renderer${sourceId ? `:${path.basename(sourceId)}` : ""}`
+		const data = { line: lineNumber, source: sourceId }
+		if (level === "error") log.error(scope, message, data)
+		else if (level === "warning") log.warn(scope, message, data)
+		else if (level === "info") log.info(scope, message, data)
+		else log.debug(scope, message, data)
+	})
+
+	mainWindow.webContents.on("render-process-gone", (_event, details) => {
+		log.error("renderer", "render process gone", details)
+	})
+
+	mainWindow.webContents.on("unresponsive", () => {
+		log.warn("renderer", "window unresponsive")
+	})
+
+	mainWindow.webContents.on("did-finish-load", () => {
+		// A reloaded renderer has no open log modal, so stop pushing batches at a
+		// window that would silently drop them.
+		setLogStreaming(false)
+		log.info("boot", "renderer loaded", {
+			url: mainWindow?.webContents.getURL(),
+		})
+	})
+
+	mainWindow.webContents.on("did-fail-load", (_e, code, desc, url) => {
+		log.error("boot", "renderer failed to load", { code, desc, url })
 	})
 
 	// Dev or production
@@ -619,26 +878,27 @@ app.whenReady().then(async () => {
 			path.resolve(a) !== "/",
 	)
 
+	const recentProjects = loadRecentProjects().filter(
+		(p) => p.rootPath && p.rootPath !== "/" && fs.existsSync(p.rootPath),
+	)
+
+	const hasActiveProject = Boolean(cliArg || recentProjects.length > 0)
+
 	let projectPath: string
 	if (cliArg) {
 		projectPath = path.resolve(cliArg)
+	} else if (recentProjects.length > 0) {
+		projectPath = recentProjects[0].rootPath
+	} else if (
+		process.cwd() &&
+		process.cwd() !== "/" &&
+		fs.existsSync(process.cwd())
+	) {
+		projectPath = process.cwd()
 	} else {
-		const recentProjects = loadRecentProjects().filter(
-			(p) => p.rootPath && p.rootPath !== "/" && fs.existsSync(p.rootPath),
-		)
-		if (recentProjects.length > 0) {
-			projectPath = recentProjects[0].rootPath
-		} else if (
-			process.cwd() &&
-			process.cwd() !== "/" &&
-			fs.existsSync(process.cwd())
-		) {
-			projectPath = process.cwd()
-		} else {
-			projectPath = os.homedir()
-		}
+		projectPath = os.homedir()
 	}
-	activeSessionPath = projectPath
+	activeSessionPath = hasActiveProject ? projectPath : ""
 
 	// Create window and menu
 	createWindow()
@@ -666,19 +926,28 @@ app.whenReady().then(async () => {
 	registerIpcHandlers()
 	if (mainWindow) bridgeAllEvents(mainWindow)
 
-	// Initialize harness
-	await initialSession.harness.init()
-	await ensureAuthenticatedModel(
-		initialSession.harness,
-		initialSession.authStorage,
-	)
+	// Initialize harness if there is an active project
+	if (hasActiveProject) {
+		await initialSession.harness.init()
+		await ensureAuthenticatedModel(
+			initialSession.harness,
+			initialSession.authStorage,
+		)
 
-	// Load OM progress for the current thread
-	await initialSession.harness.loadOMProgress?.().catch(() => {})
+		// Persist active project and thread to recent projects if launched explicitly or had recent projects
+		const initThreadId = initialSession.harness.getCurrentThreadId()
+		const initProjectName =
+			(initialSession.harness.getState?.() as any)?.projectName ||
+			path.basename(projectPath)
+		saveRecentProject(projectPath, initProjectName, initThreadId || undefined)
 
-	// Init MCP
-	if (initialSession.mcpManager?.hasServers()) {
-		await initialSession.mcpManager.init()
+		// Load OM progress for the current thread
+		await initialSession.harness.loadOMProgress?.().catch(() => {})
+
+		// Init MCP
+		if (initialSession.mcpManager?.hasServers()) {
+			await initialSession.mcpManager.init()
+		}
 	}
 
 	// Check for application updates on startup
@@ -696,35 +965,8 @@ app.whenReady().then(async () => {
 		}
 	}, 2000)
 
-	// Redirect console noise to log file
-	const logFile = path.join(getAppDataDir(), "debug.log")
-	const logStream = fs.createWriteStream(logFile, { flags: "a" })
-	const fmt = (a: unknown): string => {
-		if (typeof a === "string") return a
-		if (a instanceof Error) return `${a.name}: ${a.message}`
-		try {
-			return JSON.stringify(a)
-		} catch {
-			return String(a)
-		}
-	}
-	console.error = (...args: unknown[]) => {
-		logStream.write(
-			`[ERROR] ${new Date().toISOString()} ${args.map(fmt).join(" ")}\n`,
-		)
-	}
-	console.warn = (...args: unknown[]) => {
-		logStream.write(
-			`[WARN] ${new Date().toISOString()} ${args.map(fmt).join(" ")}\n`,
-		)
-	}
-	console.info = (...args: unknown[]) => {
-		logStream.write(
-			`[INFO] ${new Date().toISOString()} ${args.map(fmt).join(" ")}\n`,
-		)
-	}
-
-	// Filter benign macOS system-level IMK/TSM Mach port stderr noise
+	// Filter benign macOS system-level IMK/TSM Mach port stderr noise, but keep
+	// everything else flowing so a crash still reaches the terminal.
 	const origStderrWrite = process.stderr.write.bind(process.stderr)
 	process.stderr.write = ((chunk: any, encoding?: any, cb?: any) => {
 		const str = typeof chunk === "string" ? chunk : chunk?.toString() || ""
@@ -734,7 +976,7 @@ app.whenReady().then(async () => {
 			str.includes("AI_SDK_LOG_WARNINGS") ||
 			str.includes("MachPortRendezvousServer")
 		) {
-			logStream.write(`[STDERR-FILTERED] ${new Date().toISOString()} ${str}\n`)
+			log.trace("stderr", "filtered system noise", { text: str.trim() })
 			if (typeof encoding === "function") encoding()
 			else if (typeof cb === "function") cb()
 			return true
@@ -755,7 +997,26 @@ app.whenReady().then(async () => {
 })
 
 app.on("before-quit", () => {
+	log.info("boot", "app quitting")
+	shutdownLogging()
 	setMainWindowRef(null)
+	const recent = loadRecentProjects()
+	if (
+		activeSessionPath &&
+		sessions.has(activeSessionPath) &&
+		recent.some(
+			(r) =>
+				path.resolve(r.rootPath).replace(/\/+$/, "").toLowerCase() ===
+				path.resolve(activeSessionPath).replace(/\/+$/, "").toLowerCase(),
+		)
+	) {
+		const s = sessions.get(activeSessionPath)!
+		const curThread = s.harness?.getCurrentThreadId()
+		const projName =
+			(s.harness?.getState?.() as any)?.projectName ||
+			path.basename(activeSessionPath)
+		saveRecentProject(activeSessionPath, projName, curThread || undefined)
+	}
 	for (const sessionPath of [...sessions.keys()]) {
 		cleanupSession(sessionPath)
 	}
@@ -763,6 +1024,23 @@ app.on("before-quit", () => {
 
 app.on("window-all-closed", async () => {
 	setMainWindowRef(null)
+	const recent = loadRecentProjects()
+	if (
+		activeSessionPath &&
+		sessions.has(activeSessionPath) &&
+		recent.some(
+			(r) =>
+				path.resolve(r.rootPath).replace(/\/+$/, "").toLowerCase() ===
+				path.resolve(activeSessionPath).replace(/\/+$/, "").toLowerCase(),
+		)
+	) {
+		const s = sessions.get(activeSessionPath)!
+		const curThread = s.harness?.getCurrentThreadId()
+		const projName =
+			(s.harness?.getState?.() as any)?.projectName ||
+			path.basename(activeSessionPath)
+		saveRecentProject(activeSessionPath, projName, curThread || undefined)
+	}
 	for (const sessionPath of [...sessions.keys()]) {
 		cleanupSession(sessionPath)
 	}

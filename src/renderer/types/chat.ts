@@ -179,6 +179,8 @@ export interface AttachedFile {
 	data: string // base64 for images, text content for files
 	preview: string // data URL for images, empty for files
 	size?: number
+	path?: string
+	relativePath?: string
 }
 
 export interface QueuedMessage {

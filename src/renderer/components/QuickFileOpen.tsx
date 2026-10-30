@@ -56,7 +56,9 @@ export function QuickFileOpen({ onSelect, onClose }: QuickFileOpenProps) {
 
 	// Scroll into view
 	useEffect(() => {
-		const el = listRef.current?.querySelector("[data-selected='true']") as HTMLElement | null
+		const el = listRef.current?.querySelector(
+			"[data-selected='true']",
+		) as HTMLElement | null
 		el?.scrollIntoView({ block: "nearest" })
 	}, [selectedIndex])
 
@@ -88,7 +90,7 @@ export function QuickFileOpen({ onSelect, onClose }: QuickFileOpenProps) {
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.6)",
+				background: "var(--scrim)",
 				display: "flex",
 				alignItems: "flex-start",
 				justifyContent: "center",
@@ -206,9 +208,7 @@ export function QuickFileOpen({ onSelect, onClose }: QuickFileOpenProps) {
 									gap: 8,
 									padding: "6px 16px",
 									cursor: "pointer",
-									background: isSelected
-										? "var(--accent)22"
-										: "transparent",
+									background: isSelected ? "var(--accent)22" : "transparent",
 									transition: "background 0.05s",
 								}}
 							>

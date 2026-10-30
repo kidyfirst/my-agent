@@ -123,7 +123,7 @@ function ProviderCard({
 							style={{
 								padding: "6px 14px",
 								background: "var(--accent)",
-								color: "#fff",
+								color: "var(--on-accent)",
 								borderRadius: 6,
 								cursor: "pointer",
 								fontWeight: 500,
@@ -191,7 +191,7 @@ function ProviderCard({
 							background: apiKey.trim()
 								? "var(--accent)"
 								: "var(--bg-elevated)",
-							color: apiKey.trim() ? "#fff" : "var(--dim)",
+							color: apiKey.trim() ? "var(--on-accent)" : "var(--dim)",
 							borderRadius: 6,
 							cursor: apiKey.trim() ? "pointer" : "default",
 							fontWeight: 500,

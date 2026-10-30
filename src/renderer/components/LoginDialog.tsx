@@ -66,11 +66,11 @@ export function LoginDialog({
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.6)",
+				background: "var(--scrim)",
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",
-				zIndex: 100,
+				zIndex: 1100,
 			}}
 		>
 			<div
@@ -202,7 +202,7 @@ export function LoginDialog({
 								style={{
 									padding: "8px 16px",
 									background: "var(--accent)",
-									color: "#fff",
+									color: "var(--on-accent)",
 									borderRadius: 6,
 									cursor: "pointer",
 									fontWeight: 500,
@@ -256,7 +256,7 @@ export function LoginDialog({
 							style={{
 								padding: "6px 16px",
 								background: "var(--accent)",
-								color: "#fff",
+								color: "var(--on-accent)",
 								borderRadius: 6,
 								cursor: "pointer",
 								fontWeight: 500,

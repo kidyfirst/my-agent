@@ -21,9 +21,16 @@ export interface PromptContext extends BasePromptContext {
 	workingDir: string
 	availableTools?: string // Mode-specific available tools
 	toolNames?: string[]
+	/** Live MCP tool names, already namespaced as the model sees them. */
+	mcpToolNames?: string[]
+	/** Built-in MCP servers still waiting for an API key (see base.ts). */
+	mcpSetup?: BasePromptContext["mcpSetup"]
+	/** Built-in MCP servers with a key that failed to connect (see base.ts). */
+	mcpFailures?: BasePromptContext["mcpFailures"]
 }
 
 const modePrompts: Record<string, string | ((ctx: PromptContext) => string)> = {
+	react: buildModePromptFn,
 	build: buildModePromptFn,
 	plan: planModePrompt,
 	fast: fastModePrompt,
@@ -44,10 +51,14 @@ export function buildFullPrompt(ctx: PromptContext): string {
 		mode: ctx.modeId,
 		activePlan: ctx.state?.activePlan,
 		toolNames: ctx.toolNames,
+		mcpToolNames: ctx.mcpToolNames,
+		mcpSetup: ctx.mcpSetup,
+		mcpFailures: ctx.mcpFailures,
 	}
 
 	const base = buildBasePrompt(baseCtx)
-	const entry = modePrompts[ctx.modeId] || modePrompts.build
+	const entry =
+		modePrompts[ctx.modeId] || modePrompts.react || modePrompts.build
 	const modeSpecific = typeof entry === "function" ? entry(ctx) : entry
 
 	// Add available tools section if provided

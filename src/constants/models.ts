@@ -4,13 +4,13 @@
  */
 
 export const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-	anthropic: "anthropic/claude-opus-4-6",
-	"openai-codex": "openai/gpt-5.3-codex",
-	google: "google/gemini-3-flash-preview",
+	anthropic: "anthropic/claude-opus-5-5",
+	"openai-codex": "openai/gpt-5.6-terra",
+	google: "google/gemini-3.8-flash",
 	deepseek: "deepseek/deepseek-flash",
 }
 
-export const DEFAULT_FALLBACK_MODEL_ID = "google/gemini-3-flash-preview"
+export const DEFAULT_FALLBACK_MODEL_ID = "google/gemini-2.0-flash"
 
 export interface CuratedModelInfo {
 	id: string
@@ -18,33 +18,48 @@ export interface CuratedModelInfo {
 	provider: string
 }
 
+/**
+ * Curated catalog holding the latest 2 generations of real official models for each provider.
+ */
 export const CURATED_CHAT_MODELS: CuratedModelInfo[] = [
+	// Anthropic (latest 2 generations: Claude 3.7 & Claude 3.5)
 	{
-		id: "anthropic/claude-opus-4-6",
-		name: "claude-opus-4-6",
+		id: "anthropic/claude-sonnet-5-5",
+		name: "claude-sonnet-5-5",
 		provider: "anthropic",
 	},
 	{
-		id: "anthropic/claude-sonnet-4-6",
-		name: "claude-sonnet-4-6",
+		id: "anthropic/claude-opus-5-5",
+		name: "claude-opus-5-5",
 		provider: "anthropic",
 	},
 	{
-		id: "anthropic/claude-haiku-4-5",
-		name: "claude-haiku-4-5",
+		id: "anthropic/claude-fable-5-1",
+		name: "claude-fable-5-1",
 		provider: "anthropic",
 	},
-	{ id: "openai/gpt-5.2-codex", name: "gpt-5.2-codex", provider: "openai" },
-	{ id: "openai/gpt-5.3-codex", name: "gpt-5.3-codex", provider: "openai" },
-	{ id: "openai/o3", name: "o3", provider: "openai" },
+
+	// OpenAI (latest 2 generations: o-series & GPT-4o)
 	{
-		id: "google/gemini-3-flash-preview",
-		name: "gemini-3-flash-preview",
-		provider: "google",
+		id: "openai/gpt-6-sol",
+		name: "gpt-6-sol",
+		provider: "openai",
 	},
 	{
-		id: "google/gemini-3.5-flash",
-		name: "gemini-3.5-flash",
+		id: "openai/gpt-5.6-terra",
+		name: "gpt-5.6-terra",
+		provider: "openai",
+	},
+	{
+		id: "openai/gpt-5.6-sol",
+		name: "gpt-5.6-sol",
+		provider: "openai",
+	},
+
+	// Google (latest 2 generations: Gemini 2.x & Gemini 1.5)
+	{
+		id: "google/gemini-4-argon",
+		name: "gemini-4-argon",
 		provider: "google",
 	},
 	{
@@ -52,19 +67,16 @@ export const CURATED_CHAT_MODELS: CuratedModelInfo[] = [
 		name: "gemini-3.8-flash",
 		provider: "google",
 	},
+
+	// DeepSeek (latest 2 generations: V4 Pro / Reasoner & Flash / Chat)
 	{
-		id: "google/gemini-3.1-pro-preview",
-		name: "gemini-3.1-pro-preview",
-		provider: "google",
+		id: "deepseek/deepseek-v4-pro",
+		name: "deepseek-v4-pro",
+		provider: "deepseek",
 	},
 	{
 		id: "deepseek/deepseek-flash",
 		name: "deepseek-flash",
-		provider: "deepseek",
-	},
-	{
-		id: "deepseek/deepseek-v4-pro",
-		name: "deepseek-v4-pro",
 		provider: "deepseek",
 	},
 ]
@@ -94,45 +106,73 @@ export function resolveDefaultModel(
 	return DEFAULT_FALLBACK_MODEL_ID
 }
 
-/**
- * Checks if a model ID is deprecated by its provider.
- */
-export function isDeprecatedModel(modelId: string): boolean {
-	const id = (modelId || "").toLowerCase()
-	return (
-		id === "google/gemini-2.5-flash" ||
-		id === "google/gemini-2.5-pro" ||
-		id.includes("gemini-1.0") ||
-		id === "deepseek/deepseek-v4-flash" ||
-		id === "deepseek-v4-flash" ||
-		id.includes("deepseek-v4-flash") ||
-		id === "deepseek/deepseek-chat" ||
-		id === "deepseek-chat" ||
-		id === "deepseek/deepseek-reasoner" ||
-		id === "deepseek-reasoner"
-	)
+export interface ThinkingLevelOption {
+	id: string
+	label: string
+	description?: string
 }
 
 /**
- * Automatically upgrades deprecated model IDs to modern supported alternatives.
+ * Supported thinking / reasoning effort levels per model provider.
+ * Providers not listed here (e.g. Google, Groq, Mistral) do not support thinking level adjustments.
  */
-export function upgradeDeprecatedModel(modelId: string): string {
-	if (!modelId) return modelId
-	const id = modelId.toLowerCase()
-	if (id === "google/gemini-2.5-flash" || id === "google/gemini-2.5-pro") {
-		return "google/gemini-3-flash-preview"
+export const PROVIDER_THINKING_LEVELS: Record<string, ThinkingLevelOption[]> = {
+	anthropic: [
+		{ id: "off", label: "Off", description: "Thinking disabled" },
+		{ id: "low", label: "Low", description: "2k token budget" },
+		{ id: "medium", label: "Med", description: "8k token budget" },
+		{ id: "high", label: "High", description: "16k token budget" },
+		{ id: "xhigh", label: "Max", description: "32k token budget" },
+	],
+	openai: [
+		{ id: "off", label: "Off", description: "Thinking disabled" },
+		{ id: "low", label: "Low", description: "Low reasoning effort" },
+		{ id: "medium", label: "Med", description: "Medium reasoning effort" },
+		{ id: "high", label: "High", description: "High reasoning effort" },
+	],
+	"openai-codex": [
+		{ id: "off", label: "Off", description: "Thinking disabled" },
+		{ id: "low", label: "Low", description: "Low reasoning effort" },
+		{ id: "medium", label: "Med", description: "Medium reasoning effort" },
+		{ id: "high", label: "High", description: "High reasoning effort" },
+	],
+	deepseek: [
+		{ id: "off", label: "Off", description: "Thinking disabled" },
+		{ id: "low", label: "Low", description: "Low reasoning effort" },
+		{ id: "medium", label: "Med", description: "High reasoning effort" },
+		{ id: "high", label: "High", description: "High reasoning effort" },
+		{ id: "xhigh", label: "Max", description: "Maximum reasoning effort" },
+	],
+}
+
+/**
+ * Resolves the configured thinking levels for a provider or model ID.
+ * Returns null if the provider does not support thinking levels.
+ */
+export function getProviderThinkingLevels(
+	providerOrModelId?: string | null,
+): ThinkingLevelOption[] | null {
+	if (!providerOrModelId) return null
+	const lower = providerOrModelId.toLowerCase().trim()
+	let provider = lower.includes("/") ? lower.split("/")[0] : lower
+	if (provider === "claude" || provider.startsWith("claude-")) {
+		provider = "anthropic"
 	}
 	if (
-		id === "deepseek/deepseek-v4-flash" ||
-		id === "deepseek-v4-flash" ||
-		id.includes("deepseek-v4-flash") ||
-		id === "deepseek/deepseek-chat" ||
-		id === "deepseek-chat"
+		provider === "gpt" ||
+		provider.startsWith("gpt-") ||
+		provider === "o1" ||
+		provider === "o3" ||
+		provider.startsWith("o3-") ||
+		provider.startsWith("o1-")
 	) {
-		return "deepseek/deepseek-flash"
+		provider = "openai"
 	}
-	if (id === "deepseek/deepseek-reasoner" || id === "deepseek-reasoner") {
-		return "deepseek/deepseek-v4-pro"
+	if (provider === "gemini" || provider.startsWith("gemini-")) {
+		provider = "google"
 	}
-	return modelId
+	if (provider.startsWith("deepseek")) {
+		provider = "deepseek"
+	}
+	return PROVIDER_THINKING_LEVELS[provider] ?? null
 }

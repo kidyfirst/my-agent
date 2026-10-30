@@ -3,11 +3,21 @@ import type { IpcCommandHandler } from "./types.js"
 const BUILTIN_COMMANDS = [
 	{ name: "new", description: "Start a new thread", builtin: true },
 	{ name: "clear", description: "Clear current conversation", builtin: true },
-	{ name: "plan", description: "Switch to plan mode", builtin: true },
-	{ name: "build", description: "Switch to build mode", builtin: true },
-	{ name: "fast", description: "Switch to fast mode", builtin: true },
-	{ name: "thinking", description: "Toggle extended thinking", builtin: true },
+	{ name: "react", description: "Switch to ReAct mode", builtin: true },
+	{ name: "fast", description: "Switch to Fast mode", builtin: true },
+	{ name: "plan", description: "Switch to Plan & Solve mode", builtin: true },
+	{ name: "graph", description: "View execution graph", builtin: true },
 	{ name: "settings", description: "Open settings", builtin: true },
+	{
+		name: "record",
+		description: "Start or stop session recording",
+		builtin: true,
+	},
+	{
+		name: "replay",
+		description: "Upload and replay a recorded session",
+		builtin: true,
+	},
 	{
 		name: "help",
 		description: "Show keyboard shortcuts & tips",

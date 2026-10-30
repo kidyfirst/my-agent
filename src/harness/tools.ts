@@ -1,13 +1,18 @@
 import path from "node:path"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAI } from "@ai-sdk/openai"
-import type { RequestContext } from "../core/index.js"
+import {
+	type RequestContext,
+	ExecutionMode,
+	DEFAULT_EXECUTION_MODE,
+} from "../core/index.js"
 import { requestSandboxAccessTool } from "../tools/request-sandbox-access.js"
 import { createViewTool } from "../tools/file-view.js"
 import { createGrepTool } from "../tools/grep.js"
 import { createGlobTool } from "../tools/glob.js"
 import { createWriteFileTool } from "../tools/write.js"
 import { createExecuteCommandTool } from "../tools/shell.js"
+import { createSubmitPlanTool } from "../tools/submit-plan.js"
 import { stringReplaceLspTool } from "../tools/string-replace-lsp.js"
 import { astSmartEditTool } from "../tools/ast-smart-edit.js"
 import {
@@ -36,11 +41,32 @@ export const WRITE_TOOL_NAMES = [
 	"ast_smart_edit",
 ] as const
 
+export const PLAN_TOOL_NAMES = [
+	...READ_TOOL_NAMES,
+	"write_file",
+	"submit_plan",
+] as const
+
+/**
+ * Fast mode is read-only: it may inspect the workspace, but `execute_command`
+ * is deliberately absent because an arbitrary shell can write as well.
+ */
+export const FAST_TOOL_NAMES = [
+	"view",
+	"search_content",
+	"find_files",
+	"request_sandbox_access",
+] as const
+
 /** Tool names registered for a given mode, in the order they are described. */
 export function describeToolNames(modeId?: string): string[] {
-	return modeId === "plan"
-		? [...READ_TOOL_NAMES]
-		: [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES]
+	if (modeId === ExecutionMode.PLAN) {
+		return [...PLAN_TOOL_NAMES]
+	}
+	if (modeId === ExecutionMode.FAST) {
+		return [...FAST_TOOL_NAMES]
+	}
+	return [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES, "submit_plan"]
 }
 
 export function createDynamicTools(
@@ -83,7 +109,10 @@ export function createDynamicTools(
 		const projectRoot = path.resolve(
 			(state?.projectPath as string | undefined) || process.cwd(),
 		)
-		const modeId = session?.mode?.get?.() ?? (ctx?.modeId as string) ?? "build"
+		const modeId =
+			session?.mode?.get?.() ??
+			(ctx?.modeId as string) ??
+			DEFAULT_EXECUTION_MODE
 		const factories: Record<string, () => any> = {
 			view: () => createViewTool(projectRoot),
 			search_content: () => createGrepTool(projectRoot),
@@ -92,6 +121,7 @@ export function createDynamicTools(
 			write_file: () => createWriteFileTool(projectRoot),
 			string_replace_lsp: () => stringReplaceLspTool,
 			ast_smart_edit: () => astSmartEditTool,
+			submit_plan: () => createSubmitPlanTool(projectRoot),
 		}
 
 		// Plan mode is read-only: writes and edits stay disabled. The name list and

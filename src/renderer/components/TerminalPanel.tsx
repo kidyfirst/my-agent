@@ -61,7 +61,9 @@ const LIGHT_THEME = {
 }
 
 function getTerminalTheme() {
-	const isDark = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark"
+	const isDark =
+		typeof document !== "undefined" &&
+		document.documentElement.getAttribute("data-theme") === "dark"
 	return isDark ? DARK_THEME : LIGHT_THEME
 }
 
@@ -73,11 +75,20 @@ interface TerminalPanelProps {
 
 let termCounter = 0
 
-export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPanelProps) {
+export function TerminalPanel({
+	height,
+	projectPath,
+	onOpenBrowser,
+}: TerminalPanelProps) {
 	const containerRef = useRef<HTMLDivElement>(null)
 	const instancesRef = useRef<Map<string, TerminalInstance>>(new Map())
 	const onOpenBrowserRef = useRef(onOpenBrowser)
 	onOpenBrowserRef.current = onOpenBrowser
+	// The shell must start in the active project, otherwise it inherits whatever
+	// directory the session was created in (e.g. the previous repo, which then
+	// keeps showing a git branch in the prompt for a plain-folder project).
+	const projectPathRef = useRef(projectPath)
+	projectPathRef.current = projectPath
 	const [tabs, setTabs] = useState<string[]>(() => {
 		const id = `term-${++termCounter}`
 		return [id]
@@ -117,13 +128,15 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 
 		const fitAddon = new FitAddon()
 		term.loadAddon(fitAddon)
-		term.loadAddon(new WebLinksAddon((_event, uri) => {
-			if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(uri)) {
-				onOpenBrowserRef.current?.(uri)
-			} else {
-				window.api.invoke({ type: "openExternal", url: uri })
-			}
-		}))
+		term.loadAddon(
+			new WebLinksAddon((_event, uri) => {
+				if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(uri)) {
+					onOpenBrowserRef.current?.(uri)
+				} else {
+					window.api.invoke({ type: "openExternal", url: uri })
+				}
+			}),
+		)
 
 		const instance: TerminalInstance = {
 			id,
@@ -159,6 +172,7 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 				type: "ptyCreate",
 				cols: dims?.cols ?? 80,
 				rows: dims?.rows ?? 24,
+				cwd: projectPathRef.current ?? undefined,
 			})
 			.then((result) => {
 				console.log("[terminal] ptyCreate result:", result)
@@ -207,7 +221,10 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 				inst.starting = false
 				// Only retry if it looks like IPC isn't ready yet (not a spawn error)
 				const msg = String(err)
-				if (retries < 10 && (msg.includes("No handler") || msg.includes("not registered"))) {
+				if (
+					retries < 10 &&
+					(msg.includes("No handler") || msg.includes("not registered"))
+				) {
 					setTimeout(() => startPty(inst, retries + 1), 500)
 				} else {
 					inst.term.writeln(`\r\n\x1b[31m[Terminal error: ${msg}]\x1b[0m`)
@@ -221,42 +238,39 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 		setActiveTab(id)
 	}, [])
 
-	const closeTerminal = useCallback(
-		(id: string) => {
-			const instance = instancesRef.current.get(id)
-			if (instance) {
-				if (instance.sessionId) {
-					window.api.invoke({
-						type: "ptyDestroy",
-						sessionId: instance.sessionId,
-					})
-				}
-				instance.unsub?.()
-				instance.term.dispose()
-				instancesRef.current.delete(id)
+	const closeTerminal = useCallback((id: string) => {
+		const instance = instancesRef.current.get(id)
+		if (instance) {
+			if (instance.sessionId) {
+				window.api.invoke({
+					type: "ptyDestroy",
+					sessionId: instance.sessionId,
+				})
 			}
+			instance.unsub?.()
+			instance.term.dispose()
+			instancesRef.current.delete(id)
+		}
 
-			setTabs((prev) => {
-				const next = prev.filter((t) => t !== id)
-				if (next.length === 0) {
-					const newId = `term-${++termCounter}`
-					setActiveTab(newId)
-					return [newId]
-				}
-				setActiveTab((current) =>
-					current === id ? next[next.length - 1] : current,
-				)
-				return next
-			})
-			setTitles((prev) => {
-				if (!prev[id]) return prev
-				const next = { ...prev }
-				delete next[id]
-				return next
-			})
-		},
-		[],
-	)
+		setTabs((prev) => {
+			const next = prev.filter((t) => t !== id)
+			if (next.length === 0) {
+				const newId = `term-${++termCounter}`
+				setActiveTab(newId)
+				return [newId]
+			}
+			setActiveTab((current) =>
+				current === id ? next[next.length - 1] : current,
+			)
+			return next
+		})
+		setTitles((prev) => {
+			if (!prev[id]) return prev
+			const next = { ...prev }
+			delete next[id]
+			return next
+		})
+	}, [])
 
 	// Mount/switch: open xterm into DOM, start PTY, focus
 	useEffect(() => {
@@ -545,7 +559,7 @@ export function TerminalPanel({ height, projectPath, onOpenBrowser }: TerminalPa
 											transition: "color 0.1s, background-color 0.1s",
 										}}
 										onMouseEnter={(e) => {
-											e.currentTarget.style.color = "var(--error, #ef4444)"
+											e.currentTarget.style.color = "var(--error)"
 											e.currentTarget.style.backgroundColor =
 												"rgba(239, 68, 68, 0.1)"
 										}}

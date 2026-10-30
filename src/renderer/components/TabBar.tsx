@@ -1,5 +1,6 @@
 import type { ThreadInfo } from "../types/ipc"
 import { OpenInDropdown } from "./OpenInDropdown"
+import { WindowToggleIcon } from "./WindowToggleIcon"
 import type { PRStatus } from "../hooks/useProjectManager"
 
 interface TabBarProps {
@@ -11,6 +12,8 @@ interface TabBarProps {
 	sidebarVisible: boolean
 	rightSidebarVisible: boolean
 	gitBranch?: string
+	/** False for plain folders — the PR button is a git-only affordance. */
+	hasGitRepo?: boolean
 	prStatus: PRStatus | null
 	isAgentActive: boolean
 	onSelectTab: (tab: string) => void
@@ -21,6 +24,7 @@ interface TabBarProps {
 	onToggleSidebar?: () => void
 	onCreatePR: () => void
 	projectRootPath: string | null
+	replayingThreads?: Set<string>
 }
 
 const isChatTab = (tab: string) => tab === "chat" || tab.startsWith("thread:")
@@ -49,7 +53,9 @@ const tabShellStyle = (isActive: boolean): React.CSSProperties => ({
 
 export function TabBar(props: TabBarProps) {
 	const { activeTab, threads, prStatus } = props
+	const isGitRepo = props.hasGitRepo !== false
 	const showPR =
+		isGitRepo &&
 		props.gitBranch &&
 		props.gitBranch !== "main" &&
 		props.gitBranch !== "master"
@@ -102,46 +108,29 @@ export function TabBar(props: TabBarProps) {
 					title="Toggle Sidebar (Cmd+B)"
 					style={{
 						position: "absolute",
-						top: 0,
+						top: 5,
 						left: 78,
-						height: 38,
-						width: 32,
+						height: 28,
+						width: 28,
+						borderRadius: 6,
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
-						color: "var(--muted)",
+						color: "var(--text)",
 						background: "none",
 						border: "none",
 						cursor: "pointer",
-						transition: "color 0.15s, opacity 0.15s",
+						transition: "background-color 0.15s, opacity 0.15s",
 						zIndex: 10,
 					}}
 					onMouseEnter={(e) => {
-						e.currentTarget.style.color = "var(--text)"
+						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
 					}}
 					onMouseLeave={(e) => {
-						e.currentTarget.style.color = "var(--muted)"
+						e.currentTarget.style.backgroundColor = "transparent"
 					}}
 				>
-					<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-						<rect
-							x="1"
-							y="2"
-							width="14"
-							height="12"
-							rx="1.5"
-							stroke="currentColor"
-							strokeWidth="1.2"
-						/>
-						<line
-							x1="6"
-							y1="2"
-							x2="6"
-							y2="14"
-							stroke="currentColor"
-							strokeWidth="1.2"
-						/>
-					</svg>
+					<WindowToggleIcon side="left" open={false} />
 				</button>
 			)}
 			{props.openThreadTabs.length === 0 ? (
@@ -175,9 +164,19 @@ export function TabBar(props: TabBarProps) {
 							<button
 								className="titlebar-no-drag"
 								onClick={() => props.onSwitchThread(threadId)}
-								style={tabLabelStyle(isActive)}
+								style={{
+									...tabLabelStyle(isActive),
+									display: "inline-flex",
+									alignItems: "center",
+									gap: 5,
+								}}
 							>
-								{thread?.title || "New Thread"}
+								{/* Replay is marked on the replayed turns themselves (see
+								    ChatView), not on the tab: a session can mix live runs and
+								    one replayed block, so a tab-wide badge is misleading. */}
+								<span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+									{thread?.title || "New Thread"}
+								</span>
 							</button>
 							<button
 								className="titlebar-no-drag"
@@ -371,37 +370,33 @@ export function TabBar(props: TabBarProps) {
 
 			{/* Right sidebar toggle */}
 			<button
+				type="button"
 				className="titlebar-no-drag"
 				onClick={props.onToggleRightSidebar}
 				style={{
 					display: "flex",
 					alignItems: "center",
-					padding: "0 10px",
-					color: props.rightSidebarVisible ? "var(--text)" : "var(--muted)",
+					justifyContent: "center",
+					height: 28,
+					width: 28,
+					margin: "0 6px",
+					alignSelf: "center",
+					borderRadius: 6,
+					color: "var(--text)",
+					background: "none",
+					border: "none",
 					cursor: "pointer",
-					transition: "color 0.1s",
+					transition: "background-color 0.15s, opacity 0.15s",
+				}}
+				onMouseEnter={(e) => {
+					e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+				}}
+				onMouseLeave={(e) => {
+					e.currentTarget.style.backgroundColor = "transparent"
 				}}
 				title="Toggle Explorer (Cmd+Shift+E)"
 			>
-				<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-					<rect
-						x="1"
-						y="2"
-						width="14"
-						height="12"
-						rx="1.5"
-						stroke="currentColor"
-						strokeWidth="1.2"
-					/>
-					<line
-						x1="10.5"
-						y1="2"
-						x2="10.5"
-						y2="14"
-						stroke="currentColor"
-						strokeWidth="1.2"
-					/>
-				</svg>
+				<WindowToggleIcon side="right" open={props.rightSidebarVisible} />
 			</button>
 		</div>
 	)

@@ -157,4 +157,48 @@ describe("thinking options", () => {
 			types.indexOf("text-delta"),
 		)
 	})
+
+	it("resolves provider-specific thinking levels via getProviderThinkingLevels", async () => {
+		const { getProviderThinkingLevels } = await import("../constants/models.js")
+
+		// Anthropic: 5 levels (Off, Low, Med, High, Max)
+		const anthropicLevels = getProviderThinkingLevels("anthropic/claude-4.6")
+		expect(anthropicLevels).toBeDefined()
+		expect(anthropicLevels?.map((l) => l.id)).toEqual([
+			"off",
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+		])
+
+		// OpenAI: 4 levels (Off, Low, Med, High)
+		const openaiLevels = getProviderThinkingLevels("openai/gpt-5.6-terra")
+		expect(openaiLevels).toBeDefined()
+		expect(openaiLevels?.map((l) => l.id)).toEqual([
+			"off",
+			"low",
+			"medium",
+			"high",
+		])
+
+		// DeepSeek: 5 levels
+		const deepseekLevels = getProviderThinkingLevels("deepseek/deepseek-flash")
+		expect(deepseekLevels).toBeDefined()
+		expect(deepseekLevels?.map((l) => l.id)).toEqual([
+			"off",
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+		])
+
+		// Google: unsupported -> returns null
+		expect(getProviderThinkingLevels("google/gemini-3.8-flash")).toBeNull()
+		expect(getProviderThinkingLevels("gemini-3.8-flash")).toBeNull()
+
+		// Unknown / empty -> returns null
+		expect(getProviderThinkingLevels("")).toBeNull()
+		expect(getProviderThinkingLevels(undefined)).toBeNull()
+	})
 })

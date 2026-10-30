@@ -1,8 +1,24 @@
 import { randomUUID } from "node:crypto"
-import { stepCountIs, streamText, wrapLanguageModel } from "ai"
+import * as os from "node:os"
+import * as path from "node:path"
+import {
+	sessionRecordingManager,
+	createReplayTools,
+	endSessionReplay,
+	runtimeMetadata,
+	type RecordedRuntime,
+} from "../recorder/index.js"
 import { RequestContext } from "../context/index.js"
+import { logger } from "../logger/index.js"
 import { toModelTool } from "../tools/ai-tool.js"
 import type { Agent, MyAgentMessagePart } from "../agent/index.js"
+import {
+	defaultGraphRegistry,
+	defaultGraphRunner,
+	buildMessageParts,
+	DEFAULT_EXECUTION_MODE,
+	type GraphExecutionContext,
+} from "../graph/index.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
 export type ToolCategory =
@@ -33,11 +49,14 @@ export interface AvailableModel {
 	[key: string]: any
 }
 
+import type { GraphTopologyMetadata } from "../graph/index.js"
+
 export interface HarnessMode {
 	id: string
 	name: string
 	defaultModelId?: string
 	metadata?: Record<string, unknown>
+	topology?: GraphTopologyMetadata
 }
 
 export interface HarnessSubagent {
@@ -123,7 +142,7 @@ export class AgentController<TState = any> {
 	constructor(config: HarnessConfig<TState>) {
 		this.id = config.id || "myagent-code"
 		this.agent = config.agent
-		this.defaultModeId = config.defaultModeId || "build"
+		this.defaultModeId = config.defaultModeId || DEFAULT_EXECUTION_MODE
 		this.resourceId = config.resourceId
 		this.storage = config.storage
 		this.memory = config.memory
@@ -225,6 +244,16 @@ export class AgentController<TState = any> {
 			return thread?.metadata?.[opts.key]
 		}
 		return undefined
+	}
+
+	async getMemoryStore(): Promise<any> {
+		if (!this.storage) return null
+		if (typeof this.storage.init === "function") {
+			await this.storage.init()
+		}
+		return typeof this.storage.getStore === "function"
+			? await this.storage.getStore("memory")
+			: this.storage
 	}
 
 	async writeThreadMetadataValues(opts: {
@@ -333,7 +362,7 @@ export class Session<TState = any> {
 		this.controller = config.controller
 		this.resourceId = config.resourceId
 		this._state = { ...(config.initialState || {}) }
-		this._modeId = config.defaultModeId || "build"
+		this._modeId = config.defaultModeId || DEFAULT_EXECUTION_MODE
 	}
 
 	async init(): Promise<void> {
@@ -349,7 +378,7 @@ export class Session<TState = any> {
 		}
 	}
 
-	private async getMemoryStore(): Promise<any> {
+	async getMemoryStore(): Promise<any> {
 		if (!this.controller.storage) return null
 		if (typeof this.controller.storage.init === "function") {
 			await this.controller.storage.init()
@@ -386,6 +415,14 @@ export class Session<TState = any> {
 		}
 	}
 
+	get graph() {
+		return {
+			getTopology: (modeId?: string) =>
+				defaultGraphRegistry.getTopology(modeId || this._modeId),
+			listTopologies: () => defaultGraphRegistry.listTopologies(),
+		}
+	}
+
 	get model() {
 		return {
 			get: () => this._modelId,
@@ -409,13 +446,40 @@ export class Session<TState = any> {
 			}) => {
 				const threadId = randomUUID()
 				const title = opts?.title || "New Session"
+				const threadMetadata = {
+					modelId: (opts?.metadata?.modelId as string) || this._modelId,
+					modeId: (opts?.metadata?.modeId as string) || this._modeId,
+					thinkingLevel:
+						(opts?.metadata?.thinkingLevel as string) ||
+						this._state.thinkingLevel ||
+						"off",
+					permissionMode:
+						(opts?.metadata?.permissionMode as string) ||
+						this._state.permissionMode ||
+						(this._state.yolo ? "auto-approve" : "default"),
+					...(opts?.metadata || {}),
+				}
+				if (opts?.metadata?.modelId) {
+					this._modelId = opts.metadata.modelId as string
+					this._state.currentModelId = opts.metadata.modelId as string
+				}
+				if (opts?.metadata?.modeId) {
+					this._modeId = opts.metadata.modeId as string
+				}
+				if (opts?.metadata?.thinkingLevel) {
+					this._state.thinkingLevel = opts.metadata.thinkingLevel as string
+				}
+				if (opts?.metadata?.permissionMode) {
+					this._state.permissionMode = opts.metadata.permissionMode as string
+					this._state.yolo = opts.metadata.permissionMode === "auto-approve"
+				}
 				const threadObj = {
 					id: threadId,
 					title,
 					resourceId: this.resourceId,
 					createdAt: new Date(),
 					updatedAt: new Date(),
-					metadata: opts?.metadata || {},
+					metadata: threadMetadata,
 				}
 				const store = await this.getMemoryStore()
 				if (store?.saveThread) {
@@ -428,6 +492,54 @@ export class Session<TState = any> {
 			},
 			switch: async (opts: { threadId: string }) => {
 				this._currentThreadId = opts.threadId
+				const store = await this.getMemoryStore()
+				if (store?.getThreadById) {
+					const thread = await store.getThreadById({ threadId: opts.threadId })
+					if (thread?.metadata) {
+						const meta = thread.metadata as Record<string, any>
+						if (meta.modelId) {
+							this._modelId = meta.modelId
+							this._state.currentModelId = meta.modelId
+							this.emit({ type: "model_changed", modelId: meta.modelId })
+						}
+						if (meta.modeId) {
+							this._modeId = meta.modeId
+							this.emit({ type: "mode_changed", modeId: meta.modeId })
+						}
+						if (meta.thinkingLevel) {
+							this._state.thinkingLevel = meta.thinkingLevel
+						}
+						if (meta.permissionMode) {
+							this._state.permissionMode = meta.permissionMode
+							const isAuto = meta.permissionMode === "auto-approve"
+							this._state.yolo = isAuto
+							const policies = isAuto
+								? {
+										read: "allow",
+										edit: "allow",
+										execute: "allow",
+										mcp: "allow",
+									}
+								: meta.permissionMode === "read-only"
+									? {
+											read: "allow",
+											edit: "deny",
+											execute: "deny",
+											mcp: "deny",
+										}
+									: {
+											read: "allow",
+											edit: "ask",
+											execute: "ask",
+											mcp: "ask",
+										}
+							for (const [category, policy] of Object.entries(policies)) {
+								this._categoryPolicies[category as ToolCategory] =
+									policy as PermissionPolicy
+							}
+						}
+					}
+				}
 				this.emit({ type: "thread_changed", threadId: opts.threadId })
 				return opts.threadId
 			},
@@ -465,6 +577,7 @@ export class Session<TState = any> {
 				if (store?.listThreads) {
 					const res = await store.listThreads({
 						resourceId: this.resourceId,
+						filter: { resourceId: this.resourceId },
 						orderBy: { field: "updatedAt", direction: "DESC" },
 					})
 					return Array.isArray(res) ? res : (res?.threads ?? [])
@@ -500,11 +613,117 @@ export class Session<TState = any> {
 			}) => {
 				this._categoryPolicies[category] = policy
 			},
+			setForTool: ({
+				toolName,
+				policy,
+			}: {
+				toolName: string
+				policy: PermissionPolicy
+			}) => {
+				this._toolPolicies[toolName] = policy
+			},
 			getRules: () => ({
 				categories: { ...this._categoryPolicies },
 				tools: { ...this._toolPolicies },
 			}),
 		}
+	}
+
+	/** UI-level permission mode; falls back to yolo when the picker never wrote one. */
+	getPermissionMode(): string {
+		return (
+			(this._state.permissionMode as string) ||
+			(this._state.yolo ? "auto-approve" : "default")
+		)
+	}
+
+	/**
+	 * Everything a recording needs to reproduce a run: which model, which
+	 * execution mode, and the effective permission gate (including the session
+	 * grants that already answered "always allow" prompts).
+	 */
+	snapshotRuntime(): RecordedRuntime {
+		const stateModel = this._state.currentModelId
+		return {
+			modelId:
+				this._modelId ||
+				(typeof stateModel === "string" ? stateModel : "") ||
+				undefined,
+			modeId: this._modeId,
+			thinkingLevel: this._state.thinkingLevel as string | undefined,
+			permissionMode: this.getPermissionMode(),
+			permissionRules: {
+				categories: { ...this._categoryPolicies },
+				tools: { ...this._toolPolicies },
+			},
+			grants: {
+				categories: Array.from(this._grantedCategories),
+				tools: Array.from(this._grantedTools),
+			},
+		}
+	}
+
+	/**
+	 * Point the live session at a recorded runtime.
+	 *
+	 * `clearPolicies` is used when a replay starts: a custom tool policy left
+	 * over from the current session would otherwise silently change the
+	 * approval behaviour the recording captured.
+	 */
+	applyRuntime(
+		runtime: RecordedRuntime,
+		options: {
+			clearPolicies?: boolean
+			applyGrants?: boolean
+		} = {},
+	): void {
+		if (runtime.modeId && runtime.modeId !== this._modeId) {
+			this._modeId = runtime.modeId
+			this.emit({ type: "mode_changed", modeId: runtime.modeId })
+		}
+
+		if (runtime.modelId && runtime.modelId !== this._modelId) {
+			this._modelId = runtime.modelId
+			this._state.currentModelId = runtime.modelId
+			this.emit({ type: "model_changed", modelId: runtime.modelId })
+		}
+
+		if (runtime.thinkingLevel) {
+			this._state.thinkingLevel = runtime.thinkingLevel
+		}
+
+		if (runtime.permissionMode) {
+			this._state.permissionMode = runtime.permissionMode
+			this._state.yolo = runtime.permissionMode === "auto-approve"
+		}
+
+		if (options.clearPolicies) {
+			this._categoryPolicies = {}
+			this._toolPolicies = {}
+		}
+		for (const [category, policy] of Object.entries(
+			runtime.permissionRules?.categories ?? {},
+		)) {
+			if (!policy) continue
+			this._categoryPolicies[category] = policy as PermissionPolicy
+		}
+		for (const [toolName, policy] of Object.entries(
+			runtime.permissionRules?.tools ?? {},
+		)) {
+			if (!policy) continue
+			this._toolPolicies[toolName] = policy as PermissionPolicy
+		}
+
+		if (options.applyGrants) {
+			this._grantedCategories = new Set(runtime.grants?.categories ?? [])
+			this._grantedTools = new Set(runtime.grants?.tools ?? [])
+		}
+
+		this.emit({
+			type: "permission_mode_changed",
+			permissionMode: this.getPermissionMode(),
+			rules: this.permissions.getRules(),
+		})
 	}
 
 	grantCategory(category: ToolCategory): void {
@@ -623,6 +842,23 @@ export class Session<TState = any> {
 
 		const startTime = Date.now()
 		const runId = randomUUID()
+		let recorder: any = null
+		let replayModelUsed: any = null
+
+		const runState = this.state.get() as Record<string, any>
+		logger.info("run", "sendMessage", {
+			runId,
+			threadId,
+			resourceId,
+			modeId: this._modeId,
+			modelId: runState?.currentModelId,
+			permissionMode: runState?.permissionMode,
+			contentLength:
+				typeof options.content === "string"
+					? options.content.length
+					: undefined,
+			files: Array.isArray(options.files) ? options.files.length : 0,
+		})
 
 		try {
 			// 1. Build and persist user message
@@ -718,8 +954,12 @@ export class Session<TState = any> {
 
 			// 2. Prepare request context
 			const requestContext = options.requestContext || new RequestContext()
-			requestContext.set("controller", this.controller)
-			requestContext.set("harness", this.controller)
+			if (!requestContext.get("controller")) {
+				requestContext.set("controller", this.controller)
+			}
+			if (!requestContext.get("harness")) {
+				requestContext.set("harness", this.controller)
+			}
 			requestContext.set("session", this)
 			requestContext.set("threadId", threadId)
 			requestContext.set("resourceId", resourceId)
@@ -739,8 +979,35 @@ export class Session<TState = any> {
 			}
 
 			const instructions = await agent.getInstructions({ requestContext })
-			const model = await agent.getModel({ requestContext })
+			// A replay is driven entirely by the recording, but resolving the real
+			// model still runs first and can throw — the recorded model may belong
+			// to a provider this machine is no longer signed in to. Never let that
+			// kill a replay whose model is never going to be called.
+			const preloadedReplayModel = threadId
+				? sessionRecordingManager.getReplayModel(threadId)
+				: null
+			let model: any
+			try {
+				model = await agent.getModel({ requestContext })
+			} catch (err) {
+				if (!preloadedReplayModel) throw err
+				console.warn(
+					"[replay] recorded model is unavailable, falling back to the offline replay model:",
+					err,
+				)
+				model = preloadedReplayModel
+			}
 			const rawTools = await agent.listTools({ requestContext })
+			logger.debug("run", "model resolved", {
+				runId,
+				threadId,
+				modelId:
+					(model as any)?.modelId ??
+					(model as any)?.provider ??
+					(this.state.get() as any)?.currentModelId,
+				tools: Object.keys(rawTools || {}).length,
+				instructionsLength: instructions?.length ?? 0,
+			})
 
 			// Build executable tools with approval gate and lifecycle events
 			const executableTools: Record<string, any> = {}
@@ -894,7 +1161,7 @@ export class Session<TState = any> {
 				const role = m.role
 				if (role === "user") {
 					const parts: any[] = []
-					let userText = ""
+					let histUserText = ""
 					const attachedNames: string[] = []
 
 					const rawParts = Array.isArray(m.content?.parts)
@@ -907,7 +1174,8 @@ export class Session<TState = any> {
 						for (const p of rawParts) {
 							if (!p) continue
 							if (p.type === "text" && typeof p.text === "string") {
-								userText = (userText ? userText + "\n" : "") + p.text
+								histUserText =
+									(histUserText ? histUserText + "\n" : "") + p.text
 							} else if (p.type === "image") {
 								if (canVision) {
 									const imgData =
@@ -932,9 +1200,9 @@ export class Session<TState = any> {
 						}
 					} else {
 						if (typeof m.content === "string") {
-							userText = m.content
+							histUserText = m.content
 						} else if (m.content?.content) {
-							userText =
+							histUserText =
 								typeof m.content.content === "string" ? m.content.content : ""
 						}
 					}
@@ -969,40 +1237,71 @@ export class Session<TState = any> {
 					if (!canVision && attachedNames.length > 0) {
 						const uniqueNames = Array.from(new Set(attachedNames)).join(", ")
 						const note = `[Attached image: ${uniqueNames}]`
-						if (!userText.includes("[Attached image:")) {
-							userText = userText ? `${userText}\n\n${note}` : note
+						if (!histUserText.includes("[Attached image:")) {
+							histUserText = histUserText ? `${histUserText}\n\n${note}` : note
 						}
 					}
 
-					userText = userText.trim()
+					histUserText = histUserText.trim()
 					if (parts.length > 0) {
-						if (userText) {
-							parts.unshift({ type: "text", text: userText })
+						if (histUserText) {
+							parts.unshift({ type: "text", text: histUserText })
 						}
 						coreMessages.push({ role: "user", content: parts })
-					} else if (userText) {
-						coreMessages.push({ role: "user", content: userText })
+					} else if (histUserText) {
+						coreMessages.push({ role: "user", content: histUserText })
 					}
 				} else {
 					let text = ""
+					let reasoning = ""
+
 					if (typeof m.content === "string") {
 						text = m.content
-					} else if (m.content?.content) {
-						text =
-							typeof m.content.content === "string" ? m.content.content : ""
-					} else if (Array.isArray(m.content?.parts)) {
-						text = m.content.parts.map((p: any) => p.text || "").join("")
+					} else if (
+						m.content?.content &&
+						typeof m.content.content === "string"
+					) {
+						text = m.content.content
 					}
+					if (m.content?.reasoning && typeof m.content.reasoning === "string") {
+						reasoning = m.content.reasoning
+					}
+
+					if (Array.isArray(m.content?.parts) && m.content.parts.length > 0) {
+						for (const p of m.content.parts) {
+							if (!p) continue
+							if (p.type === "reasoning" || p.type === "thinking") {
+								const t = p.text || p.thinking || p.reasoning || ""
+								if (t && !reasoning.includes(t)) {
+									reasoning = reasoning ? `${reasoning}\n${t}` : t
+								}
+							} else if (p.type === "text" && typeof p.text === "string") {
+								if (!text.includes(p.text)) {
+									text = text ? `${text}\n${p.text}` : p.text
+								}
+							}
+						}
+					}
+
 					text = text.trim()
-					if (!text) continue
-					coreMessages.push({ role: "assistant", content: text })
+					reasoning = reasoning.trim()
+
+					if (reasoning) {
+						const assistantContent: any[] = [
+							{ type: "reasoning", text: reasoning },
+						]
+						if (text) {
+							assistantContent.push({ type: "text", text })
+						}
+						coreMessages.push({ role: "assistant", content: assistantContent })
+					} else if (text) {
+						coreMessages.push({ role: "assistant", content: text })
+					}
 				}
 			}
 
 			// 6. Create assistant message placeholder
 			const assistantMessageId = randomUUID()
-			let assistantText = ""
-			let reasoningText = ""
 
 			this.emit({
 				type: "message_start",
@@ -1014,250 +1313,94 @@ export class Session<TState = any> {
 				},
 			})
 
-			// 7. Run AI streamText
-			// The AI SDK dropped `maxSteps` in favour of `stopWhen`; without it the
-			// run stops after a single model call, so a tool call would never be
-			// followed by the assistant's answer.
-			// Wrap model to guarantee v3/v4 file part compatibility (avoiding null serialization).
-			// `modelIdStr` also decides how image parts are shaped: providers built on
-			// AI SDK v4 (DeepSeek) only understand the legacy `image` part and serialize
-			// anything newer as `null`, which the API rejects with a 400.
-			const legacyImageParts = modelIdStr.includes("deepseek")
-			const effectiveModel = wrapLanguageModel({
-				model: model as any,
-				middleware: {
-					specificationVersion: "v3",
-					transformParams: async ({ params }) => {
-						if (Array.isArray(params.prompt)) {
-							for (const msg of params.prompt) {
-								if (!Array.isArray(msg.content)) continue
-								for (const part of msg.content) {
-									if (part.type === "file" && typeof part.data === "string") {
-										;(part as any).data = { type: "data", data: part.data }
-									}
-									if (legacyImageParts && (part as any).type === "image") {
-										// `image_url` -> `image`: the OpenAI-compatible
-										// adapter rebuilds the data URL from base64 + mediaType.
-										const url = (part as any).image_url
-										if (typeof url === "string" && url.startsWith("data:")) {
-											const comma = url.indexOf(",")
-											const header = url.slice(5, comma)
-											;(part as any).image = url.slice(comma + 1)
-											;(part as any).mediaType =
-												header.split(";")[0] || "image/png"
-											delete (part as any).image_url
-										}
-									}
-								}
-							}
-						}
-						return params
-					},
-				},
+			// Check for offline replay model or recording
+			const replayModel = preloadedReplayModel
+			replayModelUsed = replayModel
+			const activeModel = replayModel || model
+			const activeExecutableTools = replayModel
+				? createReplayTools(executableTools, [])
+				: executableTools
+
+			const sessionsDir =
+				process.env.MYAGENT_SESSIONS_DIR ||
+				path.join(os.homedir(), ".myagent", "sessions")
+			// Snapshot the composer selections *before* the run: a replay has to
+			// reproduce the model/mode/permission this run actually used, not
+			// whatever the session is set to at replay time.
+			const runtimeSnapshot = this.snapshotRuntime()
+			const sessionModelId = runtimeSnapshot.modelId || modelIdStr
+			recorder = sessionRecordingManager.getOrCreateRecorder({
+				threadId,
+				runId,
+				sessionsDir,
+				cwd: (this.state as any)?.projectPath || process.cwd(),
+				model: sessionModelId,
+				runtime: runtimeSnapshot,
 			})
 
-			const streamRes = (streamText as any)({
-				model: effectiveModel,
-				system: instructions,
-				messages: coreMessages,
-				tools:
-					Object.keys(executableTools).length > 0 ? executableTools : undefined,
-				stopWhen: stepCountIs(50),
-				abortSignal: abortController.signal,
-			})
-
-			const buildCurrentContent = (): {
-				parts: MyAgentMessagePart[]
-				cleanText: string
-				hasThinking: boolean
-			} => {
-				const parts: MyAgentMessagePart[] = []
-				let finalCleanText = assistantText
-				let activeThinking = reasoningText
-
-				// If no structured reasoning, check if assistantText has embedded <think> tags
-				if (!activeThinking && assistantText.includes("<think")) {
-					const tagRegex =
-						/<(think|thought|reasoning|thinking)>([\s\S]*?)<\/\1>/gi
-					const extracted: string[] = []
-					const withoutClosed = assistantText.replace(tagRegex, (_m, _t, c) => {
-						const trimmed = String(c || "").trim()
-						if (trimmed) extracted.push(trimmed)
-						return ""
-					})
-					const unclosedMatch = withoutClosed.match(
-						/<(think|thought|reasoning|thinking)>([\s\S]*)$/i,
-					)
-					if (unclosedMatch) {
-						const unclosed = String(unclosedMatch[2] || "").trim()
-						if (unclosed) extracted.push(unclosed)
-						finalCleanText = withoutClosed.slice(0, unclosedMatch.index).trim()
-					} else {
-						finalCleanText = withoutClosed.trim()
-					}
-					if (extracted.length > 0) {
-						activeThinking = extracted.join("\n\n")
-					}
-				}
-
-				if (activeThinking) {
-					parts.push({
-						type: "thinking",
-						thinking: activeThinking,
-						text: activeThinking,
-					})
-				}
-				for (const t of executedTools) {
-					parts.push({
-						type: "tool-call",
-						toolCallId: t.id,
-						toolName: t.name,
-						args: t.args,
-					} as any)
-					if (t.result !== undefined) {
-						parts.push({
-							type: "tool-result",
-							toolCallId: t.id,
-							toolName: t.name,
-							result: t.result,
-							isError: t.isError,
-						} as any)
-					}
-				}
-				if (finalCleanText) {
-					parts.push({
-						type: "text",
-						text: finalCleanText,
-					})
-				}
-				return {
-					parts,
-					cleanText: finalCleanText,
-					hasThinking: Boolean(activeThinking),
-				}
+			if (recorder) {
+				recorder.recordRunStart({
+					systemPrompt: instructions,
+					userPrompt: userText,
+					tools: Object.entries(activeExecutableTools).map(([name, t]) => ({
+						name,
+						description: (t as any)?.description,
+					})),
+					stepLimit: 50,
+					runtime: runtimeSnapshot,
+				})
+				recorder.recordStepStart(1, 1)
 			}
 
-			for await (const chunk of streamRes.fullStream) {
-				if (abortController.signal.aborted) break
-				// Stream failures (bad credentials, provider 4xx, network) arrive as
-				// `error` parts and the stream then completes normally. Rethrow so the
-				// send fails loudly instead of persisting an empty assistant message.
-				if (chunk.type === "error") {
-					throw chunk.error instanceof Error
-						? chunk.error
-						: new Error(String(chunk.error))
-				}
-				if (chunk.type === "finish") {
-					const usage = (chunk as any).totalUsage ?? (chunk as any).usage
-					if (usage) {
-						this._tokenUsage = {
-							promptTokens:
-								this._tokenUsage.promptTokens + (usage.inputTokens ?? 0),
-							completionTokens:
-								this._tokenUsage.completionTokens + (usage.outputTokens ?? 0),
-							totalTokens:
-								this._tokenUsage.totalTokens + (usage.totalTokens ?? 0),
-						}
-					}
-				}
-				if (
-					chunk.type === "reasoning-delta" ||
-					chunk.type === "reasoning" ||
-					(chunk.type as string) === "reasoning-content"
-				) {
-					const delta =
-						(chunk as any).delta ||
-						(chunk as any).textDelta ||
-						(chunk as any).text ||
-						""
-					if (delta) {
-						reasoningText += delta
-						this.emit({
-							type: "message_delta",
-							id: assistantMessageId,
-							delta: "",
-							reasoningDelta: delta,
-						})
-						const { parts } = buildCurrentContent()
-						this.emit({
-							type: "message_update",
-							id: assistantMessageId,
-							message: {
-								id: assistantMessageId,
-								role: "assistant",
-								content: parts,
-							},
-						})
-					}
-				} else if (chunk.type === "tool-call") {
-					const toolCallId = (chunk as any).toolCallId
-					const existing = executedTools.find((t) => t.id === toolCallId)
-					if (!existing) {
-						executedTools.push({
-							id: toolCallId,
-							name: (chunk as any).toolName,
-							args: (chunk as any).args,
-						})
-					}
-					const { parts } = buildCurrentContent()
-					this.emit({
-						type: "message_update",
-						id: assistantMessageId,
-						message: {
-							id: assistantMessageId,
-							role: "assistant",
-							content: parts,
-						},
-					})
-				} else if (chunk.type === "tool-result") {
-					const toolCallId = (chunk as any).toolCallId
-					const existing = executedTools.find((t) => t.id === toolCallId)
-					if (existing) {
-						existing.result = (chunk as any).result
-						existing.isError = (chunk as any).isError
-					} else {
-						executedTools.push({
-							id: toolCallId,
-							name: (chunk as any).toolName,
-							args: (chunk as any).args,
-							result: (chunk as any).result,
-							isError: (chunk as any).isError,
-						})
-					}
-					const { parts } = buildCurrentContent()
-					this.emit({
-						type: "message_update",
-						id: assistantMessageId,
-						message: {
-							id: assistantMessageId,
-							role: "assistant",
-							content: parts,
-						},
-					})
-				} else if (chunk.type === "text-delta") {
-					const delta = (chunk as any).textDelta || (chunk as any).text || ""
-					assistantText += delta
-					this.emit({
-						type: "message_delta",
-						id: assistantMessageId,
-						delta,
-					})
-					const { parts } = buildCurrentContent()
-					this.emit({
-						type: "message_update",
-						id: assistantMessageId,
-						message: {
-							id: assistantMessageId,
-							role: "assistant",
-							content: parts,
-						},
-					})
-				}
+			// 7. Execute mode graph via GraphRunner
+			const graphCtx: GraphExecutionContext = {
+				modeId: this._modeId || DEFAULT_EXECUTION_MODE,
+				model: activeModel as any,
+				modelIdStr,
+				instructions,
+				executableTools: activeExecutableTools,
+				abortSignal: abortController.signal,
+				emit: (ev) => this.emit(ev),
+				store,
+				resourceId,
+				threadId,
+				recorder,
+			}
+
+			const runResult = await defaultGraphRunner.run(
+				graphCtx,
+				coreMessages,
+				assistantMessageId,
+			)
+
+			if (recorder) {
+				const isStepLimit = (runResult as any).finishReason === "tool-calls"
+				recorder.recordRunEnd({
+					status: isStepLimit ? "step-limit" : "completed",
+					finishReason: (runResult as any).finishReason ?? "stop",
+				})
+			}
+
+			this._tokenUsage = {
+				promptTokens:
+					this._tokenUsage.promptTokens + runResult.tokenUsage.promptTokens,
+				completionTokens:
+					this._tokenUsage.completionTokens +
+					runResult.tokenUsage.completionTokens,
+				totalTokens:
+					this._tokenUsage.totalTokens + runResult.tokenUsage.totalTokens,
 			}
 
 			const durationMs = Date.now() - startTime
-			const { parts: finalParts, cleanText: finalCleanText } =
-				buildCurrentContent()
+			const {
+				parts: finalParts,
+				cleanText: finalCleanText,
+				activeThinking,
+			} = buildMessageParts(
+				runResult.assistantText,
+				runResult.reasoningText,
+				runResult.executedTools,
+			)
 
 			// 8. Persist assistant message with durationMs
 			const assistantDbMessage = {
@@ -1268,9 +1411,11 @@ export class Session<TState = any> {
 					parts:
 						finalParts.length > 0
 							? finalParts
-							: [{ type: "text", text: assistantText }],
-					content: finalCleanText || assistantText,
-					reasoning: reasoningText || undefined,
+							: finalCleanText
+								? [{ type: "text", text: finalCleanText }]
+								: [],
+					content: finalCleanText,
+					reasoning: activeThinking || undefined,
 				},
 				threadId,
 				resourceId,
@@ -1283,6 +1428,16 @@ export class Session<TState = any> {
 			}
 
 			// 9. Emit final message_end and agent_end
+			logger.info("run", "run completed", {
+				runId,
+				threadId,
+				durationMs,
+				finishReason: (runResult as any)?.finishReason,
+				textLength: finalCleanText?.length ?? 0,
+				reasoningLength: activeThinking?.length ?? 0,
+				parts: finalParts.length,
+				tokenUsage: runResult.tokenUsage,
+			})
 			this.emit({
 				type: "message_end",
 				id: assistantMessageId,
@@ -1299,8 +1454,24 @@ export class Session<TState = any> {
 		} catch (err: any) {
 			if (abortController.signal.aborted) {
 				console.warn("[Session] Run aborted by user.")
+				logger.info("run", "run aborted", { runId, threadId })
+				if (recorder) {
+					recorder.recordRunEnd({ status: "aborted" })
+				}
 			} else {
 				console.error("[Session] Error during sendMessage:", err)
+				logger.error("run", "run failed", {
+					runId,
+					threadId,
+					durationMs: Date.now() - startTime,
+					error: err,
+				})
+				if (recorder) {
+					recorder.recordRunEnd({
+						status: "error",
+						error: err?.message || String(err),
+					})
+				}
 			}
 			const durationMs = Date.now() - startTime
 			this.emit({
@@ -1315,6 +1486,39 @@ export class Session<TState = any> {
 		} finally {
 			this._isRunning = false
 			this._activeAbortController = null
+			if (threadId) {
+				sessionRecordingManager.finishRecorder(threadId)
+			}
+			// A replay run is one-shot: once it finishes (or fails) the thread goes
+			// back to normal, otherwise the stale replay flag keeps the UI in
+			// "replaying" state and the next message hits "script exhausted".
+			if (replayModelUsed && threadId) {
+				// The replay switched the session to the recorded model/mode/
+				// permission. Hand the user's own selection back so the composer
+				// does not stay pinned to the recorded one.
+				const { restored } = endSessionReplay(this, threadId)
+				if (restored) {
+					try {
+						for (const [key, value] of runtimeMetadata(restored)) {
+							await this.controller.writeThreadMetadataValue?.({
+								threadId,
+								key,
+								value,
+							})
+						}
+					} catch (e) {
+						console.warn("[replay] failed to restore session metadata:", e)
+					}
+				}
+				try {
+					await this.controller.writeThreadMetadataValue?.({
+						threadId,
+						key: "isReplay",
+						value: false,
+					})
+				} catch {}
+				this.emit({ type: "session_replay_stopped", threadId })
+			}
 			if (releaseLock) {
 				try {
 					releaseLock()

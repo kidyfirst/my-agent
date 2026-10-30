@@ -9,6 +9,7 @@ declare global {
 export type HarnessEventType =
 	| "mode_changed"
 	| "model_changed"
+	| "permission_mode_changed"
 	| "thread_changed"
 	| "thread_created"
 	| "thread_deleted"
@@ -56,6 +57,8 @@ export type HarnessEventType =
 	| "plan_approval_required"
 	| "plan_approved"
 	| "shortcut"
+	| "graph_node_started"
+	| "graph_node_completed"
 	| "login_auth"
 	| "login_prompt"
 	| "login_progress"
@@ -70,6 +73,13 @@ export type HarnessEventType =
 	| "project_changed"
 	| "thread_title_updated"
 	| "display_state_changed"
+	| "session_recording_changed"
+	| "session_recording_exported"
+	| "session_replay_started"
+	| "session_replay_stopped"
+	| "agent_step_limit"
+	| "logging_config_changed"
+	| "log_entries"
 
 export interface HarnessEventPayload {
 	type: HarnessEventType
@@ -133,6 +143,8 @@ export interface AttachedFile {
 	data: string
 	preview?: string
 	mimeType?: string
+	path?: string
+	relativePath?: string
 }
 
 export interface Message {
@@ -160,6 +172,7 @@ export interface ThreadInfo {
 	createdAt: string
 	updatedAt: string
 	tokenUsage?: TokenUsage
+	metadata?: Record<string, unknown> | null
 }
 
 export interface UpdateInfo {
@@ -173,3 +186,16 @@ export interface UpdateInfo {
 	publishedAt?: string
 	error?: string
 }
+
+export {
+	ExecutionMode,
+	DEFAULT_EXECUTION_MODE,
+} from "../../core/graph/types.js"
+
+export type {
+	ExecutionModeId,
+	GraphTopologyMetadata,
+	GraphTopologyNode,
+	GraphTopologyEdge,
+	GraphNodeKind,
+} from "../../core/graph/types.js"

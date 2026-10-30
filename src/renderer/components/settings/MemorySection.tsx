@@ -26,9 +26,7 @@ export function MemorySection({
 					currentModelId={state.observerModelId}
 					models={models}
 					loading={!modelsLoaded}
-					onSelect={(v) =>
-						update("observerModelId", v)
-					}
+					onSelect={(v) => update("observerModelId", v)}
 				/>
 			</SettingRow>
 			<SettingRow
@@ -39,9 +37,7 @@ export function MemorySection({
 					currentModelId={state.reflectorModelId}
 					models={models}
 					loading={!modelsLoaded}
-					onSelect={(v) =>
-						update("reflectorModelId", v)
-					}
+					onSelect={(v) => update("reflectorModelId", v)}
 				/>
 			</SettingRow>
 
@@ -55,8 +51,7 @@ export function MemorySection({
 					value={state.observationThreshold}
 					onChange={(e) => {
 						const v = parseInt(e.target.value, 10)
-						if (!isNaN(v) && v > 0)
-							update("observationThreshold", v)
+						if (!isNaN(v) && v > 0) update("observationThreshold", v)
 					}}
 					style={{
 						width: 80,
@@ -80,8 +75,7 @@ export function MemorySection({
 					value={state.reflectionThreshold}
 					onChange={(e) => {
 						const v = parseInt(e.target.value, 10)
-						if (!isNaN(v) && v > 0)
-							update("reflectionThreshold", v)
+						if (!isNaN(v) && v > 0) update("reflectionThreshold", v)
 					}}
 					style={{
 						width: 80,

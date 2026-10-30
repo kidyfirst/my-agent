@@ -23,6 +23,7 @@ export function useProjectManager(
 		setActiveTab: React.Dispatch<React.SetStateAction<string>>
 		setThreads: React.Dispatch<React.SetStateAction<any[]>>
 		setTokenUsage: React.Dispatch<React.SetStateAction<any>>
+		setCurrentThreadId?: React.Dispatch<React.SetStateAction<string | null>>
 	},
 ) {
 	const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
@@ -121,7 +122,7 @@ export function useProjectManager(
 		loadLinkedIssues()
 	}, [loadLinkedIssues])
 
-	async function loadEnrichedProjects() {
+	async function loadEnrichedProjects(): Promise<EnrichedProject[]> {
 		try {
 			const projects = (await window.api.invoke({
 				type: "getRecentProjects",
@@ -137,10 +138,12 @@ export function useProjectManager(
 				)
 				setEnrichedProjects(sanitized)
 				loadWorktreeStatuses(sanitized)
+				return sanitized
 			}
 		} catch {
 			// ignore
 		}
+		return []
 	}
 
 	async function loadPRStatus() {
@@ -224,6 +227,9 @@ export function useProjectManager(
 			return next
 		})
 		setProjectSwitching(true)
+		try {
+			localStorage.setItem("myagent-last-project", switchPath)
+		} catch {}
 		await window.api.invoke({ type: "switchProject", path: switchPath })
 	}, [])
 
@@ -293,25 +299,97 @@ export function useProjectManager(
 		}
 	}, [cloneUrl, cloneDest, cloning])
 
-	const handleRemoveProject = useCallback(async (projectPath: string) => {
-		await window.api.invoke({ type: "removeRecentProject", path: projectPath })
-		loadEnrichedProjects()
-	}, [])
+	const handleRemoveProject = useCallback(
+		async (projectPath: string, deleteHistory?: boolean) => {
+			const normalize = (p?: string | null) =>
+				(p || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
+			const curRoot = projectInfoRef.current?.rootPath
+			const isCurrentProject =
+				!!curRoot &&
+				(normalize(curRoot) === normalize(projectPath) ||
+					normalize(curRoot).startsWith(normalize(projectPath) + "/"))
+
+			await window.api.invoke({
+				type: "removeRecentProject",
+				path: projectPath,
+				deleteHistory: Boolean(deleteHistory),
+			})
+
+			try {
+				localStorage.removeItem(`myagent-last-thread-${projectPath}`)
+				if (
+					normalize(localStorage.getItem("myagent-last-project")) ===
+					normalize(projectPath)
+				) {
+					localStorage.removeItem("myagent-last-project")
+				}
+			} catch {}
+
+			const remaining = await loadEnrichedProjects()
+			const validRemaining = (remaining || []).filter(
+				(p) => normalize(p.rootPath) !== normalize(projectPath),
+			)
+
+			if (isCurrentProject) {
+				if (validRemaining.length > 0) {
+					const nextProject = validRemaining[0]
+					setProjectSwitching(true)
+					try {
+						localStorage.setItem("myagent-last-project", nextProject.rootPath)
+					} catch {}
+					await window.api.invoke({
+						type: "switchProject",
+						path: nextProject.rootPath,
+					})
+				} else {
+					// No projects left, reset to empty start page
+					setProjectInfo(null)
+					dispatch({ type: "CLEAR" })
+					tabSetters.setCurrentThreadId?.(null)
+					tabSetters.setThreads([])
+					tabSetters.setOpenThreadTabs([])
+					tabSetters.setActiveTab("chat")
+					tabSetters.setOpenFiles([])
+					setActiveWorktrees(new Set())
+					setUnreadWorktrees(new Set())
+					tabSetters.setTokenUsage({
+						promptTokens: 0,
+						completionTokens: 0,
+						totalTokens: 0,
+					})
+				}
+			}
+		},
+		[dispatch, tabSetters],
+	)
 
 	const handleDeleteWorktree = useCallback(
 		async (worktreePath: string) => {
-			const isCurrentProject = projectInfoRef.current?.rootPath === worktreePath
+			const normalize = (p?: string | null) =>
+				(p || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
+			const isCurrentProject =
+				normalize(projectInfoRef.current?.rootPath) === normalize(worktreePath)
 			let switchTo: string | null = null
 			if (isCurrentProject) {
 				for (const p of enrichedProjects) {
 					const parentPath = p.mainRepoPath || p.rootPath
 					const siblings =
-						p.worktrees?.filter((wt) => wt.path !== worktreePath) ?? []
-					const isChild = p.worktrees?.some((wt) => wt.path === worktreePath)
+						p.worktrees?.filter(
+							(wt) => normalize(wt.path) !== normalize(worktreePath),
+						) ?? []
+					const isChild = p.worktrees?.some(
+						(wt) => normalize(wt.path) === normalize(worktreePath),
+					)
 					if (isChild) {
 						switchTo = siblings.length > 0 ? siblings[0].path : parentPath
 						break
 					}
+				}
+				if (!switchTo && enrichedProjects.length > 0) {
+					const fallbackProj = enrichedProjects.find(
+						(p) => normalize(p.rootPath) !== normalize(worktreePath),
+					)
+					if (fallbackProj) switchTo = fallbackProj.rootPath
 				}
 			}
 

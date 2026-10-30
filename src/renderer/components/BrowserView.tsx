@@ -37,12 +37,18 @@ function normalizeUrl(input: string): string {
 	const trimmed = input.trim()
 	if (!trimmed) return ""
 	if (/^https?:\/\//i.test(trimmed)) return trimmed
-	if (/^localhost[:/]|^127\.0\.0\.1[:/]|^0\.0\.0\.0[:/]/.test(trimmed)) return `http://${trimmed}`
+	if (/^localhost[:/]|^127\.0\.0\.1[:/]|^0\.0\.0\.0[:/]/.test(trimmed))
+		return `http://${trimmed}`
 	if (/^[\w-]+\.[\w.]+/.test(trimmed)) return `https://${trimmed}`
 	return `https://${trimmed}`
 }
 
-export function BrowserView({ url, onNavigate, onClose, onTitleChange }: BrowserViewProps) {
+export function BrowserView({
+	url,
+	onNavigate,
+	onClose,
+	onTitleChange,
+}: BrowserViewProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null)
 	const [addressValue, setAddressValue] = useState(url)
 	const [isLoading, setIsLoading] = useState(true)
@@ -138,14 +144,16 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 
 	// History dropdown items
 	const historyItems = historyDropdown
-		? loadHistory().filter((e) => {
-				if (!historyFilter) return true
-				const lower = historyFilter.toLowerCase()
-				return (
-					e.url.toLowerCase().includes(lower) ||
-					e.title.toLowerCase().includes(lower)
-				)
-			}).slice(0, 20)
+		? loadHistory()
+				.filter((e) => {
+					if (!historyFilter) return true
+					const lower = historyFilter.toLowerCase()
+					return (
+						e.url.toLowerCase().includes(lower) ||
+						e.title.toLowerCase().includes(lower)
+					)
+				})
+				.slice(0, 20)
 		: []
 
 	return (
@@ -155,7 +163,7 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 				display: "flex",
 				flexDirection: "column",
 				overflow: "hidden",
-				}}
+			}}
 		>
 			{/* Navigation bar */}
 			<div
@@ -186,7 +194,16 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 					}}
 					title="Back"
 				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<polyline points="15 18 9 12 15 6" />
 					</svg>
 				</button>
@@ -208,7 +225,16 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 					}}
 					title="Forward"
 				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<polyline points="9 18 15 12 9 6" />
 					</svg>
 				</button>
@@ -229,7 +255,16 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 					}}
 					title={isLoading ? "Loading..." : "Reload"}
 				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<polyline points="23 4 23 10 17 10" />
 						<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
 					</svg>
@@ -347,7 +382,9 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 
 				{/* Open in external browser */}
 				<button
-					onClick={() => window.api.invoke({ type: "openExternal", url: iframeSrc })}
+					onClick={() =>
+						window.api.invoke({ type: "openExternal", url: iframeSrc })
+					}
 					style={{
 						display: "flex",
 						alignItems: "center",
@@ -361,7 +398,16 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 					}}
 					title="Open in external browser"
 				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
 						<polyline points="15 3 21 3 21 9" />
 						<line x1="10" y1="14" x2="21" y2="3" />
@@ -384,7 +430,16 @@ export function BrowserView({ url, onNavigate, onClose, onTitleChange }: Browser
 					}}
 					title="Close browser tab"
 				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<line x1="18" y1="6" x2="6" y2="18" />
 						<line x1="6" y1="6" x2="18" y2="18" />
 					</svg>

@@ -3,10 +3,6 @@ import { generateText } from "ai"
 import type { MyAgentHarness as Harness } from "../harness/index.js"
 import type { AuthStorage } from "../auth/storage.js"
 import type { ModelResolver } from "../harness/model-resolver.js"
-import {
-	upgradeDeprecatedModel,
-	isDeprecatedModel,
-} from "../constants/models.js"
 
 let mainWindowRef: BrowserWindow | null = null
 
@@ -41,28 +37,6 @@ export async function ensureAuthenticatedModel(
 
 	let modelId = h.getCurrentModelId()
 
-	// Automatically upgrade deprecated models (e.g. gemini-2.5-flash/pro -> modern supported alternative)
-	const upgraded = upgradeDeprecatedModel(modelId)
-	if (upgraded !== modelId) {
-		await h.switchModel({ modelId: upgraded, scope: "thread" })
-		await h.switchModel({ modelId: upgraded, scope: "global" })
-		await h.setState({
-			currentModelId: upgraded,
-			subagentModelId: upgraded,
-			observerModelId: upgraded,
-			reflectorModelId: upgraded,
-		})
-		safeSend(mainWindowRef, "harness:event", {
-			type: "model_changed",
-			modelId: upgraded,
-			modeId: h.getCurrentModeId(),
-		})
-		console.log(
-			`[model-auth] Automatically upgraded deprecated ${modelId} to ${upgraded}`,
-		)
-		modelId = upgraded
-	}
-
 	const provider = modelId ? modelId.split("/")[0] : ""
 	let authProviderId = provider === "openai" ? "openai-codex" : provider
 	if (modelId.startsWith("deepseek")) authProviderId = "deepseek"
@@ -77,11 +51,7 @@ export async function ensureAuthenticatedModel(
 		authProviderId = "openai-codex"
 	else if (modelId.startsWith("google") || modelId.startsWith("gemini"))
 		authProviderId = "google"
-	if (
-		authProviderId &&
-		authStorage.isLoggedIn(authProviderId) &&
-		!isDeprecatedModel(modelId)
-	) {
+	if (authProviderId && authStorage.isLoggedIn(authProviderId)) {
 		await h.setState({
 			currentModelId: modelId,
 			subagentModelId: modelId,

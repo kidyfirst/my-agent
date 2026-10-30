@@ -39,13 +39,29 @@ describe("main agent toolset", () => {
 		)
 	})
 
-	it("keeps plan mode read-only", async () => {
+	it("exposes plan submission and planning file tools in plan mode while disabling code editing tools", async () => {
 		const tools = await getTools("plan")
 		expect(tools).toContain("view")
 		expect(tools).toContain("execute_command")
+		expect(tools).toContain("submit_plan")
+		expect(tools).toContain("write_file")
+		expect(tools).not.toContain("string_replace_lsp")
+		expect(tools).not.toContain("ast_smart_edit")
+	})
+
+	it("keeps read-only tools in fast mode and drops every write path", async () => {
+		const tools = await getTools("fast")
+		// Fast mode may look around, so it can answer "how many files are there"
+		// instead of claiming it has no tool access.
+		expect(tools).toEqual(
+			expect.arrayContaining(["view", "search_content", "find_files"]),
+		)
+		// But it must never be able to mutate the workspace.
 		expect(tools).not.toContain("write_file")
 		expect(tools).not.toContain("string_replace_lsp")
 		expect(tools).not.toContain("ast_smart_edit")
+		expect(tools).not.toContain("execute_command")
+		expect(tools).not.toContain("submit_plan")
 	})
 
 	// The system prompt used to advertise `grep` / `glob` / `task_write` /
@@ -55,15 +71,19 @@ describe("main agent toolset", () => {
 		const { describeToolNames } = await import("../tools.js")
 		const buildTools = await getTools()
 		const planTools = await getTools("plan")
+		const fastTools = await getTools("fast")
 
-		for (const name of describeToolNames("build")) {
+		for (const name of describeToolNames("react")) {
 			expect(buildTools).toContain(name)
 		}
 		for (const name of describeToolNames("plan")) {
 			expect(planTools).toContain(name)
 		}
+		for (const name of describeToolNames("fast")) {
+			expect(fastTools).toContain(name)
+		}
 		expect(buildTools).toEqual(
-			expect.arrayContaining([...describeToolNames("build")]),
+			expect.arrayContaining([...describeToolNames("react")]),
 		)
 	})
 

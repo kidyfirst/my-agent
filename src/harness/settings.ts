@@ -31,15 +31,24 @@ export interface SettingsData {
 	modelUseCounts: Record<string, number>
 	updateDismissedVersion: string | null
 	lsp?: Record<string, any>
+	/**
+	 * Credentials for MCP servers that ship with the app. Kept here rather than
+	 * in mcp.json so a built-in server never needs a hand-written config file:
+	 * the entry appears on its own, the key is the only thing the user supplies.
+	 */
+	mcp: {
+		apiKeys: Record<string, string>
+	}
 }
 
 const DEFAULT_SETTINGS: SettingsData = {
 	onboarding: {},
 	models: {
 		modeDefaults: {
-			build: "anthropic/claude-opus-4-6",
-			plan: "openai/gpt-5.2-codex",
-			fast: "cerebras/zai-glm-4.7",
+			react: "anthropic/claude-3-7-sonnet-latest",
+			build: "anthropic/claude-3-7-sonnet-latest",
+			plan: "openai/o3-mini",
+			fast: "google/gemini-2.0-flash",
 		},
 		subagentModels: {},
 	},
@@ -53,6 +62,7 @@ const DEFAULT_SETTINGS: SettingsData = {
 	modelUseCounts: {},
 	updateDismissedVersion: null,
 	lsp: {},
+	mcp: { apiKeys: {} },
 }
 
 export function getSettingsPath(): string {
@@ -83,6 +93,14 @@ export function loadSettings(
 					? raw.modelUseCounts
 					: {},
 			lsp: raw.lsp && typeof raw.lsp === "object" ? raw.lsp : {},
+			mcp: {
+				...DEFAULT_SETTINGS.mcp,
+				...(raw.mcp && typeof raw.mcp === "object" ? raw.mcp : {}),
+				apiKeys:
+					raw.mcp?.apiKeys && typeof raw.mcp.apiKeys === "object"
+						? raw.mcp.apiKeys
+						: {},
+			},
 		}
 	} catch {
 		return structuredClone(DEFAULT_SETTINGS)

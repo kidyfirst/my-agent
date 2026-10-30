@@ -5,6 +5,12 @@ import { ImagePreviewModal } from "./ImagePreviewModal"
 
 interface UserMessageProps {
 	message: Message
+	/**
+	 * Pin the message to the top of the scroll viewport so the latest prompt stays
+	 * visible. Disabled when the message is nested inside a bounded block (replay
+	 * containers), where sticking would lift it out of that block's border.
+	 */
+	pinned?: boolean
 }
 
 /** Collapsed content height; + 20px bubble padding = 80px total. */
@@ -13,6 +19,7 @@ const IMAGE_HEIGHT = 60
 
 export const UserMessage = memo(function UserMessage({
 	message,
+	pinned = true,
 }: UserMessageProps) {
 	const [copied, setCopied] = useState(false)
 	const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -210,16 +217,17 @@ export const UserMessage = memo(function UserMessage({
 				// background over the column's side padding, so no strip of the
 				// scrolled content peeks out beside the pinned card. The bubble
 				// itself keeps exactly the same box.
-				margin: "0 -24px",
-				padding: "10px 24px 14px",
+				margin: pinned ? "0 -24px" : "0",
+				padding: pinned ? "10px 24px 14px" : "2px 0 8px",
 				minWidth: 0,
 				maxWidth: "none",
 				// Collapsed user messages stick to the top of the scroll viewport so
 				// the latest one in view stays visible; a newer one paints over it.
-				position: expanded ? undefined : "sticky",
-				top: 0,
-				zIndex: expanded ? undefined : 20,
-				background: expanded ? undefined : "var(--bg)",
+				// Nested messages must not stick — the fade would leave the turn box.
+				position: pinned && !expanded ? "sticky" : undefined,
+				top: pinned && !expanded ? 0 : undefined,
+				zIndex: pinned && !expanded ? 20 : undefined,
+				background: pinned && !expanded ? "var(--bg)" : undefined,
 			}}
 		>
 			<div
@@ -236,7 +244,7 @@ export const UserMessage = memo(function UserMessage({
 					overflowWrap: "anywhere",
 					maxWidth: "75%",
 					textAlign: "left",
-					boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
+					boxShadow: "var(--shadow-sm)",
 					cursor: overflowing ? "pointer" : undefined,
 				}}
 				onClick={handleBubbleClick}

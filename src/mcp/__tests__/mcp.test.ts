@@ -12,12 +12,20 @@ describe("Native MCP Client & Manager", () => {
 		await client.disconnect()
 	})
 
-	it("initializes an MCPManager instance with no servers configured", async () => {
-		const manager = new MCPManager("/tmp")
-		expect(manager.hasServers()).toBe(false)
+	it("always lists the built-in LangSearch server, waiting for a key", async () => {
+		const manager = new MCPManager("/tmp", { apiKeys: {} })
+		expect(manager.hasServers()).toBe(true)
 		await manager.init()
+
+		const statuses = manager.getServerStatuses()
+		const langsearch = statuses.find((s) => s.name === "langsearch")
+		expect(langsearch).toBeDefined()
+		expect(langsearch?.builtin).toBe(true)
+		expect(langsearch?.needsApiKey).toBe(true)
+		expect(langsearch?.connected).toBe(false)
+		// Listed but never dialed: no tool, and no network error to report.
+		expect(langsearch?.error).toBeUndefined()
 		expect(manager.getTools()).toEqual({})
-		expect(manager.getServerStatuses()).toEqual([])
 		await manager.disconnect()
 	})
 

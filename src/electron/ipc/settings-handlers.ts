@@ -3,9 +3,18 @@ import type { IpcCommandHandler } from "./types.js"
 export function getSettingsHandlers(): Record<string, IpcCommandHandler> {
 	return {
 		setThinkingLevel: async (command, ctx) => {
-			await ctx
-				.getActiveSession()
-				.harness.setState({ thinkingLevel: command.level })
+			const s = ctx.getActiveSession()
+			await s.harness.setState({ thinkingLevel: command.level })
+			const threadId =
+				(command.threadId as string) || s.harness.getCurrentThreadId()
+			if (threadId) {
+				const ctrl = (s.harness as any).controller
+				await ctrl?.writeThreadMetadataValue?.({
+					threadId,
+					key: "thinkingLevel",
+					value: command.level,
+				})
+			}
 		},
 		setNotifications: async (command, ctx) => {
 			await ctx

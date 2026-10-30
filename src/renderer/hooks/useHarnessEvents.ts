@@ -10,6 +10,7 @@ import type {
 	UpdateInfo,
 } from "../types/ipc"
 import type { RightSidebarTab } from "../components/RightSidebar"
+import type { PermissionMode } from "./useThreadModelPermissions"
 import { playCompletionSound } from "../utils/audio"
 
 export interface HarnessCallbacks {
@@ -17,7 +18,15 @@ export interface HarnessCallbacks {
 	setModeId: (v: string) => void
 	setModelId: (v: string) => void
 	setThreadModel?: (threadId: string, modelId: string) => void
+	setThreadMode?: (threadId: string, modeId: string) => void
+	setThreadPermission?: (
+		threadId: string,
+		permissionMode: PermissionMode,
+	) => void
+	setThreadThinking?: (threadId: string, level: string) => void
+	setThinkingLevel?: (v: string) => void
 	setCurrentThreadId: (v: string | null) => void
+	setRunningThreadId?: (v: string | null) => void
 	setTokenUsage: (v: TokenUsage) => void
 	setOMProgress: (v: OMProgressState | null) => void
 	setOMModelIds: React.Dispatch<
@@ -38,6 +47,9 @@ export interface HarnessCallbacks {
 	setPendingApproval: (v: any) => void
 	setPendingQuestion: (v: any) => void
 	setPendingPlan: (v: any) => void
+	setActiveGraphNode?: (
+		node: { nodeId: string; nodeLabel: string; modeId: string } | null,
+	) => void
 	setLoginState: (v: any) => void
 	setIsAuthenticated: (v: boolean) => void
 	setLoggedInProviders: React.Dispatch<React.SetStateAction<Set<string>>>
@@ -49,16 +61,23 @@ export interface HarnessCallbacks {
 	setSidebarVisible: React.Dispatch<React.SetStateAction<boolean>>
 	setRightSidebarVisible: React.Dispatch<React.SetStateAction<boolean>>
 	setRightSidebarTab: React.Dispatch<React.SetStateAction<RightSidebarTab>>
+	setRecordingThreads?: React.Dispatch<React.SetStateAction<Set<string>>>
+	setRecordingProjects?: React.Dispatch<React.SetStateAction<Set<string>>>
+	setReplayingThreads?: React.Dispatch<React.SetStateAction<Set<string>>>
+	setReplayingProjects?: React.Dispatch<React.SetStateAction<Set<string>>>
+	/** Developer logging switch — drives the sidebar Logging entry. */
+	setLoggingEnabled?: (enabled: boolean) => void
 	projectInfoRef: React.RefObject<ProjectInfo | null>
 	notificationPrefRef: React.RefObject<string>
-	loadMessages: () => Promise<void>
+	loadMessages: (threadId?: string) => Promise<void>
 	/** Id of the last assistant message, used to attach task results to it. */
 	getLastAssistantMessageId: () => string | null
 	getAgentDurationMs?: () => number | undefined
 	currentThreadId?: string | null
-	loadThreads: () => Promise<ThreadInfo[] | undefined>
+	/** `path` tags the list with the folder it was listed for (see `threadsPath`). */
+	loadThreads: (path?: string) => Promise<ThreadInfo[] | undefined>
 	loadPRStatus: () => void
-	loadEnrichedProjects: () => Promise<void>
+	loadEnrichedProjects: () => Promise<any>
 	handleNewThread: () => void
 	handleOpenFolder: () => void
 	handleBrowserOpenRef: React.RefObject<(url: string) => void>
@@ -93,7 +112,12 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 
 			switch (event.type) {
 				case "agent_start":
-					if (isActiveWorktree) cb.dispatch({ type: "AGENT_START" })
+					if (isActiveWorktree) {
+						cb.dispatch({ type: "AGENT_START" })
+						const runningId =
+							(event as any).threadId || cb.currentThreadId || null
+						cb.setRunningThreadId?.(runningId)
+					}
 					if (worktreePath) {
 						cb.setActiveWorktrees((prev) => new Set(prev).add(worktreePath))
 					} else if (cb.projectInfoRef.current?.rootPath) {
@@ -140,6 +164,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 								.catch(() => {})
 						}
 						cb.dispatch({ type: "AGENT_END" })
+						cb.setRunningThreadId?.(null)
 						cb.loadThreads()
 						cb.loadPRStatus()
 						if ((event as any).reason !== "error") {
@@ -285,8 +310,23 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 				case "plan_approved":
 					cb.setPendingPlan(null)
 					break
-				case "mode_changed":
-					cb.setModeId(event.modeId as string)
+				case "mode_changed": {
+					const newMode = event.modeId as string
+					cb.setModeId(newMode)
+					if (cb.currentThreadId) {
+						cb.setThreadMode?.(cb.currentThreadId, newMode)
+					}
+					break
+				}
+				case "graph_node_started":
+					cb.setActiveGraphNode?.({
+						nodeId: event.nodeId as string,
+						nodeLabel: event.nodeLabel as string,
+						modeId: event.modeId as string,
+					})
+					break
+				case "graph_node_completed":
+					cb.setActiveGraphNode?.(null)
 					break
 				case "model_changed": {
 					const newModel = event.modelId as string
@@ -296,9 +336,19 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}
 					break
 				}
+				case "permission_mode_changed": {
+					// A replay switches the session to the recorded permission mode
+					// and puts the user's own back when it ends; keep the composer
+					// picker in sync with whichever mode is actually active.
+					const perm = event.permissionMode as PermissionMode | undefined
+					if (perm && cb.currentThreadId) {
+						cb.setThreadPermission?.(cb.currentThreadId, perm)
+					}
+					break
+				}
 				case "thread_changed":
 					cb.setCurrentThreadId(event.threadId as string)
-					cb.loadMessages()
+					cb.loadMessages(event.threadId as string)
 					cb.loadThreads()
 					window.api
 						.invoke({ type: "getTokenUsage" })
@@ -439,6 +489,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						},
 					})
 					cb.dispatch({ type: "AGENT_END" })
+					cb.setRunningThreadId?.(null)
 					break
 				}
 				case "shortcut": {
@@ -510,6 +561,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}))
 					break
 				case "project_changed": {
+					cb.dispatch({ type: "CLEAR" })
 					const oldPath = cb.projectInfoRef.current?.rootPath
 					if (oldPath) {
 						cb.setActiveWorktrees((prev) => {
@@ -524,6 +576,11 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					const resumeThreadId = event.currentThreadId as string | undefined
 					cb.setProjectSwitching(false)
 					cb.setProjectInfo(proj)
+					if (proj?.rootPath) {
+						try {
+							localStorage.setItem("myagent-last-project", proj.rootPath)
+						} catch {}
+					}
 					cb.setOpenFiles([])
 					cb.setUnreadWorktrees((prev) => {
 						if (!prev.has(proj.rootPath)) return prev
@@ -553,15 +610,17 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 								resumeThreadId,
 							)
 						}
-						cb.loadMessages()
-						cb.loadThreads()
+						cb.loadMessages(resumeThreadId)
+						// Tagged with the project that just opened: the sidebar must
+						// never render this list under the project it came from.
+						cb.loadThreads(proj.rootPath)
 					} else {
 						cb.dispatch({ type: "CLEAR" })
 						cb.setCurrentThreadId(null)
 						cb.setThreads([])
 						cb.setOpenThreadTabs([])
 						cb.setActiveTab("chat")
-						cb.loadThreads().then(async (loaded) => {
+						cb.loadThreads(proj.rootPath).then(async (loaded) => {
 							if (loaded && loaded.length > 0) {
 								const savedThreadId = proj?.rootPath
 									? localStorage.getItem(`myagent-last-thread-${proj.rootPath}`)
@@ -583,6 +642,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 										recent.id,
 									)
 								}
+								cb.loadMessages(recent.id)
 							}
 						})
 					}
@@ -604,6 +664,62 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 				case "update_download_error":
 					cb.setDownloadProgress?.(null)
 					break
+				case "session_recording_changed": {
+					const rThreads = (event as any).recordingThreads as
+						| string[]
+						| undefined
+					const rProjects = (event as any).recordingProjects as
+						| string[]
+						| undefined
+					if (Array.isArray(rThreads)) {
+						cb.setRecordingThreads?.(new Set(rThreads))
+					}
+					if (Array.isArray(rProjects)) {
+						cb.setRecordingProjects?.(new Set(rProjects))
+					}
+					break
+				}
+				case "session_recording_exported": {
+					const filePath = (event as any).filePath as string | undefined
+					if (filePath) {
+						console.log(
+							`[SessionRecording] Successfully exported session to ${filePath}`,
+						)
+					}
+					break
+				}
+				case "session_replay_started": {
+					const tId = (event as any).threadId as string | undefined
+					if (tId) {
+						cb.setReplayingThreads?.((prev) => new Set(prev).add(tId))
+					}
+					cb.loadThreads?.()
+					break
+				}
+				case "session_replay_stopped": {
+					const tId = (event as any).threadId as string | undefined
+					const projectPath = (event as any).worktreePath as string | undefined
+					cb.setReplayingThreads?.((prev) => {
+						const s = new Set(prev)
+						if (tId) s.delete(tId)
+						else s.clear()
+						return s
+					})
+					if (projectPath) {
+						cb.setReplayingProjects?.((prev) => {
+							const s = new Set(prev)
+							s.delete(projectPath)
+							return s
+						})
+					}
+					cb.loadThreads?.()
+					break
+				}
+				case "logging_config_changed": {
+					const enabled = Boolean((event as any).config?.enabled)
+					cb.setLoggingEnabled?.(enabled)
+					break
+				}
 			}
 		})
 

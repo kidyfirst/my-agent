@@ -26,9 +26,8 @@ export const requestSandboxAccessTool = createTool({
 	}),
 	execute: async ({ path: requestedPath, reason }, context) => {
 		try {
-			const harnessCtx = ((context as any)?.requestContext?.get?.(
-				"controller",
-			) || (context as any)?.requestContext?.get?.("harness")) as any
+			const harnessCtx = ((context as any)?.requestContext?.get?.("harness") ||
+				(context as any)?.requestContext?.get?.("controller")) as any
 
 			// Resolve to absolute path
 			const absolutePath = path.isAbsolute(requestedPath)
@@ -47,7 +46,7 @@ export const requestSandboxAccessTool = createTool({
 
 			if (!harnessCtx?.emitEvent || !harnessCtx?.registerQuestion) {
 				return {
-					content: `Cannot request sandbox access: TUI context not available. The user should manually run /sandbox add ${absolutePath}`,
+					content: `Cannot request sandbox access for "${absolutePath}": approval UI context not available. Files outside the project root cannot be accessed.`,
 					isError: true,
 				}
 			}
@@ -63,7 +62,11 @@ export const requestSandboxAccessTool = createTool({
 				harnessCtx.emitEvent!({
 					type: "ask_question" as any,
 					questionId,
-					question: `Grant access to "${absolutePath}"? Reason: ${reason}`,
+					question: `Grant access to "${absolutePath}"?\nReason: ${reason}`,
+					options: [
+						{ label: "Approve", description: "Allow access to this directory" },
+						{ label: "Deny", description: "Reject access to this directory" },
+					],
 				})
 			})
 

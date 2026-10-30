@@ -1,5 +1,5 @@
 import { promises as fs } from "fs"
-import { execSync } from "child_process"
+import { execQuiet } from "./quiet-exec.js"
 import * as path from "path"
 import type { SlashCommandMetadata } from "./slash-command-loader.js"
 
@@ -64,9 +64,8 @@ async function replaceShellOutput(
 	for (const match of matches) {
 		const [fullMatch, command] = match
 		try {
-			const output = execSync(command, {
+			const output = execQuiet(command, {
 				cwd: workingDir,
-				encoding: "utf-8",
 				timeout: 30000,
 				maxBuffer: 1024 * 1024, // 1MB buffer
 			})

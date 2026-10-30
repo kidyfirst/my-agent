@@ -33,7 +33,7 @@ export function MessageQueueBar({
 				border: "1px solid var(--border)",
 				borderRadius: 16,
 				padding: isCollapsed ? "10px 16px" : "12px 16px",
-				boxShadow: "0 2px 10px rgba(0, 0, 0, 0.04)",
+				boxShadow: "var(--shadow-sm)",
 				display: "flex",
 				flexDirection: "column",
 				gap: 8,
@@ -75,7 +75,7 @@ export function MessageQueueBar({
 							fontSize: 11,
 							fontWeight: 600,
 							color: "var(--dim)",
-							background: "var(--border-muted, #e5e7eb)",
+							background: "var(--border-muted)",
 							padding: "1px 6px",
 							borderRadius: 10,
 							minWidth: 16,
@@ -102,7 +102,8 @@ export function MessageQueueBar({
 							style={{
 								fontSize: 11,
 								color: "var(--warning)",
-								background: "rgba(234, 179, 8, 0.12)",
+								background:
+									"color-mix(in srgb, var(--warning) 12%, transparent)",
 								padding: "1px 6px",
 								borderRadius: 4,
 								display: "flex",
@@ -126,8 +127,12 @@ export function MessageQueueBar({
 						e.stopPropagation()
 						setIsCollapsed(!isCollapsed)
 					}}
-					title={isCollapsed ? "Expand queued messages" : "Collapse queued messages"}
-					aria-label={isCollapsed ? "Expand queued messages" : "Collapse queued messages"}
+					title={
+						isCollapsed ? "Expand queued messages" : "Collapse queued messages"
+					}
+					aria-label={
+						isCollapsed ? "Expand queued messages" : "Collapse queued messages"
+					}
 					style={{
 						background: "transparent",
 						border: "none",
@@ -207,7 +212,8 @@ export function MessageQueueBar({
 										}}
 									>
 										{item.files.map((file, idx) => {
-											const isImg = file.type === "image" || Boolean(file.preview)
+											const isImg =
+												file.type === "image" || Boolean(file.preview)
 											return isImg ? (
 												<img
 													key={idx}
@@ -292,8 +298,7 @@ export function MessageQueueBar({
 										transition: "all 0.15s",
 									}}
 									onMouseEnter={(e) => {
-										e.currentTarget.style.backgroundColor =
-											"var(--bg-hover, rgba(0, 0, 0, 0.05))"
+										e.currentTarget.style.backgroundColor = "var(--bg-hover)"
 										e.currentTarget.style.color = "var(--text)"
 									}}
 									onMouseLeave={(e) => {
@@ -336,8 +341,7 @@ export function MessageQueueBar({
 										transition: "all 0.15s",
 									}}
 									onMouseEnter={(e) => {
-										e.currentTarget.style.backgroundColor =
-											"var(--bg-hover, rgba(0, 0, 0, 0.05))"
+										e.currentTarget.style.backgroundColor = "var(--bg-hover)"
 										e.currentTarget.style.color = "var(--text)"
 									}}
 									onMouseLeave={(e) => {
@@ -379,8 +383,9 @@ export function MessageQueueBar({
 										transition: "all 0.15s",
 									}}
 									onMouseEnter={(e) => {
-										e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)"
-										e.currentTarget.style.color = "#ef4444"
+										e.currentTarget.style.backgroundColor =
+											"color-mix(in srgb, var(--error) 10%, transparent)"
+										e.currentTarget.style.color = "var(--error)"
 									}}
 									onMouseLeave={(e) => {
 										e.currentTarget.style.backgroundColor = "transparent"

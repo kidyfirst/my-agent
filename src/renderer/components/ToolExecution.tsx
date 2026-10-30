@@ -63,7 +63,9 @@ function countResultLines(result: unknown): number | null {
 }
 
 // Get diff counts for edit tools
-function getDiffCounts(args: unknown): { added: number; removed: number } | null {
+function getDiffCounts(
+	args: unknown,
+): { added: number; removed: number } | null {
 	if (!args || typeof args !== "object") return null
 	const a = args as Record<string, unknown>
 	const oldStr = a.old_str as string | undefined
@@ -109,9 +111,18 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 		case "view":
 		case "read_file":
 		case "file_view": {
-			const startLine = (args?.start_line ?? args?.StartLine ?? (args?.view_range as any)?.[0]) as number | undefined
-			const endLine = (args?.end_line ?? args?.EndLine ?? (args?.view_range as any)?.[1]) as number | undefined
-			const lineRange = startLine && endLine ? `#L${startLine}-${endLine}` : startLine ? `#L${startLine}` : ""
+			const startLine = (args?.start_line ??
+				args?.StartLine ??
+				(args?.view_range as any)?.[0]) as number | undefined
+			const endLine = (args?.end_line ??
+				args?.EndLine ??
+				(args?.view_range as any)?.[1]) as number | undefined
+			const lineRange =
+				startLine && endLine
+					? `#L${startLine}-${endLine}`
+					: startLine
+						? `#L${startLine}`
+						: ""
 			const lines = countResultLines(tool.result)
 
 			if (lineRange && shortPath) {
@@ -153,7 +164,9 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 		case "shell":
 		case "run_command":
 		case "bash": {
-			const cmd = (args?.command ?? args?.cmd ?? args?.CommandLine) as string | undefined
+			const cmd = (args?.command ?? args?.cmd ?? args?.CommandLine) as
+				| string
+				| undefined
 			const shortCmd = cmd
 				? cmd.length > 80
 					? cmd.slice(0, 77) + "\u2026"
@@ -263,8 +276,18 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 			return { icon: "\u2611\uFE0F", label: "Check tasks", pill: null }
 		case "ask_user":
 			return { icon: "\u2753", label: "Ask user", pill: null }
-		case "submit_plan":
-			return { icon: "\u{1F4D0}", label: "Submit plan", pill: null }
+		case "submit_plan": {
+			const title = typeof args?.title === "string" ? args.title : null
+			return {
+				icon: "\u{1F4D0}",
+				label: "Submit plan",
+				pill: title
+					? title.length > 50
+						? title.slice(0, 47) + "\u2026"
+						: title
+					: null,
+			}
+		}
 		case "request_sandbox_access":
 			return { icon: "\u{1F512}", label: "Request access", pill: null }
 		default: {
@@ -314,7 +337,14 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 				}}
 			>
 				{/* Icon */}
-				<span style={{ fontSize: 14, flexShrink: 0, width: 20, textAlign: "center" }}>
+				<span
+					style={{
+						fontSize: 14,
+						flexShrink: 0,
+						width: 20,
+						textAlign: "center",
+					}}
+				>
 					{display.icon}
 				</span>
 
@@ -322,10 +352,19 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 				{display.label && (
 					<span
 						style={{
-							color: display.label.includes("/") || display.label.includes(".") ? "var(--text)" : "var(--muted)",
+							color:
+								display.label.includes("/") || display.label.includes(".")
+									? "var(--text)"
+									: "var(--muted)",
 							fontWeight: 500,
-							fontFamily: display.label.includes("/") || display.label.includes(".") ? "var(--font-mono, monospace)" : "inherit",
-							fontSize: display.label.includes("/") || display.label.includes(".") ? 12 : 13,
+							fontFamily:
+								display.label.includes("/") || display.label.includes(".")
+									? "var(--font-mono)"
+									: "inherit",
+							fontSize:
+								display.label.includes("/") || display.label.includes(".")
+									? 12
+									: 13,
 						}}
 					>
 						{display.label}
@@ -339,7 +378,7 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 							background: "var(--bg-surface)",
 							padding: "1px 8px",
 							borderRadius: 4,
-							fontFamily: "var(--font-mono, 'SF Mono', Monaco, 'Cascadia Code', monospace)",
+							fontFamily: "var(--font-mono)",
 							fontSize: 12,
 							color: "var(--text)",
 							overflow: "hidden",
@@ -371,23 +410,34 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 					)}
 
 				{/* Status indicator */}
-				<span style={{ marginLeft: "auto", flexShrink: 0, display: "flex", alignItems: "center" }}>
+				<span
+					style={{
+						marginLeft: "auto",
+						flexShrink: 0,
+						display: "flex",
+						alignItems: "center",
+					}}
+				>
 					{tool.status === "running" && (
 						<span
 							style={{
 								width: 6,
 								height: 6,
 								borderRadius: "50%",
-								background: "#8b5cf6",
+								background: "var(--accent-2)",
 								animation: "pulse 1.2s ease-in-out infinite",
 							}}
 						/>
 					)}
 					{tool.status === "complete" && !tool.isError && (
-						<span style={{ color: "var(--success, #22c55e)", fontSize: 12, fontWeight: 600 }}>✓</span>
+						<span
+							style={{ color: "var(--success)", fontSize: 12, fontWeight: 600 }}
+						>
+							✓
+						</span>
 					)}
 					{(tool.status === "error" || tool.isError) && (
-						<span style={{ color: "var(--error, #ef4444)", fontSize: 12 }}>✕</span>
+						<span style={{ color: "var(--error)", fontSize: 12 }}>✕</span>
 					)}
 				</span>
 			</button>
@@ -445,10 +495,10 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 							</div>
 							<pre
 								style={{
-									background: "#000",
+									background: "var(--code-bg)",
 									padding: 8,
 									borderRadius: 4,
-									color: "#e5e5e5",
+									color: "var(--code-text)",
 									fontSize: 11,
 									overflow: "auto",
 									maxHeight: 300,
@@ -505,9 +555,7 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 									background: "var(--bg)",
 									padding: 8,
 									borderRadius: 4,
-									color: tool.isError
-										? "var(--error)"
-										: "var(--tool-output)",
+									color: tool.isError ? "var(--error)" : "var(--tool-output)",
 									fontSize: 11,
 									overflow: "auto",
 									maxHeight: 300,

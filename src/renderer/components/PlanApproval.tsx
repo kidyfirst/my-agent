@@ -25,7 +25,7 @@ export function PlanApproval({
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.6)",
+				background: "var(--scrim)",
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",
@@ -128,7 +128,7 @@ export function PlanApproval({
 							style={{
 								padding: "8px 20px",
 								background: "var(--success)",
-								color: "#fff",
+								color: "var(--on-accent)",
 								borderRadius: 6,
 								cursor: "pointer",
 								fontWeight: 500,

@@ -52,7 +52,7 @@ export function ToolApprovalDialog({
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.6)",
+				background: "var(--scrim)",
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",
@@ -163,7 +163,7 @@ export function ToolApprovalDialog({
 						style={{
 							padding: "6px 16px",
 							background: "var(--success)",
-							color: "#fff",
+							color: "var(--on-accent)",
 							borderRadius: 6,
 							cursor: "pointer",
 							fontWeight: 500,

@@ -7,7 +7,11 @@ interface ImagePreviewModalProps {
 	onClose: () => void
 }
 
-export function ImagePreviewModal({ src, alt, onClose }: ImagePreviewModalProps) {
+export function ImagePreviewModal({
+	src,
+	alt,
+	onClose,
+}: ImagePreviewModalProps) {
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
 			if (e.key === "Escape") {
@@ -37,7 +41,7 @@ export function ImagePreviewModal({ src, alt, onClose }: ImagePreviewModalProps)
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.82)",
+				background: "var(--scrim)",
 				backdropFilter: "blur(4px)",
 				display: "flex",
 				alignItems: "center",
@@ -76,9 +80,10 @@ export function ImagePreviewModal({ src, alt, onClose }: ImagePreviewModalProps)
 					width: 36,
 					height: 36,
 					borderRadius: "50%",
-					background: "rgba(255, 255, 255, 0.15)",
-					border: "1px solid rgba(255, 255, 255, 0.25)",
-					color: "#ffffff",
+					background: "color-mix(in srgb, var(--on-accent) 15%, transparent)",
+					border:
+						"1px solid color-mix(in srgb, var(--on-accent) 25%, transparent)",
+					color: "var(--on-accent)",
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "center",
@@ -87,11 +92,13 @@ export function ImagePreviewModal({ src, alt, onClose }: ImagePreviewModalProps)
 					zIndex: 1000000,
 				}}
 				onMouseEnter={(e) => {
-					e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.3)"
+					e.currentTarget.style.backgroundColor =
+						"color-mix(in srgb, var(--on-accent) 30%, transparent)"
 					e.currentTarget.style.transform = "scale(1.05)"
 				}}
 				onMouseLeave={(e) => {
-					e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"
+					e.currentTarget.style.backgroundColor =
+						"color-mix(in srgb, var(--on-accent) 15%, transparent)"
 					e.currentTarget.style.transform = "scale(1)"
 				}}
 			>
@@ -119,7 +126,7 @@ export function ImagePreviewModal({ src, alt, onClose }: ImagePreviewModalProps)
 					maxWidth: "92vw",
 					maxHeight: "92vh",
 					borderRadius: 8,
-					boxShadow: "0 12px 40px rgba(0, 0, 0, 0.6)",
+					boxShadow: "var(--shadow-modal)",
 					objectFit: "contain",
 					cursor: "default",
 					animation: "previewZoomIn 0.15s cubic-bezier(0.16, 1, 0.3, 1)",

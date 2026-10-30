@@ -3,6 +3,8 @@ import * as fs from "fs"
 import { shell, dialog } from "electron"
 import type { IpcCommandHandler, HandlerContext } from "./types.js"
 import { detectEditor } from "../../utils/editor.js"
+import { parseExternalUrl } from "../external-links.js"
+import { execQuiet } from "../../utils/quiet-exec.js"
 
 export function getFileHandlers(): Record<string, IpcCommandHandler> {
 	return {
@@ -29,29 +31,25 @@ export function getFileHandlers(): Record<string, IpcCommandHandler> {
 				})
 		},
 		searchFiles: async (_command, ctx) => {
-			const { execSync } =
-				require("child_process") as typeof import("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			try {
-				const output = execSync(
+				const output = execQuiet(
 					"git ls-files --cached --others --exclude-standard",
 					{
 						cwd: projectRoot,
-						encoding: "utf-8",
 						maxBuffer: 10 * 1024 * 1024,
 					},
-				) as string
+				)
 				return { files: output.split("\n").filter(Boolean) }
 			} catch {
 				try {
-					const output = execSync(
+					const output = execQuiet(
 						'find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*"',
 						{
 							cwd: projectRoot,
-							encoding: "utf-8",
 							maxBuffer: 10 * 1024 * 1024,
 						},
-					) as string
+					)
 					return {
 						files: output
 							.split("\n")
@@ -196,7 +194,10 @@ export function getFileHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		openExternal: async (command) => {
-			shell.openExternal(command.url as string)
+			// Only web links reach the OS: an unchecked scheme here would let the
+			// renderer launch anything the platform knows how to open.
+			const external = parseExternalUrl(String(command.url ?? ""))
+			if (external) await shell.openExternal(external)
 		},
 	}
 }

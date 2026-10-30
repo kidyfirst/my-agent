@@ -68,6 +68,15 @@ export function getPermissionHandlers(): Record<string, IpcCommandHandler> {
 			if (!h) return
 			h.setPermissionForCategory({ category: cat, policy })
 			if (policy === "allow") h.grantSessionCategory({ category: cat })
+			const threadId = (command.threadId as string) || h.getCurrentThreadId()
+			if (threadId && command.permissionMode) {
+				const ctrl = (h as any).controller
+				await ctrl?.writeThreadMetadataValue?.({
+					threadId,
+					key: "permissionMode",
+					value: command.permissionMode,
+				})
+			}
 		},
 		resetSessionGrants: async () => {
 			// No direct reset on Harness — session grants persist until session ends
@@ -97,6 +106,15 @@ export function getPermissionHandlers(): Record<string, IpcCommandHandler> {
 				h.setPermissionForCategory({
 					category: cat as ToolCategory,
 					policy,
+				})
+			}
+			const threadId = (command.threadId as string) || h.getCurrentThreadId()
+			if (threadId) {
+				const ctrl = (h as any).controller
+				await ctrl?.writeThreadMetadataValue?.({
+					threadId,
+					key: "permissionMode",
+					value: enabled ? "auto-approve" : "default",
 				})
 			}
 		},

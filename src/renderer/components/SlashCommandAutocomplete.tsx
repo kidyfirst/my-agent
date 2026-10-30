@@ -9,11 +9,13 @@ export interface SlashCommand {
 export const BUILTIN_COMMAND_NAMES = new Set([
 	"new",
 	"clear",
-	"plan",
-	"build",
+	"react",
 	"fast",
-	"thinking",
+	"plan",
+	"graph",
 	"settings",
+	"record",
+	"replay",
 	"help",
 ])
 
@@ -140,21 +142,27 @@ export function useSlashAutocomplete(
 					right: 0,
 					maxHeight: 280,
 					overflowY: "auto",
-					background: "var(--bg-elevated)",
+					background: "var(--bg)",
 					border: "1px solid var(--border)",
-					borderRadius: 8,
-					padding: 4,
+					borderRadius: 12,
+					padding: 6,
 					zIndex: 50,
-					boxShadow: "0 -4px 16px rgba(0,0,0,0.3)",
-					marginBottom: 4,
+					boxShadow: "var(--shadow-popover)",
+					marginBottom: 6,
+					display: "flex",
+					flexDirection: "column",
+					gap: 2,
 				}}
 			>
 				{Object.entries(grouped).map(([namespace, cmds]) => (
-					<div key={namespace}>
+					<div
+						key={namespace}
+						style={{ display: "flex", flexDirection: "column", gap: 2 }}
+					>
 						<div
 							style={{
-								padding: "6px 8px 2px",
-								fontSize: 10,
+								padding: "4px 8px 2px",
+								fontSize: 11,
 								color: "var(--dim)",
 								textTransform: "uppercase",
 								fontWeight: 600,
@@ -169,31 +177,35 @@ export function useSlashAutocomplete(
 							return (
 								<button
 									key={cmd.name}
+									type="button"
 									data-cmd-index={idx}
 									onClick={() => onSelect(cmd)}
 									onMouseEnter={() => setSelectedIndex(idx)}
+									title={
+										cmd.description
+											? `/${cmd.name} - ${cmd.description}`
+											: `/${cmd.name}`
+									}
 									style={{
 										display: "flex",
 										width: "100%",
-										padding: "6px 8px",
+										padding: "7px 10px",
 										textAlign: "left",
 										cursor: "pointer",
-										borderRadius: 6,
-										background: isSelected
-											? "var(--accent)" + "22"
-											: "transparent",
+										borderRadius: 8,
+										background: isSelected ? "var(--bg-hover)" : "transparent",
 										fontSize: 12,
 										color: isSelected ? "var(--accent)" : "var(--text)",
 										gap: 8,
 										alignItems: "center",
 										border: "none",
 										outline: "none",
-										transition: "background 0.1s",
+										transition: "background-color 0.1s, color 0.1s",
 									}}
 								>
 									<span
 										style={{
-											fontFamily: "var(--font-mono, monospace)",
+											fontFamily: "var(--font-mono)",
 											flexShrink: 0,
 											fontWeight: 500,
 										}}

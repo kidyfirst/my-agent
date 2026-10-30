@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import type { OMProgressState } from "../types/ipc"
 
-// OM brand colors
-const OBSERVER_COLOR = "#fdac53" // orange — observation/messages
-const REFLECTOR_COLOR = "#ff69cc" // pink — reflection/memory
-const COLOR_RED = "#DC5663" // high threshold
-const COLOR_GRAY = "#52525b" // low threshold (dark mode)
+// OM stage colors — the same tokens the mode badges use, so they follow the theme.
+const OBSERVER_COLOR = "var(--mode-observe)" // orange — observation/messages
+const REFLECTOR_COLOR = "var(--mode-reflect)" // pink — reflection/memory
+const COLOR_RED = "var(--error)" // high threshold
+const COLOR_GRAY = "var(--dim)" // low threshold
 
 function colorByPercent(percent: number): string {
 	if (percent >= 90) return COLOR_RED
@@ -92,11 +92,19 @@ function Metric({
 				flexShrink: 0,
 			}}
 		>
-			<span style={{ color: labelColor, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
+			<span
+				style={{ color: labelColor, fontWeight: 500, whiteSpace: "nowrap" }}
+			>
+				{label}
+			</span>
 			<ProgressBar percent={percent} width={32} />
-			<span style={{ color, fontWeight: 400, whiteSpace: "nowrap" }}>{fraction}</span>
+			<span style={{ color, fontWeight: 400, whiteSpace: "nowrap" }}>
+				{fraction}
+			</span>
 			{bufferedSavings != null && bufferedSavings > 0 && (
-				<span style={{ color: "var(--muted)", fontSize: 10, whiteSpace: "nowrap" }}>
+				<span
+					style={{ color: "var(--muted)", fontSize: 10, whiteSpace: "nowrap" }}
+				>
 					↓{formatTokensThreshold(bufferedSavings)}
 				</span>
 			)}

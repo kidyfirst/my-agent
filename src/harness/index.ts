@@ -19,7 +19,11 @@ import {
 	type PermissionPolicy,
 	type TokenUsage,
 	type ToolCategory,
-	type RequestContext,
+	RequestContext,
+	defaultGraphRegistry,
+	ExecutionMode,
+	DEFAULT_EXECUTION_MODE,
+	type GraphTopologyMetadata,
 } from "../core/index.js"
 
 export { Harness }
@@ -42,6 +46,7 @@ import { Memory } from "../memory/index.js"
 import { SQLiteStore } from "../store/index.js"
 import { AuthStorage } from "../auth/storage.js"
 import { MCPManager } from "../mcp/manager.js"
+import type { McpServerStatus } from "../mcp/types.js"
 import { HookManager } from "../hooks/manager.js"
 import {
 	detectProject,
@@ -230,7 +235,7 @@ export interface ToolApprovalOptions {
 
 export interface PlanApprovalOptions {
 	planId?: string
-	response?: string
+	response?: string | { action: "approved" | "rejected"; feedback?: string }
 	approved?: boolean
 	feedback?: string
 	[key: string]: unknown
@@ -259,6 +264,7 @@ export interface MyAgentHarness<TState = HarnessState> {
 	activeSession?: Session<TState> | null
 	init(): Promise<void>
 	subscribe(listener: (event: MyAgentEvent) => void): () => void
+	emitEvent?(event: MyAgentEvent): void
 	sendMessage(options: SendMessageOptions): Promise<void>
 	abort(): Promise<void>
 	steer(options: SteerOptions): Promise<void>
@@ -266,6 +272,8 @@ export interface MyAgentHarness<TState = HarnessState> {
 	getState(): TState & Record<string, unknown>
 	setState(patch: Partial<TState>): Promise<void>
 	listModes(): HarnessMode[]
+	listExecutionModes?(): GraphTopologyMetadata[]
+	getModeGraph?(options: { modeId: string }): GraphTopologyMetadata | undefined
 	getCurrentModeId(): string
 	switchMode(options: { modeId: string }): Promise<void>
 	getCurrentModelId(): string
@@ -303,12 +311,31 @@ export interface MyAgentHarness<TState = HarnessState> {
 		questionId: string
 		resolve: (ans: string) => void
 	}): void
+	registerPlanApproval?(options: {
+		planId: string
+		resolve: (response: {
+			action: "approved" | "rejected"
+			feedback?: string
+		}) => void
+	}): void
 	respondToPlanApproval(options: PlanApprovalOptions): Promise<void> | void
 	listAvailableModels(): AvailableModelItem[] | Promise<AvailableModelItem[]>
 	loadOMProgress?(): Promise<unknown>
 	setPermissionForCategory(options: { category: string; policy: string }): void
 	getPermissionRules(): PermissionRulesResult
 	getSessionGrants(): SessionGrantsResult
+	/**
+	 * Names of the tools the connected MCP servers registered (already namespaced
+	 * as `server_tool`). The system prompt lists them so the model knows it can
+	 * look things up instead of claiming it has no web access.
+	 */
+	getMcpToolNames?(): string[]
+	/**
+	 * Connection state of every configured MCP server. The prompt uses it to
+	 * separate "key saved but the server rejected it" from "no key yet" — the two
+	 * failures look identical to the model otherwise, and it guesses wrong.
+	 */
+	getMcpServerStatuses?(): McpServerStatus[]
 	grantSessionCategory(options: { category: string }): void
 	getSession(): Promise<HarnessSessionInfo>
 	getMessageQueue(options: { threadId: string }): Promise<QueuedMessage[]>
@@ -482,6 +509,13 @@ export async function createMyAgent(
 		? undefined
 		: new MCPManager(project.rootPath)
 
+	// Warm the connection right away. `getTools()` is synchronous, so a manager
+	// that only dials on first use hands the very first turn an empty MCP
+	// toolset — the one turn where the user is most likely to ask something that
+	// needs the web. The promise is deliberately not awaited: harness creation
+	// must not wait on the network.
+	if (mcpManager) void mcpManager.init().catch(() => {})
+
 	const codeAgent = new Agent({
 		id: "code-agent",
 		name: "Code Agent",
@@ -497,15 +531,17 @@ export async function createMyAgent(
 		? undefined
 		: new HookManager(project.rootPath, "session-init")
 
-	const configuredBuildModel = loadSettings().models?.modeDefaults?.build
+	const modeDefaults = loadSettings().models?.modeDefaults
+	const configuredReactModel =
+		modeDefaults?.[ExecutionMode.REACT] || modeDefaults?.build
 	let defaultModelId: string | undefined
-	if (configuredBuildModel) {
-		const provider = configuredBuildModel.split("/")[0] || ""
+	if (configuredReactModel) {
+		const provider = configuredReactModel.split("/")[0] || ""
 		let authProvider = provider === "openai" ? "openai-codex" : provider
-		if (configuredBuildModel.startsWith("deepseek")) authProvider = "deepseek"
-		else if (configuredBuildModel.startsWith("google")) authProvider = "google"
+		if (configuredReactModel.startsWith("deepseek")) authProvider = "deepseek"
+		else if (configuredReactModel.startsWith("google")) authProvider = "google"
 		if (authStorage.isLoggedIn(authProvider)) {
-			defaultModelId = configuredBuildModel
+			defaultModelId = configuredReactModel
 		}
 	}
 	if (!defaultModelId) {
@@ -515,20 +551,23 @@ export async function createMyAgent(
 	const defaultSubagents = createDefaultSubagents(project.rootPath)
 	const defaultModes: HarnessMode[] = [
 		{
-			id: "build",
-			name: "Build",
+			id: ExecutionMode.REACT,
+			name: "ReAct",
 			defaultModelId,
 			metadata: { default: true },
+			topology: defaultGraphRegistry.getTopology(ExecutionMode.REACT),
 		},
 		{
-			id: "plan",
-			name: "Plan",
+			id: ExecutionMode.PLAN,
+			name: "Plan & Solve",
 			defaultModelId,
+			topology: defaultGraphRegistry.getTopology(ExecutionMode.PLAN),
 		},
 		{
-			id: "fast",
+			id: ExecutionMode.FAST,
 			name: "Fast",
 			defaultModelId,
+			topology: defaultGraphRegistry.getTopology(ExecutionMode.FAST),
 		},
 	]
 
@@ -550,7 +589,7 @@ export async function createMyAgent(
 	const controller = new Harness<HarnessState>({
 		id: "myagent-code",
 		agent: codeAgent,
-		defaultModeId: "build",
+		defaultModeId: ExecutionMode.REACT,
 		resourceId: project.resourceId,
 		storage,
 		memory,
@@ -587,6 +626,10 @@ export async function createMyAgent(
 	const subscribers = new Set<(event: MyAgentEvent) => void>()
 	let activeSession: Session<HarnessState> | null = null
 	const pendingQuestions = new Map<string, (ans: string) => void>()
+	const pendingPlans = new Map<
+		string,
+		(response: { action: "approved" | "rejected"; feedback?: string }) => void
+	>()
 	const categoryPolicies: Record<string, string> = {}
 
 	const sessionReady = controller
@@ -700,11 +743,39 @@ export async function createMyAgent(
 				subscribers.delete(listener)
 			}
 		},
+		emitEvent(event: MyAgentEvent) {
+			for (const sub of subscribers) {
+				try {
+					sub(event)
+				} catch (err) {
+					console.error("Error in subscriber:", err)
+				}
+			}
+		},
 		async sendMessage(options: SendMessageOptions) {
 			const session = activeSession ?? (await sessionReady)
-			return session.sendMessage(options)
+			const rc = options.requestContext ?? new RequestContext()
+			if (!rc.get("harness")) {
+				rc.set("harness", this)
+			}
+			if (!rc.get("controller")) {
+				rc.set("controller", this)
+			}
+			return session.sendMessage({ ...options, requestContext: rc })
 		},
 		async abort() {
+			for (const resolver of pendingPlans.values()) {
+				try {
+					resolver({ action: "rejected", feedback: "Operation aborted" })
+				} catch {}
+			}
+			pendingPlans.clear()
+			for (const resolver of pendingQuestions.values()) {
+				try {
+					resolver("Operation aborted")
+				} catch {}
+			}
+			pendingQuestions.clear()
 			const session = activeSession ?? (await sessionReady)
 			return session.abort()
 		},
@@ -738,8 +809,14 @@ export async function createMyAgent(
 		listModes() {
 			return controller.listModes?.() ?? modes
 		},
+		listExecutionModes() {
+			return defaultGraphRegistry.listTopologies()
+		},
+		getModeGraph(options: { modeId: string }) {
+			return defaultGraphRegistry.getTopology(options.modeId)
+		},
 		getCurrentModeId() {
-			return activeSession?.mode?.get?.() ?? "build"
+			return activeSession?.mode?.get?.() ?? ExecutionMode.REACT
 		},
 		async switchMode(options: { modeId: string }) {
 			const session = activeSession ?? (await sessionReady)
@@ -927,7 +1004,63 @@ export async function createMyAgent(
 		}) {
 			pendingQuestions.set(options.questionId, options.resolve)
 		},
+		registerPlanApproval(options: {
+			planId: string
+			resolve: (response: {
+				action: "approved" | "rejected"
+				feedback?: string
+			}) => void
+		}) {
+			pendingPlans.set(options.planId, options.resolve)
+		},
 		async respondToPlanApproval(options: PlanApprovalOptions) {
+			const planId = options.planId
+			let action: "approved" | "rejected" = "rejected"
+			let feedback: string | undefined = options.feedback
+
+			if (typeof options.response === "object" && options.response !== null) {
+				action =
+					options.response.action === "approved" ? "approved" : "rejected"
+				feedback = options.response.feedback ?? feedback
+			} else if (typeof options.response === "string") {
+				action = options.response === "approved" ? "approved" : "rejected"
+			} else if (typeof options.approved === "boolean") {
+				action = options.approved ? "approved" : "rejected"
+			}
+
+			const normalizedResponse: {
+				action: "approved" | "rejected"
+				feedback?: string
+			} = {
+				action,
+				feedback,
+			}
+
+			let resolver = planId ? pendingPlans.get(planId) : undefined
+			if (!resolver && pendingPlans.size > 0) {
+				const [firstKey, firstResolver] = pendingPlans.entries().next().value!
+				resolver = firstResolver
+				pendingPlans.delete(firstKey)
+			} else if (planId) {
+				pendingPlans.delete(planId)
+			}
+
+			if (resolver) {
+				resolver(normalizedResponse)
+
+				if (normalizedResponse.action === "approved") {
+					try {
+						await harness.switchMode({ modeId: ExecutionMode.REACT })
+					} catch (e) {
+						console.error(
+							"[plan-approval] failed to switch mode on approval:",
+							e,
+						)
+					}
+				}
+				return
+			}
+
 			const session = activeSession ?? (await sessionReady)
 			if (
 				typeof (
@@ -943,9 +1076,7 @@ export async function createMyAgent(
 				).handlePlanApprovalResume(options)
 			}
 			return session.respondToToolSuspension({
-				resumeData:
-					options.response ??
-					(options.approved ? "approved" : (options.feedback ?? "rejected")),
+				resumeData: normalizedResponse,
 			})
 		},
 		async listAvailableModels() {
@@ -1000,6 +1131,19 @@ export async function createMyAgent(
 				return { categories, tools }
 			}
 			return { categories: categoryPolicies, tools: {} }
+		},
+		/**
+		 * Names of the tools the connected MCP servers registered, exactly as the
+		 * model sees them (`langsearch_web_search`). The system prompt lists them
+		 * in its authoritative toolset section; without that the model is told it
+		 * only has the built-in tools and answers "no web access" while the search
+		 * tool is sitting in the same request.
+		 */
+		getMcpToolNames(): string[] {
+			return mcpManager ? Object.keys(mcpManager.getTools()) : []
+		},
+		getMcpServerStatuses(): McpServerStatus[] {
+			return mcpManager?.getServerStatuses() ?? []
 		},
 		getSessionGrants(): SessionGrantsResult {
 			if (activeSession?.getGrants) {

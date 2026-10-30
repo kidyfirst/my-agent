@@ -23,6 +23,8 @@ export function getDashboardHandlers(): Record<string, IpcCommandHandler> {
 				}
 				estimatedCost: number
 				modelId: string | null
+				modeId: string
+				thinkingLevel: string
 				startedAt: number | null
 				totalDurationMs: number
 				isCurrentSession: boolean
@@ -81,6 +83,10 @@ export function getDashboardHandlers(): Record<string, IpcCommandHandler> {
 
 					const modelId =
 						timing.currentModelId ?? (state?.currentModelId as string) ?? null
+					const modeId = (session.harness.getCurrentModeId?.() ??
+						(state?.currentModeId as string) ??
+						"react") as string
+					const thinkingLevel = (state?.thinkingLevel as string) || "off"
 
 					agents.push({
 						worktreePath: wtPath,
@@ -98,6 +104,8 @@ export function getDashboardHandlers(): Record<string, IpcCommandHandler> {
 							tokens.completionTokens,
 						),
 						modelId,
+						modeId,
+						thinkingLevel,
 						startedAt: timing.startedAt,
 						totalDurationMs:
 							timing.totalDurationMs +

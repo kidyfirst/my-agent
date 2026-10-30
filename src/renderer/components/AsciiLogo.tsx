@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react"
 
-const MY_TOP =    "█▀▄▀█  █ █"
+const MY_TOP = "█▀▄▀█  █ █"
 const MY_BOTTOM = "█ ▀ █   █ "
 const SEP = "   "
-const AGENT_TOP =    "▄▀█ █▀▀ █▀▀ █▄ █ ▀█▀"
+const AGENT_TOP = "▄▀█ █▀▀ █▀▀ █▄ █ ▀█▀"
 const AGENT_BOTTOM = "█▀█ █▄█ ██▄ █ ▀█  █ "
 
 const MY_LEN = MY_TOP.length // 10
@@ -51,8 +51,7 @@ export function AsciiLogo() {
 		>
 			<pre
 				style={{
-					fontFamily:
-						"'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+					fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
 					fontSize: 15,
 					lineHeight: 1.15,
 					margin: 0,
@@ -65,10 +64,10 @@ export function AsciiLogo() {
 					<span>{sepShown}</span>
 					<span
 						style={{
-							color: "var(--logo-accent, #059669)",
+							color: "var(--logo-accent)",
 							textShadow:
 								agentCols > 0
-									? "0 0 10px rgba(16,185,129,0.25)"
+									? "0 0 10px color-mix(in srgb, var(--logo-accent) 25%, transparent)"
 									: "none",
 						}}
 						className={done ? "ascii-glow-settle" : undefined}
@@ -83,11 +82,9 @@ export function AsciiLogo() {
 								width: 2,
 								height: "0.85em",
 								marginLeft: 1,
-								background: isAgentPhase
-									? "var(--logo-accent, #059669)"
-									: "var(--text)",
+								background: isAgentPhase ? "var(--logo-accent)" : "var(--text)",
 								boxShadow: isAgentPhase
-									? "0 0 4px rgba(16,185,129,0.5)"
+									? "0 0 4px color-mix(in srgb, var(--logo-accent) 50%, transparent)"
 									: "none",
 								verticalAlign: "text-bottom",
 							}}
@@ -101,10 +98,10 @@ export function AsciiLogo() {
 					<span>{sepShown}</span>
 					<span
 						style={{
-							color: "var(--logo-accent, #059669)",
+							color: "var(--logo-accent)",
 							textShadow:
 								agentCols > 0
-									? "0 0 10px rgba(16,185,129,0.25)"
+									? "0 0 10px color-mix(in srgb, var(--logo-accent) 25%, transparent)"
 									: "none",
 						}}
 						className={done ? "ascii-glow-settle" : undefined}
@@ -130,8 +127,8 @@ export function AsciiLogo() {
 					50% { opacity: 0; }
 				}
 				@keyframes ascii-glow {
-					0% { text-shadow: 0 0 16px rgba(16,185,129,0.5), 0 0 32px rgba(16,185,129,0.25); }
-					100% { text-shadow: 0 0 8px rgba(16,185,129,0.2); }
+					0% { text-shadow: 0 0 16px color-mix(in srgb, var(--logo-accent) 50%, transparent), 0 0 32px color-mix(in srgb, var(--logo-accent) 25%, transparent); }
+					100% { text-shadow: 0 0 8px color-mix(in srgb, var(--logo-accent) 20%, transparent); }
 				}
 				.ascii-cursor {
 					animation: ascii-blink 0.53s step-end infinite;

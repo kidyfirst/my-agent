@@ -53,6 +53,10 @@ export class SQLiteStore extends MyAgentBase {
 		await this.memoryStore.init()
 	}
 
+	getUserVersion(): number {
+		return this.memoryStore.getUserVersion()
+	}
+
 	async getStore(domain: string): Promise<any> {
 		if (domain === "memory") {
 			return this.memoryStore

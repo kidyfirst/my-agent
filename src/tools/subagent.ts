@@ -40,7 +40,7 @@ interface SubagentToolDeps {
 }
 
 // Default model for subagent tasks — fast and cheap
-const DEFAULT_SUBAGENT_MODEL = "anthropic/claude-opus-4-6"
+const DEFAULT_SUBAGENT_MODEL = "google/gemini-2.0-flash"
 // Explore subagents can use Cerebras for speed when available
 const EXPLORE_SUBAGENT_MODEL = DEFAULT_SUBAGENT_MODEL
 

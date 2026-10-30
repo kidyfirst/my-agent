@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useId } from "react"
+import { claimMenu, releaseMenu } from "../utils/menuRegistry"
 
 const openTargets = [
 	{
@@ -85,6 +86,15 @@ export function OpenInDropdown({
 }) {
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
+	const menuId = useId()
+
+	// Joins the app-wide single-menu rule, so a sidebar menu opening elsewhere
+	// does not leave this dropdown floating next to it.
+	useEffect(() => {
+		if (!open) return
+		claimMenu(menuId, () => setOpen(false))
+		return () => releaseMenu(menuId)
+	}, [open, menuId])
 
 	useEffect(() => {
 		if (!open) return
@@ -93,8 +103,9 @@ export function OpenInDropdown({
 				setOpen(false)
 			}
 		}
-		document.addEventListener("mousedown", handler)
-		return () => document.removeEventListener("mousedown", handler)
+		// Capture: sidebar triggers stop mousedown from bubbling.
+		document.addEventListener("mousedown", handler, true)
+		return () => document.removeEventListener("mousedown", handler, true)
 	}, [open])
 
 	if (!projectPath) return null
@@ -151,21 +162,24 @@ export function OpenInDropdown({
 						// Above the sticky user message (zIndex 20) so the menu isn't
 						// painted over when it drops into the chat area.
 						zIndex: 400,
-						background: "var(--bg-elevated)",
+						background: "var(--bg)",
 						border: "1px solid var(--border)",
-						borderRadius: 6,
-						padding: 4,
-						marginTop: 4,
-						minWidth: 150,
-						boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+						borderRadius: 12,
+						padding: 6,
+						marginTop: 6,
+						minWidth: 160,
+						boxShadow: "var(--shadow-popover)",
+						display: "flex",
+						flexDirection: "column",
+						gap: 2,
 					}}
 				>
 					<div
 						style={{
-							padding: "4px 8px",
-							fontSize: 10,
+							padding: "4px 8px 2px",
+							fontSize: 11,
 							color: "var(--dim)",
-							fontWeight: 500,
+							fontWeight: 600,
 							textTransform: "uppercase",
 							letterSpacing: "0.5px",
 						}}
@@ -175,6 +189,7 @@ export function OpenInDropdown({
 					{openTargets.map((target) => (
 						<button
 							key={target.id}
+							type="button"
 							onClick={() => {
 								window.api.invoke({
 									type: "openProjectIn",
@@ -183,29 +198,44 @@ export function OpenInDropdown({
 								})
 								setOpen(false)
 							}}
+							title={target.label}
 							style={{
 								display: "flex",
 								alignItems: "center",
 								gap: 8,
 								width: "100%",
-								padding: "6px 8px",
+								padding: "7px 10px",
 								fontSize: 12,
 								color: "var(--text)",
 								cursor: "pointer",
-								borderRadius: 4,
+								borderRadius: 8,
 								background: "transparent",
 								border: "none",
 								textAlign: "left",
+								transition: "background-color 0.1s, color 0.1s",
 							}}
 							onMouseEnter={(e) => {
-								e.currentTarget.style.background = "var(--bg-hover)"
+								e.currentTarget.style.backgroundColor = "var(--bg-hover)"
 							}}
 							onMouseLeave={(e) => {
-								e.currentTarget.style.background = "transparent"
+								e.currentTarget.style.backgroundColor = "transparent"
 							}}
 						>
-							{target.icon}
-							{target.label}
+							<span
+								style={{ display: "flex", alignItems: "center", flexShrink: 0 }}
+							>
+								{target.icon}
+							</span>
+							<span
+								style={{
+									flex: 1,
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								}}
+							>
+								{target.label}
+							</span>
 						</button>
 					))}
 				</div>

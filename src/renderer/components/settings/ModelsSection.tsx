@@ -7,10 +7,7 @@ interface ModelsSectionProps {
 	update: (key: keyof SettingsState, value: unknown) => void
 }
 
-export function ModelsSection({
-	state,
-	update,
-}: ModelsSectionProps) {
+export function ModelsSection({ state, update }: ModelsSectionProps) {
 	return (
 		<>
 			<SectionHeader title="Thinking" />
@@ -21,12 +18,7 @@ export function ModelsSection({
 				<Select
 					value={state.thinkingLevel}
 					options={thinkingOptions}
-					onChange={(v) =>
-						update(
-							"thinkingLevel",
-							v as ThinkingLevel,
-						)
-					}
+					onChange={(v) => update("thinkingLevel", v as ThinkingLevel)}
 				/>
 			</SettingRow>
 
@@ -38,8 +30,8 @@ export function ModelsSection({
 					lineHeight: 1.5,
 				}}
 			>
-				Use the model selector in the status bar
-				to change the active model and mode.
+				Use the model selector in the status bar to change the active model and
+				mode.
 			</div>
 		</>
 	)

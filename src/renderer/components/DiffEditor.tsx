@@ -11,9 +11,7 @@ export function DiffEditor({ filePath, onClose, onOpenFile }: DiffEditorProps) {
 	const [diff, setDiff] = useState<string | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [viewMode, setViewMode] = useState<"inline" | "side-by-side">(
-		"inline",
-	)
+	const [viewMode, setViewMode] = useState<"inline" | "side-by-side">("inline")
 
 	useEffect(() => {
 		if (!filePath) return
@@ -27,9 +25,7 @@ export function DiffEditor({ filePath, onClose, onOpenFile }: DiffEditorProps) {
 				})) as { diff: string }
 				setDiff(result.diff || "")
 			} catch (err: unknown) {
-				setError(
-					err instanceof Error ? err.message : "Failed to load diff",
-				)
+				setError(err instanceof Error ? err.message : "Failed to load diff")
 			} finally {
 				setLoading(false)
 			}
@@ -73,9 +69,7 @@ export function DiffEditor({ filePath, onClose, onOpenFile }: DiffEditorProps) {
 				<div style={{ flex: 1 }} />
 				<button
 					onClick={() =>
-						setViewMode(
-							viewMode === "inline" ? "side-by-side" : "inline",
-						)
+						setViewMode(viewMode === "inline" ? "side-by-side" : "inline")
 					}
 					style={{
 						fontSize: 11,
@@ -148,11 +142,7 @@ export function DiffEditor({ filePath, onClose, onOpenFile }: DiffEditorProps) {
 						background: "var(--bg)",
 					}}
 				>
-					<DiffView
-						diff={diff}
-						fileName={filePath}
-						viewMode={viewMode}
-					/>
+					<DiffView diff={diff} fileName={filePath} viewMode={viewMode} />
 				</div>
 			)}
 		</div>

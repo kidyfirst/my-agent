@@ -165,10 +165,10 @@ export function FilesChangedBar({
 					<span style={{ fontWeight: 500 }}>
 						{files.length} file{files.length === 1 ? "" : "s"} changed
 					</span>
-					<span style={{ color: "var(--success, #22c55e)", fontWeight: 500 }}>
+					<span style={{ color: "var(--success)", fontWeight: 500 }}>
 						+{added}
 					</span>
-					<span style={{ color: "var(--error, #ef4444)", fontWeight: 500 }}>
+					<span style={{ color: "var(--error)", fontWeight: 500 }}>
 						-{deleted}
 					</span>
 					<Chevron open={expanded} size={10} />
@@ -307,10 +307,10 @@ export function FilesChangedBar({
 											fontSize: 11,
 										}}
 									>
-										<span style={{ color: "var(--success, #22c55e)" }}>
+										<span style={{ color: "var(--success)" }}>
 											+{file.added}
 										</span>
-										<span style={{ color: "var(--error, #ef4444)" }}>
+										<span style={{ color: "var(--error)" }}>
 											-{file.deleted}
 										</span>
 										{onOpenDiff && (

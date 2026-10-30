@@ -81,9 +81,7 @@ export function TodoProgress({ todos }: TodoProgressProps) {
 						<span
 							style={{
 								textDecoration:
-									todo.status === "completed"
-										? "line-through"
-										: "none",
+									todo.status === "completed" ? "line-through" : "none",
 								opacity: todo.status === "completed" ? 0.7 : 1,
 							}}
 						>

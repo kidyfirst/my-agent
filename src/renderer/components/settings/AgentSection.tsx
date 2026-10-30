@@ -6,10 +6,7 @@ interface AgentSectionProps {
 	update: (key: keyof SettingsState, value: unknown) => void
 }
 
-export function AgentSection({
-	state,
-	update,
-}: AgentSectionProps) {
+export function AgentSection({ state, update }: AgentSectionProps) {
 	return (
 		<>
 			<SectionHeader title="Editing" />
@@ -19,9 +16,7 @@ export function AgentSection({
 			>
 				<Toggle
 					checked={state.smartEditing}
-					onChange={(v) =>
-						update("smartEditing", v)
-					}
+					onChange={(v) => update("smartEditing", v)}
 				/>
 			</SettingRow>
 		</>

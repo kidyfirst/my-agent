@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer, webUtils } from "electron"
 
 export type HarnessCommand = {
 	type: string
@@ -46,6 +46,28 @@ const api = {
 	},
 
 	platform: process.platform,
+
+	/**
+	 * Resolve the absolute filesystem path of a File dragged into the window.
+	 * `File.path` was removed in Electron 32, so `webUtils.getPathForFile` is the
+	 * only supported way to recover the path without copying the file through IPC.
+	 */
+	getPathForFile: (file: File): string => {
+		try {
+			return webUtils.getPathForFile(file) || ""
+		} catch {
+			return ""
+		}
+	},
+
+	/** True when this Electron build supports `webUtils.getPathForFile`. */
+	supportsPathForFile: (() => {
+		try {
+			return typeof webUtils?.getPathForFile === "function"
+		} catch {
+			return false
+		}
+	})(),
 }
 
 contextBridge.exposeInMainWorld("api", api)

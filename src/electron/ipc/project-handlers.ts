@@ -3,7 +3,15 @@ import * as os from "os"
 import * as fs from "fs"
 import type { IpcCommandHandler, WorktreeSession } from "./types.js"
 import { safeSend } from "../helpers.js"
-import { detectProject } from "../../utils/project.js"
+import {
+	detectProject,
+	getDatabasePath,
+	pathCreatedAt,
+	resourceIdVariants,
+} from "../../utils/project.js"
+import { deleteThreadTaskChanges } from "../task-changes-store.js"
+import { readProjectThreadsByPath } from "../project-threads.js"
+import { deleteThreadInDb, renameThreadInDb } from "../project-thread-write.js"
 import {
 	loadRecentProjects,
 	saveRecentProject,
@@ -11,15 +19,123 @@ import {
 	removeRecentProject,
 } from "../../utils/recent-projects.js"
 
+export function purgeProjectHistory(projectPath: string): void {
+	if (!projectPath || projectPath === "/" || !projectPath.trim()) return
+	try {
+		const { DatabaseSync } = require("node:sqlite")
+		const dbPath = getDatabasePath()
+		if (!fs.existsSync(dbPath)) return
+
+		const proj = detectProject(projectPath)
+		const resourceIds = new Set<string>()
+		if (proj.resourceId) resourceIds.add(proj.resourceId)
+
+		// Check for worktrees associated with this repo
+		try {
+			const { execSync } = require("child_process")
+			if (
+				fs.existsSync(projectPath) &&
+				fs.statSync(projectPath).isDirectory()
+			) {
+				const output = execSync("git worktree list --porcelain", {
+					cwd: projectPath,
+					encoding: "utf-8",
+					stdio: ["pipe", "pipe", "pipe"],
+				}) as string
+				for (const block of output.split("\n\n").filter(Boolean)) {
+					const firstLine = block.split("\n")[0]
+					if (firstLine.startsWith("worktree ")) {
+						const wtPath = firstLine.slice(9).trim()
+						if (wtPath && wtPath !== projectPath) {
+							const wtProj = detectProject(wtPath)
+							if (wtProj.resourceId) resourceIds.add(wtProj.resourceId)
+						}
+					}
+				}
+			}
+		} catch {
+			// ignore git failure
+		}
+
+		const db = new DatabaseSync(dbPath)
+		try {
+			db.exec("BEGIN TRANSACTION;")
+			for (const resId of resourceIds) {
+				try {
+					const threads = db
+						.prepare("SELECT id FROM myagent_threads WHERE resourceId = ?")
+						.all(resId) as Array<{ id: string }>
+					for (const t of threads) {
+						if (t?.id) {
+							deleteThreadTaskChanges(t.id)
+							db.prepare(
+								"DELETE FROM myagent_messages WHERE thread_id = ?",
+							).run(t.id)
+						}
+					}
+				} catch {}
+
+				try {
+					db.prepare("DELETE FROM myagent_messages WHERE resourceId = ?").run(
+						resId,
+					)
+				} catch {}
+				try {
+					db.prepare("DELETE FROM myagent_threads WHERE resourceId = ?").run(
+						resId,
+					)
+				} catch {}
+				try {
+					db.prepare(
+						"DELETE FROM myagent_observational_memory WHERE resourceId = ?",
+					).run(resId)
+				} catch {}
+			}
+			db.exec("COMMIT;")
+		} catch (err) {
+			try {
+				db.exec("ROLLBACK;")
+			} catch {}
+			console.error("[purgeProjectHistory] Error purging SQLite records:", err)
+		} finally {
+			try {
+				db.close()
+			} catch {}
+		}
+	} catch (err) {
+		console.error("[purgeProjectHistory] Failed:", err)
+	}
+}
+
 export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 	return {
 		getProjectInfo: async (_command, ctx) => {
+			if (!ctx.activeSessionPath) return null
+			const recent = loadRecentProjects()
+			const normActive = path
+				.resolve(ctx.activeSessionPath)
+				.replace(/\/+$/, "")
+				.toLowerCase()
+			const isProject = recent.some((r) => {
+				const normRoot = path
+					.resolve(r.rootPath)
+					.replace(/\/+$/, "")
+					.toLowerCase()
+				return (
+					normRoot === normActive ||
+					normActive.startsWith(normRoot + "/") ||
+					normActive.startsWith(normRoot + "\\")
+				)
+			})
+			if (!isProject) return null
+
 			const projectRoot = ctx.getActiveSession().projectRoot
 			const project = detectProject(projectRoot)
 			return {
 				name: project.name,
 				rootPath: project.rootPath,
 				gitBranch: project.gitBranch,
+				isGitRepo: project.isGitRepo,
 				isWorktree: project.isWorktree,
 			}
 		},
@@ -31,13 +147,20 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 				let gitBranch: string | undefined
 				let isWorktree = false
 				let mainRepoPath: string | undefined
-				const worktrees: Array<{ path: string; branch: string }> = []
+				const worktrees: Array<{
+					path: string
+					branch: string
+					createdAt?: string
+				}> = []
+				// Creation order, not last-opened order: the sidebar must stay put.
+				const createdAt = p.addedAt || p.lastOpened || undefined
 				let exists = true
 				try {
 					if (!fs.existsSync(p.rootPath)) {
 						exists = false
 						return {
 							...p,
+							createdAt,
 							gitBranch,
 							isWorktree,
 							mainRepoPath,
@@ -69,7 +192,21 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 							const customWt = projects.find((cp) => cp.rootPath === wt.path)
 							worktrees.push({
 								path: wt.path as string,
-								branch: customWt?.name || (wt.branch as string) || "detached",
+								// A worktree is identified by its own branch — its sessions
+								// hang under that row in the sidebar. Falling back to the
+								// project name would label it with the repo it was cut from
+								// (e.g. "my-agent"), making it indistinguishable from the
+								// project row right above it.
+								branch:
+									(wt.branch as string) ||
+									customWt?.name ||
+									path.basename(wt.path as string) ||
+									"detached",
+								// `git worktree list` has no timestamps; a worktree the user
+								// added as a project keeps its addedAt, otherwise use the
+								// directory's own creation time.
+								createdAt:
+									customWt?.addedAt || pathCreatedAt(wt.path as string),
 							})
 						}
 					}
@@ -78,6 +215,7 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 				}
 				return {
 					...p,
+					createdAt,
 					gitBranch,
 					isWorktree,
 					mainRepoPath,
@@ -129,8 +267,102 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 
 			return result
 		},
-		removeRecentProject: async (command) => {
-			removeRecentProject(command.path as string)
+		/**
+		 * Sessions of every folder in the sidebar, keyed by path. Read straight
+		 * from the threads table so a project that isn't open can still show its
+		 * sessions (see `project-threads.ts`).
+		 */
+		listProjectThreads: async (command) => {
+			const paths = Array.isArray(command.paths)
+				? (command.paths as unknown[]).filter(
+						(p): p is string => typeof p === "string" && p.length > 0,
+					)
+				: []
+			return readProjectThreadsByPath(paths)
+		},
+		/**
+		 * Rename or delete a session of a project that is not open.
+		 *
+		 * The active harness can only reach its own threads, so the sidebar's
+		 * ⋯ menu on a sibling project's session writes to the threads table
+		 * directly (see `project-thread-write.ts`). The path is resolved to its
+		 * `resourceId` first, which keeps the write scoped to that one folder.
+		 */
+		mutateProjectThread: async (command) => {
+			const projectPath =
+				typeof command.projectPath === "string" ? command.projectPath : ""
+			const threadId =
+				typeof command.threadId === "string" ? command.threadId : ""
+			const action = command.action === "delete" ? "delete" : "rename"
+			if (!projectPath || projectPath === "/" || !threadId) {
+				return { ok: false }
+			}
+
+			const { resourceId } = detectProject(projectPath)
+			if (!resourceId) return { ok: false }
+
+			const dbPath = getDatabasePath()
+			// The folder may be stored under more than one id (path-keyed before a
+			// remote existed, URL-keyed afterwards); the write has to reach
+			// whichever one wrote the row.
+			const scopes = (() => {
+				try {
+					return resourceIdVariants(projectPath)
+				} catch {
+					return [resourceId]
+				}
+			})()
+			if (action === "rename") {
+				const title = typeof command.title === "string" ? command.title : ""
+				return {
+					ok: renameThreadInDb({
+						dbPath,
+						resourceId: scopes,
+						threadId,
+						title,
+					}),
+				}
+			}
+
+			const ok = deleteThreadInDb({
+				dbPath,
+				resourceId: scopes,
+				threadId,
+			})
+			if (ok) deleteThreadTaskChanges(threadId)
+			return { ok }
+		},
+		removeRecentProject: async (command, ctx) => {
+			const projectPath = command.path as string
+			const deleteHistory = Boolean(command.deleteHistory)
+
+			removeRecentProject(projectPath)
+			ctx.cleanupSession(projectPath)
+
+			if (deleteHistory) {
+				purgeProjectHistory(projectPath)
+			}
+
+			const safeRemoved = path
+				.resolve(projectPath)
+				.replace(/\/+$/, "")
+				.toLowerCase()
+			const safeActive = path
+				.resolve(ctx.activeSessionPath || "")
+				.replace(/\/+$/, "")
+				.toLowerCase()
+
+			if (
+				safeActive === safeRemoved ||
+				safeActive.startsWith(safeRemoved + "/") ||
+				safeActive.startsWith(safeRemoved + "\\")
+			) {
+				const recent = loadRecentProjects()
+				const fallback =
+					recent.find((r) => r.rootPath && fs.existsSync(r.rootPath))
+						?.rootPath || ""
+				ctx.setActiveSessionPath(fallback)
+			}
 			return { success: true }
 		},
 		createWorktree: async (command) => {
@@ -455,6 +687,7 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 				})
 
 				removeRecentProject(wtPath)
+				purgeProjectHistory(wtPath)
 				return { success: true }
 			} catch (e: any) {
 				const msg = e.stderr?.trim() || e.message || "Failed to delete worktree"
@@ -468,6 +701,50 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 			if (!projectPath || !newName) return { success: false }
 			renameRecentProject(projectPath, newName)
 			return { success: true }
+		},
+		/**
+		 * Rename the branch a worktree has checked out.
+		 *
+		 * The sidebar labels a worktree by its branch, so an inline edit there
+		 * has to move the branch itself — an alias kept only for display would
+		 * leave `git status`, the PR panel and the ⌘K list quoting the old name.
+		 *
+		 * `git branch -m <new>` (no source branch) renames whatever is checked
+		 * out at `cwd`, which is the only form git accepts while that branch is
+		 * held by this worktree. The directory keeps its old name: paths are how
+		 * sessions, task changes and issue links are keyed, so nothing moves.
+		 */
+		renameWorktree: async (command) => {
+			const { execFileSync } = require("child_process")
+			const wtPath = command.worktreePath as string
+			const newName = (command.newName as string)?.trim()
+			if (!wtPath || !newName) {
+				return { success: false, error: "Branch name is required" }
+			}
+
+			try {
+				// Surfaces "invalid ref name" as a readable message instead of a
+				// raw git trace from `branch -m`.
+				execFileSync("git", ["check-ref-format", "--branch", newName], {
+					cwd: wtPath,
+					encoding: "utf-8",
+					stdio: ["pipe", "pipe", "pipe"],
+				})
+				execFileSync("git", ["branch", "-m", newName], {
+					cwd: wtPath,
+					encoding: "utf-8",
+					stdio: ["pipe", "pipe", "pipe"],
+				})
+				return { success: true, branch: newName }
+			} catch (e: any) {
+				const msg = (
+					e.stderr?.trim()?.split("\n").pop() ||
+					e.message ||
+					"Failed to rename worktree branch"
+				).replace(/^fatal:\s*/, "")
+				console.error("[renameWorktree] Error:", msg)
+				return { success: false, error: msg }
+			}
 		},
 	}
 }

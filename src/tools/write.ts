@@ -1,7 +1,7 @@
 /**
  * Write tool — create new files or overwrite existing ones.
  */
-import { createTool } from "../core/index.js"
+import { createTool, ExecutionMode } from "../core/index.js"
 import { z } from "zod/v3"
 import * as path from "path"
 import * as fs from "fs"
@@ -39,6 +39,33 @@ Usage notes:
 				// Security: ensure the path is within the project root or allowed paths
 				assertPathAllowed(absolutePath, root, allowedPaths)
 
+				const relPath = path.relative(root, absolutePath)
+
+				// In Plan mode, write_file is restricted to plan files or notes (.myagent/plans/ or *.md)
+				const harnessCtx = (toolContext?.requestContext?.get?.("controller") ||
+					toolContext?.requestContext?.get?.("harness")) as any
+				const session = toolContext?.requestContext?.get?.("session") as any
+				const modeId =
+					session?.mode?.get?.() ??
+					harnessCtx?.modeId ??
+					harnessCtx?.session?.modeId
+				const isPlanMode = modeId === ExecutionMode.PLAN
+
+				if (isPlanMode) {
+					const normalizedRelPath = relPath.replace(/\\/g, "/")
+					const isAllowedPlanPath =
+						normalizedRelPath.startsWith(".myagent/") ||
+						normalizedRelPath.startsWith("plans/") ||
+						normalizedRelPath.endsWith(".md")
+
+					if (!isAllowedPlanPath) {
+						return {
+							content: `In Plan mode, source files cannot be modified before the plan is approved. Only plan files (under .myagent/plans/ or *.md) can be written. Call submit_plan when your plan is ready.`,
+							isError: true,
+						}
+					}
+				}
+
 				// Check if file exists
 				const exists = fs.existsSync(absolutePath)
 
@@ -52,7 +79,6 @@ Usage notes:
 				fs.writeFileSync(absolutePath, context.content, "utf-8")
 
 				const lineCount = context.content.split("\n").length
-				const relPath = path.relative(root, absolutePath)
 
 				if (exists) {
 					return {

@@ -19,7 +19,9 @@ interface SubagentExecutionProps {
 	}
 }
 
-export const SubagentExecution = memo(function SubagentExecution({ subagent }: SubagentExecutionProps) {
+export const SubagentExecution = memo(function SubagentExecution({
+	subagent,
+}: SubagentExecutionProps) {
 	const [expanded, setExpanded] = useState(false)
 	const isDone = subagent.status === "complete"
 
@@ -43,14 +45,19 @@ export const SubagentExecution = memo(function SubagentExecution({ subagent }: S
 				}}
 			>
 				{/* Icon */}
-				<span style={{ fontSize: 14, flexShrink: 0, width: 20, textAlign: "center" }}>
+				<span
+					style={{
+						fontSize: 14,
+						flexShrink: 0,
+						width: 20,
+						textAlign: "center",
+					}}
+				>
 					&#x1F3D7;&#xFE0F;
 				</span>
 
 				{/* Label */}
-				<span style={{ color: "var(--muted)", fontWeight: 500 }}>
-					Agent
-				</span>
+				<span style={{ color: "var(--muted)", fontWeight: 500 }}>Agent</span>
 
 				{/* Task description */}
 				<span
@@ -76,10 +83,14 @@ export const SubagentExecution = memo(function SubagentExecution({ subagent }: S
 				{/* Status */}
 				<span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
 					{isDone && !subagent.isError && (
-						<span style={{ color: "var(--success)", fontSize: 11 }}>&#10003;</span>
+						<span style={{ color: "var(--success)", fontSize: 11 }}>
+							&#10003;
+						</span>
 					)}
 					{isDone && subagent.isError && (
-						<span style={{ color: "var(--error)", fontSize: 11 }}>&#10007;</span>
+						<span style={{ color: "var(--error)", fontSize: 11 }}>
+							&#10007;
+						</span>
 					)}
 					{!isDone && (
 						<span

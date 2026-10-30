@@ -172,31 +172,33 @@ export function GitPanel({ onFileClick, activeFilePath }: GitPanelProps) {
 			)}
 
 			{/* Sync with main (only for non-main branches) */}
-			{status.branch && status.branch !== "main" && status.branch !== "master" && (
-				<div style={{ padding: "2px 12px 6px" }}>
-					<button
-						onClick={handleSyncWithMain}
-						disabled={isSyncing}
-						style={{
-							width: "100%",
-							padding: "3px 8px",
-							fontSize: 10,
-							color: "var(--text)",
-							background: "transparent",
-							border: "1px solid var(--border)",
-							borderRadius: 4,
-							cursor: isSyncing ? "default" : "pointer",
-							opacity: isSyncing ? 0.6 : 1,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							gap: 4,
-						}}
-					>
-						{isSyncing ? "Syncing\u2026" : "\u21BB Sync with main"}
-					</button>
-				</div>
-			)}
+			{status.branch &&
+				status.branch !== "main" &&
+				status.branch !== "master" && (
+					<div style={{ padding: "2px 12px 6px" }}>
+						<button
+							onClick={handleSyncWithMain}
+							disabled={isSyncing}
+							style={{
+								width: "100%",
+								padding: "3px 8px",
+								fontSize: 10,
+								color: "var(--text)",
+								background: "transparent",
+								border: "1px solid var(--border)",
+								borderRadius: 4,
+								cursor: isSyncing ? "default" : "pointer",
+								opacity: isSyncing ? 0.6 : 1,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								gap: 4,
+							}}
+						>
+							{isSyncing ? "Syncing\u2026" : "\u21BB Sync with main"}
+						</button>
+					</div>
+				)}
 
 			{/* Feedback toast */}
 			{feedback && (
@@ -205,9 +207,7 @@ export function GitPanel({ onFileClick, activeFilePath }: GitPanelProps) {
 						padding: "3px 12px",
 						fontSize: 11,
 						color:
-							feedback.type === "success"
-								? "var(--success)"
-								: "var(--error)",
+							feedback.type === "success" ? "var(--success)" : "var(--error)",
 						textAlign: "center",
 					}}
 				>
@@ -243,17 +243,10 @@ export function GitPanel({ onFileClick, activeFilePath }: GitPanelProps) {
 							outline: "none",
 							boxSizing: "border-box",
 						}}
-						onFocus={(e) =>
-							(e.target.style.borderColor = "var(--accent)")
-						}
-						onBlur={(e) =>
-							(e.target.style.borderColor = "var(--border-muted)")
-						}
+						onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+						onBlur={(e) => (e.target.style.borderColor = "var(--border-muted)")}
 						onKeyDown={(e) => {
-							if (
-								e.key === "Enter" &&
-								(e.metaKey || e.ctrlKey)
-							) {
+							if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 								e.preventDefault()
 								handleCommit()
 							}
@@ -271,12 +264,10 @@ export function GitPanel({ onFileClick, activeFilePath }: GitPanelProps) {
 							background: commitMessage.trim()
 								? "var(--accent)"
 								: "var(--bg-surface)",
-							color: commitMessage.trim() ? "#fff" : "var(--dim)",
+							color: commitMessage.trim() ? "var(--on-accent)" : "var(--dim)",
 							borderRadius: 4,
 							border: "none",
-							cursor: commitMessage.trim()
-								? "pointer"
-								: "default",
+							cursor: commitMessage.trim() ? "pointer" : "default",
 							opacity: isCommitting ? 0.6 : 1,
 						}}
 					>

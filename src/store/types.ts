@@ -17,6 +17,7 @@ export interface StorageThreadType {
 }
 
 export interface StorageListThreadsInput {
+	resourceId?: string
 	page?: number
 	perPage?: number | false
 	orderBy?: {

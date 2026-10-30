@@ -45,6 +45,17 @@ export function extractThinkingFromText(rawText: string): ParsedThinkingResult {
 		cleanText = withoutClosed.trim()
 	}
 
+	// Clean out any raw DSML / tool calling markup leaked into text stream
+	if (cleanText.includes("<｜") || cleanText.includes("<function=")) {
+		cleanText = cleanText
+			.replace(/<｜DSML｜tool calls>[\s\S]*?(?:<\/｜DSML｜tool calls>|$)/gi, "")
+			.replace(/<｜tool calls｜>[\s\S]*?(?:<\/｜tool calls｜>|$)/gi, "")
+			.replace(/<｜DSML｜[\s\S]*?｜>/g, "")
+			.replace(/<｜[\s\S]*?｜>/g, "")
+			.replace(/<function=\w+>[\s\S]*?(?:<\/function>|$)/gi, "")
+			.trim()
+	}
+
 	return {
 		extractedThinking: thinkingParts.join("\n\n"),
 		cleanText,

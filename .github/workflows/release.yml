@@ -163,7 +163,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update README.md with latest release info
+      - name: Update READMEs and docs site with latest release info
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           git config user.name "github-actions[bot]"
@@ -171,12 +171,18 @@ jobs:
           git checkout main
           git pull origin main
           node scripts/update-readme-release.js "${{ github.ref_name }}"
-          if ! git diff --quiet README.md; then
-            git add README.md
+          # The script rewrites every edition that carries the release markers
+          # (README.md and README_EN.md) plus the download links and version
+          # labels of the GitHub Pages site (docs/index.html). Staging only the
+          # Chinese README left the English mirror and the site on the old
+          # version — and the site's links 404 until the new tag is up.
+          FILES="README.md README_EN.md docs/index.html"
+          if ! git diff --quiet $FILES; then
+            git add $FILES
             git commit -m "docs: auto-update release download matrix for ${{ github.ref_name }} [skip ci]"
             git push origin main
           else
-            echo "README.md is already up to date."
+            echo "READMEs and docs site are already up to date."
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

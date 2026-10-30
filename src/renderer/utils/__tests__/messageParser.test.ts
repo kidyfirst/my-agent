@@ -50,6 +50,13 @@ describe("messageParser", () => {
 			expect(res.extractedThinking).toBe("Streaming thinking")
 			expect(res.isStreamingThinking).toBe(true)
 		})
+
+		it("cleans leaked DeepSeek DSML tool calls and special tokens from cleanText", () => {
+			const text =
+				'我先看一下项目文档，再给你有依据的回答。\n<｜DSML｜tool calls><｜DSML｜invoke name="view"><｜DSML｜parameter name="file" string="true">/docs/architecture.md</｜DSML｜parameter></｜DSML｜invoke></｜DSML｜tool calls>'
+			const res = extractThinkingFromText(text)
+			expect(res.cleanText).toBe("我先看一下项目文档，再给你有依据的回答。")
+		})
 	})
 
 	describe("normalizeMessageContent", () => {

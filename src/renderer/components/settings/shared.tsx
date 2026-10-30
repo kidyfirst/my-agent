@@ -73,7 +73,7 @@ export function Toggle({
 					width: 14,
 					height: 14,
 					borderRadius: "50%",
-					background: "#fff",
+					background: "var(--on-accent)",
 					transition: "left 0.15s",
 				}}
 			/>

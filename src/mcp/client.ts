@@ -342,7 +342,21 @@ class StdioConnection implements IMCPConnection {
 }
 
 /**
- * HTTP-based MCP server connection (remote endpoint).
+ * HTTP-based MCP server connection.
+ *
+ * Speaks the Streamable HTTP transport, which is what hosted MCP endpoints
+ * (LangSearch, and the reference servers behind most vendors) actually require:
+ *
+ *   - `Accept` must list both `application/json` and `text/event-stream`,
+ *     otherwise the endpoint answers 406.
+ *   - The server may reply with a single JSON body *or* an SSE stream; both are
+ *     valid answers to the same request.
+ *   - `initialize` may hand back an `Mcp-Session-Id` header that every later
+ *     request has to repeat, and a negotiated protocol version that has to be
+ *     sent as `MCP-Protocol-Version`.
+ *
+ * A plain "POST JSON, read JSON" client works against none of that, which is why
+ * this class parses SSE frames and carries the session forward.
  */
 class HttpConnection implements IMCPConnection {
 	private name: string
@@ -350,6 +364,8 @@ class HttpConnection implements IMCPConnection {
 	private timeout: number
 	private nextId = 1
 	private connected = false
+	private sessionId?: string
+	private protocolVersion = PROTOCOL_VERSION
 
 	constructor(name: string, config: McpServerConfig, timeout: number) {
 		this.name = name
@@ -361,51 +377,153 @@ class HttpConnection implements IMCPConnection {
 		return this.connected
 	}
 
-	private async post(method: string, params: any): Promise<any> {
+	private headers(): Record<string, string> {
+		return {
+			"Content-Type": "application/json",
+			Accept: "application/json, text/event-stream",
+			"MCP-Protocol-Version": this.protocolVersion,
+			...(this.sessionId ? { "Mcp-Session-Id": this.sessionId } : {}),
+			...this.config.headers,
+		}
+	}
+
+	/** Pull the JSON-RPC payload with `id` out of an SSE response. */
+	private async readSse(res: Response, id: number): Promise<any> {
+		const body = res.body
+		if (!body) return undefined
+
+		const reader = body.getReader()
+		const decoder = new TextDecoder()
+		let buffer = ""
+		const events: { event?: string; data: string }[] = []
+
+		while (true) {
+			const { value, done } = await reader.read()
+			if (value) buffer += decoder.decode(value, { stream: true })
+			if (done) buffer += decoder.decode()
+
+			// Frames are separated by a blank line; an event can span many data lines.
+			let sep: number
+			while ((sep = buffer.search(/\r?\n\r?\n/)) !== -1) {
+				const rawFrame = buffer.slice(0, sep)
+				buffer = buffer.slice(sep + (buffer[sep] === "\r" ? 4 : 2))
+				let event: string | undefined
+				const dataLines: string[] = []
+				for (const line of rawFrame.split(/\r?\n/)) {
+					if (line.startsWith("event:")) event = line.slice(6).trim()
+					else if (line.startsWith("data:"))
+						dataLines.push(line.slice(5).trim())
+				}
+				if (dataLines.length > 0) {
+					events.push({ event, data: dataLines.join("\n") })
+				}
+			}
+
+			for (const frame of events) {
+				let msg: any
+				try {
+					msg = JSON.parse(frame.data)
+				} catch {
+					continue
+				}
+				if (msg?.id !== id) continue // server notification or another request
+				await reader.cancel().catch(() => {})
+				if (msg.error) throw new Error(this.errorText(msg.error))
+				return msg.result
+			}
+			events.length = 0
+
+			if (done) break
+		}
+
+		throw new Error(
+			`MCP server "${this.name}" closed the stream without answering`,
+		)
+	}
+
+	private errorText(error: any): string {
+		return typeof error === "object" && error?.message
+			? String(error.message)
+			: JSON.stringify(error)
+	}
+
+	/**
+	 * Send one JSON-RPC message. Returns the matching `result` for a request, or
+	 * undefined for a notification (no id).
+	 */
+	private async post(
+		method: string,
+		params: any,
+		options: { notification?: boolean } = {},
+	): Promise<any> {
 		if (!this.config.url) {
 			throw new Error(`MCP server "${this.name}" missing URL`)
 		}
 
-		const id = this.nextId++
+		const id = options.notification ? undefined : this.nextId++
 		const controller = new AbortController()
 		const timer = setTimeout(() => controller.abort(), this.timeout)
 
 		try {
 			const res = await fetch(this.config.url, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					...this.config.headers,
-				},
+				headers: this.headers(),
 				body: JSON.stringify({
 					jsonrpc: "2.0",
-					id,
+					...(id !== undefined ? { id } : {}),
 					method,
 					params,
 				}),
 				signal: controller.signal,
 			})
 
+			// Session id arrives on the initialize response and must be echoed.
+			const sessionId = res.headers.get("mcp-session-id")
+			if (sessionId) this.sessionId = sessionId
+
 			if (!res.ok) {
-				throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+				const detail = await res.text().catch(() => "")
+				throw new Error(
+					`HTTP ${res.status}: ${res.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ""}`,
+				)
 			}
 
-			const json = (await res.json()) as any
-			if (json?.error) {
-				const msg =
-					typeof json.error === "object" && json.error.message
-						? json.error.message
-						: JSON.stringify(json.error)
-				throw new Error(msg)
+			if (id === undefined) {
+				// Notifications are answered with 202 and no body.
+				await res.text().catch(() => "")
+				return undefined
 			}
-			return json?.result
+
+			const contentType = res.headers.get("content-type") || ""
+			if (contentType.includes("text/event-stream")) {
+				return this.readSse(res, id)
+			}
+
+			const text = await res.text()
+			if (!text.trim()) {
+				throw new Error(`MCP server "${this.name}" returned an empty response`)
+			}
+			let json: any
+			try {
+				json = JSON.parse(text)
+			} catch {
+				throw new Error(
+					`MCP server "${this.name}" returned non-JSON (${contentType || "no content-type"}): ${text.slice(0, 200)}`,
+				)
+			}
+			// A JSON body may still be a batch.
+			const message = Array.isArray(json)
+				? json.find((m: any) => m?.id === id)
+				: json
+			if (message?.error) throw new Error(this.errorText(message.error))
+			return message?.result
 		} finally {
 			clearTimeout(timer)
 		}
 	}
 
 	async connect(): Promise<void> {
-		await this.post("initialize", {
+		const result = await this.post("initialize", {
 			protocolVersion: PROTOCOL_VERSION,
 			capabilities: {},
 			clientInfo: {
@@ -413,8 +531,14 @@ class HttpConnection implements IMCPConnection {
 				version: "1.0.0",
 			},
 		})
+		// Use whatever version the server negotiated for the requests that follow.
+		const negotiated =
+			typeof result?.protocolVersion === "string"
+				? result.protocolVersion
+				: undefined
+		if (negotiated) this.protocolVersion = negotiated
 		try {
-			await this.post("notifications/initialized", {})
+			await this.post("notifications/initialized", {}, { notification: true })
 		} catch {}
 		this.connected = true
 	}
@@ -434,6 +558,16 @@ class HttpConnection implements IMCPConnection {
 
 	async disconnect(): Promise<void> {
 		this.connected = false
+		// Best effort: tell the server the session is over so it can free it.
+		if (this.config.url && this.sessionId) {
+			try {
+				await fetch(this.config.url, {
+					method: "DELETE",
+					headers: this.headers(),
+				})
+			} catch {}
+		}
+		this.sessionId = undefined
 	}
 }
 

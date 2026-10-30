@@ -21,6 +21,8 @@ interface ProjectInfo {
 	gitUrl?: string
 	/** Current git branch */
 	gitBranch?: string
+	/** True when the path resolves to a git repo (branch may still be empty on a repo without commits) */
+	isGitRepo: boolean
 	/** Whether this is a git worktree */
 	isWorktree: boolean
 	/** Path to main git repo (different from rootPath if worktree) */
@@ -148,9 +150,32 @@ export function detectProject(projectPath: string): ProjectInfo {
 		rootPath,
 		gitUrl,
 		gitBranch,
+		isGitRepo,
 		isWorktree,
 		mainRepoPath,
 	}
+}
+
+/**
+ * Every resource id the folder at `projectPath` can be stored under.
+ *
+ * A project used to be keyed by its git URL once a remote existed and by its
+ * own path before that, so adding (or losing) an `origin` silently moved every
+ * new session to a different id — the sessions written under the old one were
+ * still in the table but no longer matched. Reading by all variants keeps them
+ * visible. Worktrees are keyed by their path only, so they yield a single id.
+ */
+export function resourceIdVariants(projectPath: string): string[] {
+	const info = detectProject(projectPath)
+	const ids = new Set<string>([info.resourceId])
+	const name = slugify(info.name || "project")
+	// Path-keyed variant (what a repo without a remote used).
+	ids.add(`${name}-${shortHash(info.rootPath)}`)
+	// URL-keyed variant (what a repo with a remote uses).
+	if (info.gitUrl) {
+		ids.add(`${name}-${shortHash(normalizeGitUrl(info.gitUrl))}`)
+	}
+	return [...ids].filter(Boolean)
 }
 
 /**
@@ -159,6 +184,24 @@ export function detectProject(projectPath: string): ProjectInfo {
  * - Linux: ~/.local/share/my-agent
  * - Windows: %APPDATA%/my-agent
  */
+/**
+ * Best-effort creation time of a path.
+ *
+ * `git worktree list` carries no timestamps, so the directory's birth time is
+ * the closest thing to "when this worktree was created". On filesystems without
+ * birth time (some Linux setups) it falls back to the inode change time.
+ */
+export function pathCreatedAt(target: string): string | undefined {
+	try {
+		const stat = fs.statSync(target)
+		const ms =
+			stat.birthtimeMs && stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.ctimeMs
+		return ms ? new Date(ms).toISOString() : undefined
+	} catch {
+		return undefined
+	}
+}
+
 export function getAppDataDir(): string {
 	const platform = os.platform()
 	let baseDir: string

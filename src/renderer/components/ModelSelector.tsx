@@ -121,14 +121,16 @@ export function ModelList({
 							{providerAuth[provider] ? (
 								<span
 									style={{
-										background: "#05966922",
-										color: "#059669",
+										background:
+											"color-mix(in srgb, var(--success) 13%, transparent)",
+										color: "var(--success)",
 										padding: "0px 6px",
 										borderRadius: 3,
 										fontWeight: 500,
 										fontSize: 9,
 										textTransform: "none",
-										border: "1px solid #05966944",
+										border:
+											"1px solid color-mix(in srgb, var(--success) 27%, transparent)",
 									}}
 								>
 									Connected
@@ -136,14 +138,16 @@ export function ModelList({
 							) : (
 								<span
 									style={{
-										background: "#ef444422",
-										color: "#ef4444",
+										background:
+											"color-mix(in srgb, var(--error) 13%, transparent)",
+										color: "var(--error)",
 										padding: "0px 6px",
 										borderRadius: 3,
 										fontWeight: 500,
 										fontSize: 9,
 										textTransform: "none",
-										border: "1px solid #ef444444",
+										border:
+											"1px solid color-mix(in srgb, var(--error) 27%, transparent)",
 									}}
 								>
 									Not connected
@@ -254,7 +258,7 @@ export function ModelSelector({
 			style={{
 				position: "fixed",
 				inset: 0,
-				background: "rgba(0, 0, 0, 0.6)",
+				background: "var(--scrim)",
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",
@@ -266,19 +270,104 @@ export function ModelSelector({
 		>
 			<div
 				style={{
-					background: "var(--bg-elevated)",
+					background: "var(--bg)",
 					border: "1px solid var(--border)",
-					borderRadius: 12,
+					borderRadius: 14,
 					padding: 0,
 					width: 500,
 					maxHeight: "70vh",
 					display: "flex",
 					flexDirection: "column",
 					overflow: "hidden",
+					boxShadow: "var(--shadow-modal)",
 				}}
 			>
+				{/* Header */}
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "space-between",
+						padding: "8px 16px",
+						borderBottom: "1px solid var(--border-muted)",
+						background: "var(--bg-surface)",
+						flexShrink: 0,
+						minHeight: 38,
+					}}
+				>
+					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+						<div
+							style={{
+								width: 22,
+								height: 22,
+								borderRadius: 5,
+								background:
+									"linear-gradient(135deg, var(--accent), var(--accent-2))",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								color: "var(--on-accent)",
+								fontSize: 12,
+								fontWeight: "bold",
+							}}
+						>
+							✦
+						</div>
+						<span
+							style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}
+						>
+							Select Model
+						</span>
+					</div>
+
+					<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+						<button
+							onClick={onClose}
+							style={{
+								background: "transparent",
+								border: "none",
+								color: "var(--muted)",
+								cursor: "pointer",
+								padding: "4px",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								borderRadius: 6,
+								transition: "color 0.15s ease",
+							}}
+							title="Close (Esc)"
+							onMouseEnter={(e) => {
+								;(e.currentTarget as HTMLElement).style.color = "var(--text)"
+							}}
+							onMouseLeave={(e) => {
+								;(e.currentTarget as HTMLElement).style.color = "var(--muted)"
+							}}
+						>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					</div>
+				</div>
+
 				{/* Search */}
-				<div style={{ padding: 12, borderBottom: "1px solid var(--border-muted)" }}>
+				<div
+					style={{
+						padding: "10px 12px",
+						borderBottom: "1px solid var(--border-muted)",
+						background: "var(--bg)",
+					}}
+				>
 					<input
 						ref={inputRef}
 						value={filter}
@@ -342,7 +431,10 @@ export function ModelPickerInline({
 	useEffect(() => {
 		if (!open) return
 		const handler = (e: MouseEvent) => {
-			if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+			if (
+				containerRef.current &&
+				!containerRef.current.contains(e.target as Node)
+			) {
 				setOpen(false)
 				setFilter("")
 			}
@@ -375,9 +467,13 @@ export function ModelPickerInline({
 			<button
 				onClick={() => setOpen(!open)}
 				style={{
-					background: isUnauth ? "#f59e0b12" : "var(--bg-elevated)",
-					color: isUnauth ? "#f59e0b" : "var(--text)",
-					border: isUnauth ? "1px solid #f59e0b44" : "1px solid var(--border)",
+					background: isUnauth
+						? "color-mix(in srgb, var(--warning) 7%, transparent)"
+						: "var(--bg-elevated)",
+					color: isUnauth ? "var(--warning)" : "var(--text)",
+					border: isUnauth
+						? "1px solid color-mix(in srgb, var(--warning) 27%, transparent)"
+						: "1px solid var(--border)",
 					borderRadius: 4,
 					padding: "4px 8px",
 					fontSize: 12,
@@ -391,9 +487,24 @@ export function ModelPickerInline({
 					gap: 6,
 				}}
 			>
-				<span style={{ display: "flex", alignItems: "center", gap: 4, overflow: "hidden" }}>
-					{isUnauth && <span style={{ fontSize: 11, flexShrink: 0 }}>&#x26A0;</span>}
-					<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+				<span
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 4,
+						overflow: "hidden",
+					}}
+				>
+					{isUnauth && (
+						<span style={{ fontSize: 11, flexShrink: 0 }}>&#x26A0;</span>
+					)}
+					<span
+						style={{
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+							whiteSpace: "nowrap",
+						}}
+					>
 						{shortName}
 					</span>
 				</span>
@@ -402,7 +513,7 @@ export function ModelPickerInline({
 				</span>
 			</button>
 			{isUnauth && !open && (
-				<div style={{ fontSize: 10, color: "#f59e0b", marginTop: 2 }}>
+				<div style={{ fontSize: 10, color: "var(--warning)", marginTop: 2 }}>
 					Not connected — OM memory is paused
 				</div>
 			)}
@@ -413,21 +524,26 @@ export function ModelPickerInline({
 						position: "absolute",
 						top: "100%",
 						right: 0,
-						marginTop: 4,
+						marginTop: 6,
 						width: 360,
 						maxHeight: 320,
-						background: "var(--bg-elevated)",
+						background: "var(--bg)",
 						border: "1px solid var(--border)",
-						borderRadius: 8,
+						borderRadius: 12,
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
 						zIndex: 50,
-						boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+						boxShadow: "var(--shadow-popover)",
 					}}
 				>
 					{/* Search */}
-					<div style={{ padding: 8, borderBottom: "1px solid var(--border-muted)" }}>
+					<div
+						style={{
+							padding: 8,
+							borderBottom: "1px solid var(--border-muted)",
+						}}
+					>
 						<input
 							ref={inputRef}
 							value={filter}

@@ -10,6 +10,16 @@
 	const GITHUB_REPO = "kidyfirst/my-agent"
 	const DEFAULT_VERSION = "v0.1.1"
 	const BASE_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases`
+	const I18N = window.DocsI18n
+
+	// OS glyphs used by the primary hero CTA
+	const OS_ICONS = {
+		mac: "M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.79 1.06-1.88.94-2.98-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.76-.95 2.84 1.05.08 2.12-.53 2.74-1.26z",
+		windows:
+			"M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.901-1.801",
+		linux:
+			"M12.003 0c-2.457 0-4.043 1.942-4.043 4.398 0 1.259.452 2.738.995 4.093-1.09.432-2.179 1.144-2.846 2.052-.906 1.233-.872 2.651-.872 4.148 0 1.559.39 3.275 1.579 4.35 1.05.947 2.502 1.344 3.904 1.488.47.781 1.096 1.493 1.83 2.087-.456.195-.916.353-1.378.48-1.095.302-2.146.402-2.91.564-.468.099-.54.34-.343.606.336.453 1.27.734 2.215.734 1.844 0 3.864-.897 5.029-2.122 1.165 1.225 3.185 2.122 5.029 2.122.945 0 1.879-.281 2.215-.734.197-.266.125-.507-.343-.606-.764-.162-1.815-.262-2.91-.564-.462-.127-.922-.285-1.378-.48.734-.594 1.36-1.306 1.83-2.087 1.402-.144 2.854-.541 3.904-1.488 1.189-1.075 1.579-2.791 1.579-4.35 0-1.497.034-2.915-.872-4.148-.667-.908-1.756-1.62-2.846-2.052.543-1.355.995-2.834.995-4.093C16.046 1.942 14.46 0 12.003 0z",
+	}
 
 	// Fallback direct download links for v0.1.1
 	const FALLBACK_ASSETS = {
@@ -223,49 +233,69 @@
 		setLink("btn-linux-appimage", release.assets.linuxAppImage)
 		setLink("btn-linux-deb", release.assets.linuxDeb)
 
-		// Setup Primary Hero CTA based on detected client
+		// Setup Primary Hero CTA based on detected client.
+		// Only the icon, the i18n key and the target link change here; the copy
+		// itself is resolved by i18n.js so it follows the language switch.
 		const heroBtn = document.getElementById("hero-download-btn")
 		const heroTip = document.getElementById("hero-os-tip")
 
 		if (heroBtn && heroTip) {
+			const heroLabel = heroBtn.querySelector(".js-hero-label")
+			const heroIcon = heroBtn.querySelector(".js-os-icon")
+
+			const applyHero = ({ href, labelKey, iconPath, tipKey, cardId }) => {
+				if (href) heroBtn.href = href
+				if (heroLabel && labelKey) heroLabel.setAttribute("data-i18n", labelKey)
+				if (heroIcon && iconPath) heroIcon.innerHTML = `<path d="${iconPath}"/>`
+				if (tipKey) heroTip.setAttribute("data-i18n-html", tipKey)
+				if (I18N) {
+					I18N.apply()
+				} else if (heroLabel && labelKey) {
+					heroLabel.textContent = heroLabel.textContent
+				}
+				if (cardId) highlightPlatformCard(cardId)
+			}
+
 			if (client.os === "mac") {
 				if (client.arch === "arm64") {
-					heroBtn.href = release.assets.macArmDmg.url
-					heroBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.79 1.06-1.88.94-2.98-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.76-.95 2.84 1.05.08 2.12-.53 2.74-1.26z"/></svg>
-            <span>下载 macOS 版 (${release.tag})</span>
-          `
-					heroTip.innerHTML = `已自动适配 <strong>Apple Silicon (M1/M2/M3/M4)</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
-					highlightPlatformCard("platform-mac-arm")
+					applyHero({
+						href: release.assets.macArmDmg.url,
+						labelKey: "hero.ctaMacArm",
+						iconPath: OS_ICONS.mac,
+						tipKey: "hero.tipMacArm",
+						cardId: "platform-mac-arm",
+					})
 				} else {
-					heroBtn.href = release.assets.macX64Dmg.url
-					heroBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.63-.79 1.06-1.88.94-2.98-.94.04-2.07.63-2.73 1.4-.58.67-1.09 1.76-.95 2.84 1.05.08 2.12-.53 2.74-1.26z"/></svg>
-            <span>下载 macOS Intel 版 (${release.tag})</span>
-          `
-					heroTip.innerHTML = `已自动适配 <strong>Intel 处理器</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
-					highlightPlatformCard("platform-mac-x64")
+					applyHero({
+						href: release.assets.macX64Dmg.url,
+						labelKey: "hero.ctaMacX64",
+						iconPath: OS_ICONS.mac,
+						tipKey: "hero.tipMacX64",
+						cardId: "platform-mac-x64",
+					})
 				}
 			} else if (client.os === "windows") {
-				heroBtn.href = release.assets.winExe.url || "#downloads"
-				heroBtn.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.901-1.801"/></svg>
-          <span>下载 Windows 版 (${release.tag})</span>
-        `
-				heroTip.innerHTML = `已自动适配 <strong>Windows 64位</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
-				highlightPlatformCard("platform-win")
+				applyHero({
+					href: release.assets.winExe.url || "#downloads",
+					labelKey: "hero.ctaWin",
+					iconPath: OS_ICONS.windows,
+					tipKey: "hero.tipWin",
+					cardId: "platform-win",
+				})
 			} else if (client.os === "linux") {
-				heroBtn.href = release.assets.linuxAppImage.url || "#downloads"
-				heroBtn.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.003 0c-2.457 0-4.043 1.942-4.043 4.398 0 1.259.452 2.738.995 4.093-1.09.432-2.179 1.144-2.846 2.052-.906 1.233-.872 2.651-.872 4.148 0 1.559.39 3.275 1.579 4.35 1.05.947 2.502 1.344 3.904 1.488.47.781 1.096 1.493 1.83 2.087-.456.195-.916.353-1.378.48-1.095.302-2.146.402-2.91.564-.468.099-.54.34-.343.606.336.453 1.27.734 2.215.734 1.844 0 3.864-.897 5.029-2.122 1.165 1.225 3.185 2.122 5.029 2.122.945 0 1.879-.281 2.215-.734.197-.266.125-.507-.343-.606-.764-.162-1.815-.262-2.91-.564-.462-.127-.922-.285-1.378-.48.734-.594 1.36-1.306 1.83-2.087 1.402-.144 2.854-.541 3.904-1.488 1.189-1.075 1.579-2.791 1.579-4.35 0-1.497.034-2.915-.872-4.148-.667-.908-1.756-1.62-2.846-2.052.543-1.355.995-2.834.995-4.093C16.046 1.942 14.46 0 12.003 0z"/></svg>
-          <span>下载 Linux 版 (${release.tag})</span>
-        `
-				heroTip.innerHTML = `已自动适配 <strong>Linux x64</strong> · <a href="#downloads">查看所有平台与格式 ↓</a>`
-				highlightPlatformCard("platform-linux")
+				applyHero({
+					href: release.assets.linuxAppImage.url || "#downloads",
+					labelKey: "hero.ctaLinux",
+					iconPath: OS_ICONS.linux,
+					tipKey: "hero.tipLinux",
+					cardId: "platform-linux",
+				})
 			} else {
-				heroBtn.href = "#downloads"
-				heroBtn.innerHTML = `<span>立即下载 My Agent (${release.tag})</span>`
-				heroTip.innerHTML = `请在下方选择适合您的操作系统版本`
+				applyHero({
+					href: "#downloads",
+					labelKey: "hero.cta",
+					tipKey: "hero.tipOther",
+				})
 			}
 		}
 
@@ -275,11 +305,15 @@
 			copyBtn.addEventListener("click", () => {
 				const cmd = 'xattr -cr "/Applications/My Agent.app"'
 				navigator.clipboard.writeText(cmd).then(() => {
-					const originalText = copyBtn.textContent
-					copyBtn.textContent = "已复制!"
+					copyBtn.textContent = I18N ? I18N.t("guide.copied") : "已复制!"
 					copyBtn.style.color = "#34d399"
 					setTimeout(() => {
-						copyBtn.textContent = originalText
+						if (I18N) {
+							/* Re-resolve from the dictionary so the label matches the current language */
+							I18N.apply()
+						} else {
+							copyBtn.textContent = "复制命令"
+						}
 						copyBtn.style.color = ""
 					}, 2000)
 				})

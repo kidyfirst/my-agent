@@ -1,5 +1,6 @@
 import type { CommandItem } from "../components/CommandPalette"
 import type { ThreadInfo } from "../types/ipc"
+import { ExecutionMode } from "../types/ipc"
 
 interface BuildCommandItemsArgs {
 	close: () => void
@@ -7,8 +8,10 @@ interface BuildCommandItemsArgs {
 	openFiles: string[]
 	threads: ThreadInfo[]
 	enrichedProjects: { name: string; rootPath: string; gitBranch?: string }[]
+	/** Plain-folder projects have no git panel, so its command is omitted. */
+	hasGitRepo?: boolean
 	modeId: string
-	thinkingLevel: string
+	thinkingLevel?: string
 	setActiveTab: (tab: string) => void
 	setRightSidebarVisible: (visible: boolean) => void
 	setRightSidebarTab: (tab: any) => void
@@ -20,9 +23,15 @@ interface BuildCommandItemsArgs {
 	handleOpenFolder: () => void
 	handleShowCloneModal: () => void
 	handleBrowserOpen: (url: string) => void
-	handleToggleThinking: () => void
-	handleTogglePlanning: () => void
+	handleToggleThinking?: () => void
+	handleSelectMode?: (modeId: string) => void
+	handleOpenGraphViewer?: () => void
+	handleOpenSettings?: (section?: string) => void
+	handleOpenAgents?: () => void
 	handleSwitchProject: (rootPath: string) => void
+	isRecording?: boolean
+	handleToggleRecording?: () => void
+	handleStartReplay?: () => void
 }
 
 /** Builds the ⌘K command palette entries. */
@@ -36,7 +45,11 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 		group: "Navigation",
 		shortcut: "\u2318,",
 		action: () => {
-			args.setActiveTab("settings")
+			if (args.handleOpenSettings) {
+				args.handleOpenSettings()
+			} else {
+				args.setActiveTab("settings")
+			}
 			close()
 		},
 	})
@@ -45,21 +58,27 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 		label: "Open Agent Dashboard",
 		group: "Navigation",
 		action: () => {
-			args.setActiveTab("agents")
+			if (args.handleOpenAgents) {
+				args.handleOpenAgents()
+			} else {
+				args.setActiveTab("agents")
+			}
 			close()
 		},
 	})
-	items.push({
-		id: "focus-git",
-		label: "Focus Git Panel",
-		group: "Navigation",
-		shortcut: "\u2318\u21e7G",
-		action: () => {
-			args.setRightSidebarVisible(true)
-			args.setRightSidebarTab("git")
-			close()
-		},
-	})
+	if (args.hasGitRepo !== false) {
+		items.push({
+			id: "focus-git",
+			label: "Focus Git Panel",
+			group: "Navigation",
+			shortcut: "\u2318\u21e7G",
+			action: () => {
+				args.setRightSidebarVisible(true)
+				args.setRightSidebarTab("git")
+				close()
+			},
+		})
+	}
 	items.push({
 		id: "focus-files",
 		label: "Focus File Tree",
@@ -81,6 +100,30 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 		},
 	})
 
+	items.push({
+		id: "toggle-recording",
+		label: args.isRecording
+			? "Stop Session Recording"
+			: "Start Session Recording",
+		group: "Actions",
+		action: () => {
+			if (args.handleToggleRecording) {
+				args.handleToggleRecording()
+			}
+			close()
+		},
+	})
+	items.push({
+		id: "start-replay",
+		label: "Replay Session Recording",
+		group: "Actions",
+		action: () => {
+			if (args.handleStartReplay) {
+				args.handleStartReplay()
+			}
+			close()
+		},
+	})
 	items.push({
 		id: "search-files",
 		label: "Search Files",
@@ -157,26 +200,39 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 			close()
 		},
 	})
-	items.push({
-		id: "toggle-thinking",
-		label:
-			args.thinkingLevel === "off" ? "Enable Thinking" : "Disable Thinking",
-		group: "Actions",
-		action: () => {
-			args.handleToggleThinking()
-			close()
-		},
-	})
-	items.push({
-		id: "toggle-planning",
-		label:
-			args.modeId === "plan" ? "Switch to Build Mode" : "Switch to Plan Mode",
-		group: "Actions",
-		action: () => {
-			args.handleTogglePlanning()
-			close()
-		},
-	})
+	if (args.handleSelectMode) {
+		const modeList: Array<{ id: string; label: string }> = [
+			{ id: ExecutionMode.REACT, label: "Switch to ReAct Mode" },
+			{ id: ExecutionMode.FAST, label: "Switch to Fast Mode" },
+			{ id: ExecutionMode.PLAN, label: "Switch to Plan & Solve Mode" },
+		]
+		for (const m of modeList) {
+			const isCurrent =
+				m.id === args.modeId || (m.id === "react" && args.modeId === "build")
+			if (!isCurrent) {
+				items.push({
+					id: `switch-mode-${m.id}`,
+					label: m.label,
+					group: "Actions",
+					action: () => {
+						args.handleSelectMode!(m.id)
+						close()
+					},
+				})
+			}
+		}
+	}
+	if (args.handleOpenGraphViewer) {
+		items.push({
+			id: "view-execution-graph",
+			label: "View Execution Graph (LangGraph)",
+			group: "Actions",
+			action: () => {
+				args.handleOpenGraphViewer!()
+				close()
+			},
+		})
+	}
 	items.push({
 		id: "toggle-theme",
 		label: "Toggle Theme",

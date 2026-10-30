@@ -4,6 +4,8 @@ import {
 	LocalFilesystem,
 	LocalSandbox,
 	WORKSPACE_TOOLS,
+	ExecutionMode,
+	DEFAULT_EXECUTION_MODE,
 	type RequestContext,
 } from "../core/index.js"
 
@@ -56,19 +58,15 @@ export function getDynamicWorkspace({
 		} catch {}
 	}
 	const state = ctx?.state ?? ctx?.getState?.()
-	const modeId = ctx?.session?.modeId ?? ctx?.modeId ?? "build"
+	const modeId = ctx?.session?.modeId ?? ctx?.modeId ?? DEFAULT_EXECUTION_MODE
 	const rawProjectPath = state?.projectPath || process.cwd()
 	const projectPath = path.resolve(rawProjectPath)
 	const workspaceId = `${WORKSPACE_ID_PREFIX}-${projectPath}`
 	const sandboxPaths = (state?.sandboxAllowedPaths ?? []) as string[]
 	const allowedPaths = sandboxPaths.map((p) => path.resolve(p))
-	const isPlanMode = modeId === "plan"
+	const isPlanMode = modeId === ExecutionMode.PLAN
 
 	const planModeTools = {
-		[WORKSPACE_TOOLS.FILESYSTEM.WRITE_FILE]: {
-			...TOOL_NAME_OVERRIDES[WORKSPACE_TOOLS.FILESYSTEM.WRITE_FILE],
-			enabled: false,
-		},
 		[WORKSPACE_TOOLS.FILESYSTEM.EDIT_FILE]: {
 			...TOOL_NAME_OVERRIDES[WORKSPACE_TOOLS.FILESYSTEM.EDIT_FILE],
 			enabled: false,

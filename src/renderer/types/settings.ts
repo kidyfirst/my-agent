@@ -34,9 +34,20 @@ export interface McpServerStatus {
 	toolCount: number
 	toolNames: string[]
 	error?: string
+	/** Shipped with the app rather than declared in a config file */
+	builtin?: boolean
+	title?: string
+	url?: string
+	description?: string
+	apiKeyUrl?: string
+	docsUrl?: string
+	hasApiKey?: boolean
+	/** Listed but unusable until the user saves an API key */
+	needsApiKey?: boolean
 }
 
 export interface SettingsProps {
+	isOpen?: boolean
 	onClose?: () => void
 	loggedInProviders?: Set<string>
 	onLogin?: (providerId: string) => void

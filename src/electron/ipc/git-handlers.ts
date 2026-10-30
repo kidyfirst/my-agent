@@ -1,4 +1,5 @@
 import type { IpcCommandHandler } from "./types.js"
+import { execFileQuiet, execQuiet } from "../../utils/quiet-exec.js"
 
 export function getGitHandlers(): Record<string, IpcCommandHandler> {
 	return {
@@ -118,20 +119,15 @@ export function getGitHandlers(): Record<string, IpcCommandHandler> {
 			return result
 		},
 		gitStatus: async (_command, ctx) => {
-			const { execSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			try {
-				const status = execSync("git status --porcelain=v1 -uall", {
+				const status = execQuiet("git status --porcelain=v1 -uall", {
 					cwd: projectRoot,
-					encoding: "utf-8",
 					maxBuffer: 5 * 1024 * 1024,
-				}) as string
-				const branch = (
-					execSync("git rev-parse --abbrev-ref HEAD", {
-						cwd: projectRoot,
-						encoding: "utf-8",
-					}) as string
-				).trim()
+				})
+				const branch = execQuiet("git rev-parse --abbrev-ref HEAD", {
+					cwd: projectRoot,
+				}).trim()
 				const files = status
 					.split("\n")
 					.filter(Boolean)
@@ -153,36 +149,31 @@ export function getGitHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		gitDiff: async (command, ctx) => {
-			const { execSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			const args = command.staged ? ["diff", "--cached"] : ["diff"]
 			if (command.file) args.push("--", command.file as string)
 			try {
-				const diff = execSync(`git ${args.join(" ")}`, {
+				const diff = execQuiet(`git ${args.join(" ")}`, {
 					cwd: projectRoot,
-					encoding: "utf-8",
 					maxBuffer: 5 * 1024 * 1024,
-				}) as string
+				})
 				return { diff }
 			} catch {
 				return { diff: "" }
 			}
 		},
 		gitStage: async (command, ctx) => {
-			const { execFileSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			const stageFiles = command.files as string[] | undefined
 			try {
 				if (stageFiles && stageFiles.length > 0) {
-					execFileSync("git", ["add", "--", ...stageFiles], {
+					execFileQuiet("git", ["add", "--", ...stageFiles], {
 						cwd: projectRoot,
-						encoding: "utf-8",
 						maxBuffer: 5 * 1024 * 1024,
 					})
 				} else {
-					execFileSync("git", ["add", "-A"], {
+					execFileQuiet("git", ["add", "-A"], {
 						cwd: projectRoot,
-						encoding: "utf-8",
 						maxBuffer: 5 * 1024 * 1024,
 					})
 				}
@@ -192,20 +183,17 @@ export function getGitHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		gitUnstage: async (command, ctx) => {
-			const { execFileSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			const unstageFiles = command.files as string[] | undefined
 			try {
 				if (unstageFiles && unstageFiles.length > 0) {
-					execFileSync("git", ["reset", "HEAD", "--", ...unstageFiles], {
+					execFileQuiet("git", ["reset", "HEAD", "--", ...unstageFiles], {
 						cwd: projectRoot,
-						encoding: "utf-8",
 						maxBuffer: 5 * 1024 * 1024,
 					})
 				} else {
-					execFileSync("git", ["reset", "HEAD"], {
+					execFileQuiet("git", ["reset", "HEAD"], {
 						cwd: projectRoot,
-						encoding: "utf-8",
 						maxBuffer: 5 * 1024 * 1024,
 					})
 				}
@@ -215,16 +203,14 @@ export function getGitHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		gitCommit: async (command, ctx) => {
-			const { execFileSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			const commitMsg = command.message as string
 			if (!commitMsg || !commitMsg.trim()) {
 				return { success: false, error: "Commit message is required" }
 			}
 			try {
-				execFileSync("git", ["commit", "-m", commitMsg.trim()], {
+				execFileQuiet("git", ["commit", "-m", commitMsg.trim()], {
 					cwd: projectRoot,
-					encoding: "utf-8",
 					maxBuffer: 5 * 1024 * 1024,
 				})
 				return { success: true }
@@ -236,12 +222,10 @@ export function getGitHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		gitPush: async (_command, ctx) => {
-			const { execSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			try {
-				execSync("git push", {
+				execQuiet("git push", {
 					cwd: projectRoot,
-					encoding: "utf-8",
 					maxBuffer: 5 * 1024 * 1024,
 					timeout: 60000,
 				})
@@ -254,15 +238,13 @@ export function getGitHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		gitPull: async (_command, ctx) => {
-			const { execSync } = require("child_process")
 			const projectRoot = ctx.getActiveSession().projectRoot
 			try {
-				const pullOutput = execSync("git pull", {
+				const pullOutput = execQuiet("git pull", {
 					cwd: projectRoot,
-					encoding: "utf-8",
 					maxBuffer: 5 * 1024 * 1024,
 					timeout: 60000,
-				}) as string
+				})
 				return { success: true, output: pullOutput.trim() }
 			} catch (e: any) {
 				return {
