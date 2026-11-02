@@ -65,6 +65,12 @@ export interface HarnessCallbacks {
 	setRecordingProjects?: React.Dispatch<React.SetStateAction<Set<string>>>
 	setReplayingThreads?: React.Dispatch<React.SetStateAction<Set<string>>>
 	setReplayingProjects?: React.Dispatch<React.SetStateAction<Set<string>>>
+	setRunningThreads?: React.Dispatch<React.SetStateAction<Set<string>>>
+	setThreadsWithApproval?: React.Dispatch<
+		React.SetStateAction<Map<string, any>>
+	>
+	runningThreads?: Set<string>
+	threadsWithApproval?: Map<string, any>
 	/** Developer logging switch — drives the sidebar Logging entry. */
 	setLoggingEnabled?: (enabled: boolean) => void
 	projectInfoRef: React.RefObject<ProjectInfo | null>
@@ -110,12 +116,18 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 				worktreePath === currentRoot ||
 				normalize(worktreePath) === normalize(currentRoot)
 
+			const eventThreadId = (event as any).threadId as string | undefined
+			const isCurrentThread =
+				!eventThreadId || eventThreadId === cb.currentThreadId
+
 			switch (event.type) {
-				case "agent_start":
-					if (isActiveWorktree) {
+				case "agent_start": {
+					if (eventThreadId) {
+						cb.setRunningThreads?.((prev) => new Set(prev).add(eventThreadId))
+					}
+					if (isActiveWorktree && isCurrentThread) {
 						cb.dispatch({ type: "AGENT_START" })
-						const runningId =
-							(event as any).threadId || cb.currentThreadId || null
+						const runningId = eventThreadId || cb.currentThreadId || null
 						cb.setRunningThreadId?.(runningId)
 					}
 					if (worktreePath) {
@@ -126,9 +138,31 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						)
 					}
 					break
+				}
 				case "agent_end": {
+					const targetThreadId = eventThreadId || cb.currentThreadId
+					if (targetThreadId) {
+						cb.setRunningThreads?.((prev) => {
+							if (!prev.has(targetThreadId)) return prev
+							const next = new Set(prev)
+							next.delete(targetThreadId)
+							return next
+						})
+						cb.setThreadsWithApproval?.((prev) => {
+							if (!prev.has(targetThreadId)) return prev
+							const next = new Map(prev)
+							next.delete(targetThreadId)
+							return next
+						})
+					} else {
+						cb.setRunningThreads?.(new Set())
+						cb.setThreadsWithApproval?.(new Map())
+					}
+					if (targetThreadId && targetThreadId === cb.currentThreadId) {
+						cb.setRunningThreadId?.(null)
+					}
 					const endPath = worktreePath || cb.projectInfoRef.current?.rootPath
-					if (isActiveWorktree) {
+					if (isActiveWorktree && isCurrentThread) {
 						// Attach the files this task changed to its last assistant
 						// message and persist the turn duration.
 						const lastAssistant = cb.getLastAssistantMessageId()
@@ -170,6 +204,8 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						if ((event as any).reason !== "error") {
 							cb.loadMessages().catch(() => {})
 						}
+					} else {
+						cb.loadThreads()
 					}
 					if (endPath) {
 						cb.setActiveWorktrees((prev) => {
@@ -194,7 +230,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					cb.loadThreads()
 					break
 				case "message_start":
-					if (isActiveWorktree && event.message) {
+					if (isActiveWorktree && isCurrentThread && event.message) {
 						cb.dispatch({
 							type: "MESSAGE_START",
 							message: event.message as Message,
@@ -202,7 +238,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}
 					break
 				case "message_update":
-					if (isActiveWorktree) {
+					if (isActiveWorktree && isCurrentThread) {
 						const msg =
 							(event.message as Message | undefined) ||
 							((event as any).id
@@ -222,7 +258,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}
 					break
 				case "message_end":
-					if (isActiveWorktree) {
+					if (isActiveWorktree && isCurrentThread) {
 						const msg =
 							(event.message as Message | undefined) ||
 							((event as any).id
@@ -248,7 +284,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}
 					break
 				case "tool_start":
-					if (isActiveWorktree)
+					if (isActiveWorktree && isCurrentThread)
 						cb.dispatch({
 							type: "TOOL_START",
 							id: event.toolCallId as string,
@@ -257,7 +293,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						})
 					break
 				case "tool_update":
-					if (isActiveWorktree)
+					if (isActiveWorktree && isCurrentThread)
 						cb.dispatch({
 							type: "TOOL_UPDATE",
 							id: event.toolCallId as string,
@@ -265,7 +301,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						})
 					break
 				case "tool_end":
-					if (isActiveWorktree)
+					if (isActiveWorktree && isCurrentThread)
 						cb.dispatch({
 							type: "TOOL_END",
 							id: event.toolCallId as string,
@@ -274,7 +310,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						})
 					break
 				case "shell_output":
-					if (isActiveWorktree)
+					if (isActiveWorktree && isCurrentThread)
 						cb.dispatch({
 							type: "SHELL_OUTPUT",
 							id: event.toolCallId as string,
@@ -282,15 +318,41 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 							stream: event.stream as "stdout" | "stderr",
 						})
 					break
-				case "tool_approval_required":
-					cb.setPendingApproval({
+				case "tool_approval_required": {
+					const approvalTargetId = eventThreadId || cb.currentThreadId
+					const approvalData = {
+						threadId: approvalTargetId,
 						toolCallId: event.toolCallId as string,
 						toolName: event.toolName as string,
 						args: event.args,
 						category: (event.category as string) ?? null,
 						categoryLabel: (event.categoryLabel as string) ?? null,
-					})
+					}
+					if (approvalTargetId) {
+						cb.setThreadsWithApproval?.((prev) =>
+							new Map(prev).set(approvalTargetId, approvalData),
+						)
+					}
+					if (!eventThreadId || eventThreadId === cb.currentThreadId) {
+						cb.setPendingApproval(approvalData)
+					}
 					break
+				}
+				case "tool_approval_resolved": {
+					const resolvedTargetId = eventThreadId || cb.currentThreadId
+					if (resolvedTargetId) {
+						cb.setThreadsWithApproval?.((prev) => {
+							if (!prev.has(resolvedTargetId)) return prev
+							const next = new Map(prev)
+							next.delete(resolvedTargetId)
+							return next
+						})
+					}
+					if (!eventThreadId || eventThreadId === cb.currentThreadId) {
+						cb.setPendingApproval(null)
+					}
+					break
+				}
 				case "ask_question":
 					cb.setPendingQuestion({
 						questionId: event.questionId as string,
@@ -346,9 +408,18 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}
 					break
 				}
-				case "thread_changed":
-					cb.setCurrentThreadId(event.threadId as string)
-					cb.loadMessages(event.threadId as string)
+				case "thread_changed": {
+					const tId = event.threadId as string
+					const isSameThread = cb.currentThreadId === tId
+					cb.setCurrentThreadId(tId)
+					const isRunning = cb.runningThreads?.has(tId) ?? false
+					cb.dispatch({ type: "SET_AGENT_ACTIVE", active: isRunning })
+					cb.setRunningThreadId?.(isRunning ? tId : null)
+					const pending = cb.threadsWithApproval?.get(tId)
+					cb.setPendingApproval?.(pending || null)
+					if (!isSameThread) {
+						cb.loadMessages(tId)
+					}
 					cb.loadThreads()
 					window.api
 						.invoke({ type: "getTokenUsage" })
@@ -363,6 +434,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						})
 						.catch(() => {})
 					break
+				}
 				case "thread_created": {
 					const newThreadId = (event.thread as any)?.id
 					if (newThreadId) {
@@ -438,39 +510,47 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					)
 					break
 				case "subagent_start":
-					cb.dispatch({
-						type: "SUBAGENT_START",
-						toolCallId: event.toolCallId as string,
-						agentType: event.agentType as string,
-						task: event.task as string,
-						modelId: event.modelId as string | undefined,
-					})
+					if (isActiveWorktree && isCurrentThread) {
+						cb.dispatch({
+							type: "SUBAGENT_START",
+							toolCallId: event.toolCallId as string,
+							agentType: event.agentType as string,
+							task: event.task as string,
+							modelId: event.modelId as string | undefined,
+						})
+					}
 					break
 				case "subagent_tool_start":
-					cb.dispatch({
-						type: "SUBAGENT_TOOL_START",
-						toolCallId: event.toolCallId as string,
-						subToolName: event.subToolName as string,
-						subToolArgs: event.subToolArgs,
-					})
+					if (isActiveWorktree && isCurrentThread) {
+						cb.dispatch({
+							type: "SUBAGENT_TOOL_START",
+							toolCallId: event.toolCallId as string,
+							subToolName: event.subToolName as string,
+							subToolArgs: event.subToolArgs,
+						})
+					}
 					break
 				case "subagent_tool_end":
-					cb.dispatch({
-						type: "SUBAGENT_TOOL_END",
-						toolCallId: event.toolCallId as string,
-						subToolName: event.subToolName as string,
-						subToolResult: event.subToolResult,
-						isError: event.isError as boolean,
-					})
+					if (isActiveWorktree && isCurrentThread) {
+						cb.dispatch({
+							type: "SUBAGENT_TOOL_END",
+							toolCallId: event.toolCallId as string,
+							subToolName: event.subToolName as string,
+							subToolResult: event.subToolResult,
+							isError: event.isError as boolean,
+						})
+					}
 					break
 				case "subagent_end":
-					cb.dispatch({
-						type: "SUBAGENT_END",
-						toolCallId: event.toolCallId as string,
-						result: event.result as string,
-						isError: event.isError as boolean,
-						durationMs: event.durationMs as number,
-					})
+					if (isActiveWorktree && isCurrentThread) {
+						cb.dispatch({
+							type: "SUBAGENT_END",
+							toolCallId: event.toolCallId as string,
+							result: event.result as string,
+							isError: event.isError as boolean,
+							durationMs: event.durationMs as number,
+						})
+					}
 					break
 				case "error": {
 					const err = event.error as { message?: string }
@@ -615,11 +695,6 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						// never render this list under the project it came from.
 						cb.loadThreads(proj.rootPath)
 					} else {
-						cb.dispatch({ type: "CLEAR" })
-						cb.setCurrentThreadId(null)
-						cb.setThreads([])
-						cb.setOpenThreadTabs([])
-						cb.setActiveTab("chat")
 						cb.loadThreads(proj.rootPath).then(async (loaded) => {
 							if (loaded && loaded.length > 0) {
 								const savedThreadId = proj?.rootPath
@@ -642,7 +717,23 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 										recent.id,
 									)
 								}
-								cb.loadMessages(recent.id)
+								const isRunning = cb.runningThreads?.has(recent.id) ?? false
+								cb.dispatch({
+									type: "SET_AGENT_ACTIVE",
+									active: isRunning,
+								})
+								cb.setRunningThreadId?.(isRunning ? recent.id : null)
+								const pending = cb.threadsWithApproval?.get(recent.id)
+								cb.setPendingApproval?.(pending || null)
+								await cb.loadMessages(recent.id)
+							} else {
+								cb.dispatch({ type: "CLEAR" })
+								cb.setCurrentThreadId(null)
+								cb.setRunningThreadId?.(null)
+								cb.setPendingApproval?.(null)
+								cb.setThreads([])
+								cb.setOpenThreadTabs([])
+								cb.setActiveTab("chat")
 							}
 						})
 					}

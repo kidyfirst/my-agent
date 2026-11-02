@@ -99,27 +99,35 @@ export function RightSidebar({
 			layoutReserve,
 		)
 	})
+	const [isDragging, setIsDragging] = useState(false)
 	// Width reached by the current drag, so mouse-up can decide whether the
 	// panel should hide without waiting for another render.
 	const dragWidthRef = useRef(width)
+	const prevVisibleRef = useRef(visible)
 
 	// Reopening after a collapsing drag must not restore a sliver.
 	useEffect(() => {
-		if (!visible) return
-		setWidth((w) =>
-			restoreRightSidebarWidth(w, window.innerWidth, layoutReserve),
-		)
+		if (!visible) {
+			prevVisibleRef.current = false
+			return
+		}
+		if (!prevVisibleRef.current) {
+			prevVisibleRef.current = true
+			setWidth((w) =>
+				restoreRightSidebarWidth(w, window.innerWidth, layoutReserve),
+			)
+		}
 	}, [visible, layoutReserve])
 
 	// A window resize — or the left sidebar getting wider — can leave the panel
 	// wider than the chat column can afford.
 	useEffect(() => {
 		const clamp = () => {
-			setWidth((w) =>
-				clampRightSidebarWidth(w, window.innerWidth, layoutReserve),
-			)
+			setWidth((w) => {
+				const next = clampRightSidebarWidth(w, window.innerWidth, layoutReserve)
+				return next === w ? w : next
+			})
 		}
-		clamp()
 		window.addEventListener("resize", clamp)
 		return () => window.removeEventListener("resize", clamp)
 	}, [layoutReserve])
@@ -131,6 +139,7 @@ export function RightSidebar({
 	const onDragStart = useCallback(
 		(e: React.MouseEvent) => {
 			e.preventDefault()
+			setIsDragging(true)
 			const startX = e.clientX
 			const startWidth = width
 			dragWidthRef.current = width
@@ -148,6 +157,7 @@ export function RightSidebar({
 			}
 
 			const onMouseUp = () => {
+				setIsDragging(false)
 				document.removeEventListener("mousemove", onMouseMove)
 				document.removeEventListener("mouseup", onMouseUp)
 				document.body.style.cursor = ""
@@ -189,7 +199,9 @@ export function RightSidebar({
 				// Fade while dragged into the closing range: releasing right now
 				// hides the panel.
 				opacity: isCollapsing ? 0.55 : 1,
-				transition: "margin-right 0.22s ease, opacity 0.15s ease",
+				transition: isDragging
+					? "none"
+					: "margin-right 0.22s ease, opacity 0.15s ease",
 			}}
 		>
 			{/* Drag handle on left edge */}

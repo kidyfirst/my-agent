@@ -266,7 +266,7 @@ export interface MyAgentHarness<TState = HarnessState> {
 	subscribe(listener: (event: MyAgentEvent) => void): () => void
 	emitEvent?(event: MyAgentEvent): void
 	sendMessage(options: SendMessageOptions): Promise<void>
-	abort(): Promise<void>
+	abort(options?: { threadId?: string }): Promise<void>
 	steer(options: SteerOptions): Promise<void>
 	followUp(options: FollowUpOptions): Promise<void>
 	getState(): TState & Record<string, unknown>
@@ -305,6 +305,9 @@ export interface MyAgentHarness<TState = HarnessState> {
 	getTokenUsage(): TokenUsage
 	getDisplayState(): HarnessDisplayState
 	isRunning(): boolean
+	isThreadRunning(threadId?: string): boolean
+	getRunningThreadIds(): string[]
+	getPendingApprovals(threadId?: string): unknown[]
 	respondToToolApproval(options: ToolApprovalOptions): unknown
 	respondToQuestion(options: { questionId: string; answer: string }): void
 	registerQuestion?(options: {
@@ -763,7 +766,7 @@ export async function createMyAgent(
 			}
 			return session.sendMessage({ ...options, requestContext: rc })
 		},
-		async abort() {
+		async abort(options?: { threadId?: string }) {
 			for (const resolver of pendingPlans.values()) {
 				try {
 					resolver({ action: "rejected", feedback: "Operation aborted" })
@@ -777,7 +780,7 @@ export async function createMyAgent(
 			}
 			pendingQuestions.clear()
 			const session = activeSession ?? (await sessionReady)
-			return session.abort()
+			return (session as any).abort(options)
 		},
 		async steer(options: SteerOptions) {
 			const session = activeSession ?? (await sessionReady)
@@ -894,10 +897,11 @@ export async function createMyAgent(
 			const session = activeSession ?? (await sessionReady)
 			const threadId = options?.threadId || this.getCurrentThreadId()
 			if (!threadId) return []
+			let list: any[] = []
 			try {
 				const rawMessages =
 					(await session.thread?.listMessages?.({ ...options, threadId })) ?? []
-				const list = Array.isArray(rawMessages)
+				list = Array.isArray(rawMessages)
 					? rawMessages
 					: ((rawMessages as any)?.messages ?? [])
 				if (list.length > 0) {
@@ -925,10 +929,6 @@ export async function createMyAgent(
 							}
 						}
 					} catch {}
-
-					return list.map(
-						(m: any) => normalizeControllerMessage(m) as ControllerMessageLike,
-					)
 				}
 			} catch (err) {
 				console.warn(
@@ -937,26 +937,43 @@ export async function createMyAgent(
 				)
 			}
 
-			// Fallback: query SQLite memory store directly (e.g. if session thread throws or returns empty)
-			try {
-				const memStore = await storage.getStore("memory")
-				const res = await memStore.listMessages({
-					threadId,
-					limit: options?.limit,
-					perPage: options?.limit ?? false,
-					orderBy: { field: "createdAt", direction: "ASC" },
-				})
-				const list = res.messages ?? []
-				return list.map(
-					(m: any) => normalizeControllerMessage(m) as ControllerMessageLike,
-				)
-			} catch (fallbackErr) {
-				console.error(
-					`[harness] storage fallback listMessages failed for ${threadId}:`,
-					fallbackErr,
-				)
-				return []
+			// Fallback: query SQLite memory store directly if list is empty
+			if (list.length === 0) {
+				try {
+					const memStore = await storage.getStore("memory")
+					const res = await memStore.listMessages({
+						threadId,
+						limit: options?.limit,
+						perPage: options?.limit ?? false,
+						orderBy: { field: "createdAt", direction: "ASC" },
+					})
+					list = res.messages ?? []
+				} catch (fallbackErr) {
+					console.error(
+						`[harness] storage fallback listMessages failed for ${threadId}:`,
+						fallbackErr,
+					)
+				}
 			}
+
+			// If the thread is actively streaming/running in background, ensure the in-progress assistant message is visible
+			const activeAssistant = (session as any)?.getCurrentAssistantMessage?.(
+				threadId,
+			)
+			if (activeAssistant) {
+				const existingIdx = list.findIndex(
+					(m: any) => m.id === activeAssistant.id,
+				)
+				if (existingIdx !== -1) {
+					list[existingIdx] = activeAssistant
+				} else {
+					list.push(activeAssistant)
+				}
+			}
+
+			return list.map(
+				(m: any) => normalizeControllerMessage(m) as ControllerMessageLike,
+			)
 		},
 		getTokenUsage() {
 			return (
@@ -977,12 +994,24 @@ export async function createMyAgent(
 				false
 			)
 		},
-		respondToToolApproval(options: ToolApprovalOptions) {
+		isThreadRunning(threadId?: string) {
+			return (activeSession as any)?.isThreadRunning?.(threadId) ?? false
+		},
+		getRunningThreadIds() {
+			return (activeSession as any)?.getRunningThreadIds?.() ?? []
+		},
+		getPendingApprovals(threadId?: string) {
+			return (activeSession as any)?.getPendingApprovals?.(threadId) ?? []
+		},
+		respondToToolApproval(
+			options: ToolApprovalOptions & { threadId?: string },
+		) {
 			const decision =
 				options.decision ?? (options.approved !== false ? "approve" : "decline")
 			return activeSession?.respondToToolApproval?.({
 				decision,
 				toolCallId: options.toolCallId ?? "",
+				threadId: options.threadId,
 				...(options.requestContext
 					? { requestContext: options.requestContext }
 					: {}),

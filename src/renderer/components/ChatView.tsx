@@ -16,6 +16,7 @@ import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
 import { shouldPinToBottom } from "../utils/chatScroll"
 
 export interface ChatViewProps {
+	threadId?: string | null
 	messages: Message[]
 	tools: Map<
 		string,
@@ -66,6 +67,9 @@ export interface ChatViewProps {
 	 * stop is stored, so this note lives only as long as the renderer says so.
 	 */
 	interrupted?: boolean
+	onRevert?: () => void
+	reverting?: boolean
+	reverted?: boolean
 }
 
 export type RenderItem =
@@ -261,6 +265,7 @@ export function decideDuplicateUser(
 }
 
 export function ChatView({
+	threadId,
 	messages,
 	tools,
 	subagents,
@@ -273,9 +278,21 @@ export function ChatView({
 	isActivelyReplaying,
 	replaySource,
 	interrupted,
+	onRevert,
+	reverting,
+	reverted,
 }: ChatViewProps) {
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const isAutoScroll = useRef(true)
+	const prevThreadIdRef = useRef(threadId)
+	const scrollRafRef = useRef<number | null>(null)
+
+	useEffect(() => {
+		if (prevThreadIdRef.current !== threadId) {
+			prevThreadIdRef.current = threadId
+			isAutoScroll.current = true
+		}
+	}, [threadId])
 
 	// Auto-scroll on new messages or tool updates. A message the user just sent
 	// always belongs in view: reading history first must not push the fresh
@@ -283,8 +300,11 @@ export function ChatView({
 	useEffect(() => {
 		const pin = isAutoScroll.current || shouldPinToBottom(messages)
 		if (pin && scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-			requestAnimationFrame(() => {
+			if (scrollRafRef.current != null) {
+				cancelAnimationFrame(scrollRafRef.current)
+			}
+			scrollRafRef.current = requestAnimationFrame(() => {
+				scrollRafRef.current = null
 				if (
 					(isAutoScroll.current || shouldPinToBottom(messages)) &&
 					scrollRef.current
@@ -292,6 +312,12 @@ export function ChatView({
 					scrollRef.current.scrollTop = scrollRef.current.scrollHeight
 				}
 			})
+		}
+		return () => {
+			if (scrollRafRef.current != null) {
+				cancelAnimationFrame(scrollRafRef.current)
+				scrollRafRef.current = null
+			}
 		}
 	}, [messages.length, messages, tools, subagents, isAgentActive, interrupted])
 
@@ -338,7 +364,25 @@ export function ChatView({
 		// Only the first execution block of a turn shows the duration label
 		let turnDurationShown = false
 
-		for (const msg of messages) {
+		const lastUserMsgIdx = (() => {
+			for (let i = messages.length - 1; i >= 0; i--) {
+				if (isUserMessage(messages[i])) return i
+			}
+			return -1
+		})()
+
+		const lastAssistantMsgIdx = (() => {
+			for (let i = messages.length - 1; i >= 0; i--) {
+				if (messages[i].role === "assistant") return i
+			}
+			return -1
+		})()
+
+		const isLastAssistantInCurrentTurn =
+			lastAssistantMsgIdx !== -1 && lastAssistantMsgIdx > lastUserMsgIdx
+
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i]
 			const isUser = isUserMessage(msg)
 			const isSystem =
 				msg.role === "system" ||
@@ -364,7 +408,13 @@ export function ChatView({
 			} else if (isSystem) {
 				items.push({ type: "system", key: `msg-${msg.id}`, data: msg })
 			} else if (msg.role === "assistant") {
-				const isStreaming = msg.id === streamingMessageId
+				const isCurrentTurnStreaming = Boolean(
+					isAgentActive && isLastAssistantInCurrentTurn && i === lastAssistantMsgIdx,
+				)
+				const isStreaming =
+					msg.id === streamingMessageId ||
+					Boolean((msg as any).isStreaming) ||
+					isCurrentTurnStreaming
 				const msgDurationMs = msg.durationMs ?? turnDurationById.get(msg.id)
 				const contentBlocks = normalizeMessageContent(
 					msg.content,
@@ -444,7 +494,10 @@ export function ChatView({
 								// Only the first block of a turn carries the task duration,
 								// so a multi-round turn doesn't repeat "Worked for …".
 								durationMs: withDuration ? msgDurationMs : undefined,
-								startedAt: isStreaming ? agentStartedAt : null,
+								startedAt: isStreaming
+									? agentStartedAt ||
+									  (msgDurationMs ? Date.now() - msgDurationMs : null)
+									: null,
 								changedFiles: showChangedFiles ? msg.changedFiles : undefined,
 							},
 						})
@@ -560,7 +613,10 @@ export function ChatView({
 								text: thoughtStr,
 								durationSec,
 								isStreaming: isStreaming && isAgentActive,
-								startedAt: isStreaming ? agentStartedAt : null,
+								startedAt: isStreaming
+									? agentStartedAt ||
+									  (msgDurationMs ? Date.now() - msgDurationMs : null)
+									: null,
 							})
 						}
 					} else if (
@@ -674,7 +730,7 @@ export function ChatView({
 								...msg,
 								content: [],
 								changedFiles: msg.changedFiles,
-								isStreaming: false,
+								isStreaming: isStreaming,
 							},
 						})
 					}
@@ -726,7 +782,7 @@ export function ChatView({
 					data: {
 						isActive: isAgentActive,
 						steps: unrenderedSteps,
-						startedAt: agentStartedAt,
+						startedAt: agentStartedAt || Date.now(),
 					},
 				})
 			}
@@ -754,7 +810,7 @@ export function ChatView({
 				data: {
 					isActive: true,
 					steps: [],
-					startedAt: agentStartedAt,
+					startedAt: agentStartedAt || Date.now(),
 				},
 			})
 		}
@@ -938,7 +994,7 @@ export function ChatView({
 			onScroll={handleScroll}
 			style={{
 				flex: 1,
-				overflowY: "auto",
+				overflowY: "scroll",
 				overflowX: "hidden",
 				// No padding on the scroll container itself: padding here opens a
 				// strip beside sticky children where scrolled content still shows,
@@ -1149,7 +1205,13 @@ export function ChatView({
 				    keeps the truncated answer from reading like a crash. Shown the
 				    moment Stop is pressed — waiting for the harness to confirm the
 				    abort would put the note a round trip behind the click. */}
-				{interrupted && <InterruptedNotice />}
+				{interrupted && (
+					<InterruptedNotice
+						onRevert={onRevert}
+						reverting={reverting}
+						reverted={reverted}
+					/>
+				)}
 
 				<style>{`
 				@keyframes pulse {

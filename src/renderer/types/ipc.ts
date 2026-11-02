@@ -21,6 +21,7 @@ export type HarnessEventType =
 	| "message_end"
 	| "tool_start"
 	| "tool_approval_required"
+	| "tool_approval_resolved"
 	| "tool_update"
 	| "tool_end"
 	| "tool_input_start"

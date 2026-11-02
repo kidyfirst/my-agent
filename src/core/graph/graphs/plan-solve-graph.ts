@@ -124,6 +124,7 @@ export const planSolveGraphDefinition: AgentGraphDefinition = {
 					recorder: ctx.recorder,
 					turn: 1,
 					step: 1,
+					threadId: ctx.threadId,
 				})
 
 				return {
@@ -171,6 +172,7 @@ export const planSolveGraphDefinition: AgentGraphDefinition = {
 						recorder: ctx.recorder,
 						turn: 1,
 						step: 2,
+						threadId: ctx.threadId,
 					})
 
 					return {

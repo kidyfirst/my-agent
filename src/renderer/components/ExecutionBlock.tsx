@@ -164,6 +164,54 @@ function ThoughtStepItem({
 	)
 }
 
+const WORKING_CHAR_STAGGER_MS = 28
+
+/**
+ * A running turn's header fades its characters in one after another so the
+ * line reads as "alive" the moment it appears, then goes still. A finished
+ * turn renders plain text, otherwise the animation would replay every time
+ * the block re-enters view.
+ *
+ * The label is split into two runs — the stable prefix ("Working for") and the
+ * ticking duration — because the duration changes every 100ms. Animating the
+ * whole string on every tick would make the line flicker; only new characters
+ * in the duration run get an entrance.
+ */
+function staggeredChars(text: string, offset: number) {
+    return Array.from(text).map((char, i) => (
+        <span
+            key={`${i}-${char}`}
+            className="working-char"
+            style={{ animationDelay: `${(offset + i) * WORKING_CHAR_STAGGER_MS}ms` }}
+        >
+            {char === " " ? "\u00a0" : char}
+        </span>
+    ))
+}
+
+function AnimatedWorkingLabel({
+    prefix,
+    duration,
+}: {
+    prefix: string
+    duration: string | null
+}) {
+    const label = duration ? `${prefix} ${duration}` : prefix
+    return (
+        <span aria-label={label}>
+            {/* The prefix keeps stable keys, so a ticking duration does not
+                re-mount it and restart its entrance. */}
+            {staggeredChars(prefix, 0)}
+            {duration && (
+                <>
+                    <span className="working-char">{"\u00a0"}</span>
+                    {staggeredChars(duration, prefix.length + 1)}
+                </>
+            )}
+        </span>
+    )
+}
+
 export const ExecutionBlock = memo(function ExecutionBlock({
 	isActive = false,
 	steps,
@@ -273,7 +321,29 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 						: undefined
 				}
 			>
-				<span>{headerLabel}</span>
+                <style>{`
+                    @keyframes working-char-in {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    .working-char {
+                        display: inline-block;
+                        white-space: pre;
+                        opacity: 1;
+                        animation: working-char-in 260ms ease-out both;
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                        .working-char { animation: none; }
+                    }
+                `}</style>
+                {isActive ? (
+                    <AnimatedWorkingLabel
+                        prefix="Working"
+                        duration={formattedDuration}
+                    />
+                ) : (
+                    <span>{headerLabel}</span>
+                )}
 				{steps.length > 0 && <Chevron open={expanded} />}
 				{steps.length > 0 && !expanded && (
 					<span style={{ fontSize: 11, color: "var(--dim)" }}>

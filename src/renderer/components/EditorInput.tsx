@@ -848,7 +848,9 @@ export function EditorInput({
 	const handleSetThinkingLevel = useCallback(
 		(newLevel: string) => {
 			if (isAgentActive) {
-				showBusyPrompt("当前会话有任务在执行，无法切换思考强度")
+				showBusyPrompt(
+					"Cannot change thinking effort while a task is running in this session",
+				)
 				return
 			}
 			if (onSelectThinkingLevel) {
@@ -1401,7 +1403,7 @@ export function EditorInput({
 												e.stopPropagation()
 												if (isAgentActive) {
 													showBusyPrompt(
-														"当前会话有任务在执行，无法切换思考强度",
+														"Cannot change thinking effort while a task is running in this session",
 													)
 													return
 												}
@@ -1416,7 +1418,7 @@ export function EditorInput({
 													e.stopPropagation()
 													if (isAgentActive) {
 														showBusyPrompt(
-															"当前会话有任务在执行，无法切换思考强度",
+															"Cannot change thinking effort while a task is running in this session",
 														)
 														return
 													}
@@ -1441,8 +1443,8 @@ export function EditorInput({
 											}}
 											title={
 												isAgentActive
-													? "当前会话有任务在执行，无法切换思考强度"
-													: `Thinking effort: ${thinkingLevel || "off"} (点击调整推理强度)`
+													? "Cannot change thinking effort while a task is running in this session"
+													: `Thinking effort: ${thinkingLevel || "off"} (Click to adjust reasoning effort)`
 											}
 											style={{
 												color: showThinkingSlider
@@ -1850,7 +1852,7 @@ export function EditorInput({
 																				onClick={() => {
 																					if (isAgentActive) {
 																						showBusyPrompt(
-																							"当前会话有任务在执行，无法切换模型",
+																							"Cannot change model while a task is running in this session",
 																						)
 																						return
 																					}
@@ -1865,7 +1867,7 @@ export function EditorInput({
 																				onMouseLeave={handleModelMouseLeave}
 																				title={
 																					isAgentActive
-																						? "当前会话有任务在执行，无法切换模型"
+																						? "Cannot change model while a task is running in this session"
 																						: m.name || m.id
 																				}
 																				style={{
@@ -2119,7 +2121,7 @@ export function EditorInput({
 																onClick={() => {
 																	if (isAgentActive) {
 																		showBusyPrompt(
-																			"当前会话有任务在执行，无法切换模型",
+																			"Cannot change model while a task is running in this session",
 																		)
 																		return
 																	}
@@ -2131,7 +2133,7 @@ export function EditorInput({
 																}}
 																title={
 																	isAgentActive
-																		? "当前会话有任务在执行，无法切换模型"
+																		? "Cannot change model while a task is running in this session"
 																		: undefined
 																}
 																style={{
@@ -2335,7 +2337,7 @@ export function EditorInput({
 													onClick={() => {
 														if (isAgentActive) {
 															showBusyPrompt(
-																"当前会话有任务在执行，无法切换执行模式",
+																"Cannot change execution mode while a task is running in this session",
 															)
 															return
 														}
@@ -2344,7 +2346,7 @@ export function EditorInput({
 													}}
 													title={
 														isAgentActive
-															? "当前会话有任务在执行，无法切换执行模式"
+															? "Cannot change execution mode while a task is running in this session"
 															: `${opt.label}: ${opt.description}`
 													}
 													style={{

@@ -7,6 +7,7 @@ import {
 	captureGitSnapshot,
 	diffBetweenSnapshots,
 	diffFileBetweenSnapshots,
+	revertToGitSnapshot,
 } from "../electron/git-task-snapshot.js"
 
 let repo: string
@@ -74,5 +75,29 @@ describe("git task snapshot", () => {
 		const before = git(["status", "--porcelain"])
 		captureGitSnapshot(repo)
 		expect(git(["status", "--porcelain"])).toBe(before)
+	})
+
+	it("reverts modified, added, and deleted files back to the snapshot", () => {
+		const before = captureGitSnapshot(repo)
+
+		// Modify a.ts, create new.ts, delete keep.ts
+		writeFileSync(join(repo, "a.ts"), "changed content\n")
+		writeFileSync(join(repo, "new.ts"), "brand new\n")
+		rmSync(join(repo, "keep.ts"))
+
+		// Verify diff exists
+		const during = captureGitSnapshot(repo)
+		expect(diffBetweenSnapshots(repo, before, during)).toHaveLength(3)
+
+		// Revert
+		const result = revertToGitSnapshot(repo, before)
+		expect(result.success).toBe(true)
+		expect(result.revertedFiles).toContain("a.ts")
+		expect(result.revertedFiles).toContain("new.ts")
+		expect(result.revertedFiles).toContain("keep.ts")
+
+		// Verify state restored
+		const after = captureGitSnapshot(repo)
+		expect(diffBetweenSnapshots(repo, before, after)).toEqual([])
 	})
 })

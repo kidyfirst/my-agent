@@ -82,6 +82,7 @@ export const reactGraphDefinition: AgentGraphDefinition = {
 					initialAssistantText: state.assistantText,
 					initialReasoningText: state.reasoningText,
 					recorder: ctx.recorder,
+					threadId: ctx.threadId,
 				})
 
 				return {

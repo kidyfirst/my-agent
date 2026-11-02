@@ -347,6 +347,28 @@ export class Session<TState = any> {
 		(decision: "approve" | "decline") => void
 	> = new Map()
 	private _pendingSuspensions: Map<string, (data: any) => void> = new Map()
+	private _threadRuns: Map<
+		string,
+		{
+			threadId: string
+			runId: string
+			abortController: AbortController
+			pendingApprovals: Map<
+				string,
+				{
+					toolCallId: string
+					toolName: string
+					args: any
+					category?: string
+					categoryLabel?: string
+					resolve: (decision: "approve" | "decline") => void
+				}
+			>
+			currentAssistantMessage?: any
+			startTime: number
+		}
+	> = new Map()
+	private _threadQueues: Map<string, Promise<void>> = new Map()
 
 	om = {
 		observer: {
@@ -741,16 +763,81 @@ export class Session<TState = any> {
 		}
 	}
 
+	get isRunning(): boolean {
+		return this.isThreadRunning(this._currentThreadId)
+	}
+
+	isThreadRunning(threadId?: string): boolean {
+		const targetId = threadId || this._currentThreadId
+		return targetId ? this._threadRuns.has(targetId) : false
+	}
+
+	getRunningThreadIds(): string[] {
+		return Array.from(this._threadRuns.keys())
+	}
+
+	getPendingApprovals(threadId?: string): Array<{
+		threadId: string
+		toolCallId: string
+		toolName: string
+		args: any
+		category?: string
+		categoryLabel?: string
+	}> {
+		const result: Array<{
+			threadId: string
+			toolCallId: string
+			toolName: string
+			args: any
+			category?: string
+			categoryLabel?: string
+		}> = []
+
+		if (threadId) {
+			const tr = this._threadRuns.get(threadId)
+			if (tr) {
+				for (const item of tr.pendingApprovals.values()) {
+					result.push({
+						threadId,
+						toolCallId: item.toolCallId,
+						toolName: item.toolName,
+						args: item.args,
+						category: item.category,
+						categoryLabel: item.categoryLabel,
+					})
+				}
+			}
+		} else {
+			for (const [tId, tr] of this._threadRuns.entries()) {
+				for (const item of tr.pendingApprovals.values()) {
+					result.push({
+						threadId: tId,
+						toolCallId: item.toolCallId,
+						toolName: item.toolName,
+						args: item.args,
+						category: item.category,
+						categoryLabel: item.categoryLabel,
+					})
+				}
+			}
+		}
+		return result
+	}
+
+	getCurrentAssistantMessage(threadId: string): any {
+		return this._threadRuns.get(threadId)?.currentAssistantMessage || null
+	}
+
 	get run() {
 		return {
-			isRunning: () => this._isRunning,
+			isRunning: (threadId?: string) => this.isThreadRunning(threadId),
 		}
 	}
 
 	get stream() {
 		return {
-			isOpen: () => this._isRunning,
-			isActive: () => this._isRunning,
+			isOpen: (threadId?: string) => this.isThreadRunning(threadId),
+			isActive: (threadId?: string) => this.isThreadRunning(threadId),
 		}
 	}
 
@@ -771,12 +858,35 @@ export class Session<TState = any> {
 		}
 	}
 
-	async abort(): Promise<void> {
+	async abort(opts?: { threadId?: string }): Promise<void> {
+		const targetId = opts?.threadId || this._currentThreadId
+		if (targetId && this._threadRuns.has(targetId)) {
+			const tr = this._threadRuns.get(targetId)!
+			for (const item of tr.pendingApprovals.values()) {
+				try {
+					item.resolve("decline")
+				} catch {}
+			}
+			tr.pendingApprovals.clear()
+			tr.abortController.abort()
+			this._threadRuns.delete(targetId)
+		} else if (!opts?.threadId) {
+			for (const tr of this._threadRuns.values()) {
+				for (const item of tr.pendingApprovals.values()) {
+					try {
+						item.resolve("decline")
+					} catch {}
+				}
+				tr.pendingApprovals.clear()
+				tr.abortController.abort()
+			}
+			this._threadRuns.clear()
+		}
 		if (this._activeAbortController) {
 			this._activeAbortController.abort()
 			this._activeAbortController = null
 		}
-		this._isRunning = false
+		this._isRunning = this._threadRuns.size > 0
 	}
 
 	async steer(_options: any): Promise<void> {}
@@ -786,14 +896,46 @@ export class Session<TState = any> {
 	respondToToolApproval(opts: {
 		decision?: "approve" | "decline" | "always_allow_category" | string
 		toolCallId: string
+		threadId?: string
 		requestContext?: any
 		declineContext?: any
 	}): void {
-		const resolver = this._pendingApprovals.get(opts.toolCallId)
+		let resolver: ((decision: "approve" | "decline") => void) | undefined
+		let resolvedThreadId = opts.threadId
+
+		if (opts.threadId && this._threadRuns.has(opts.threadId)) {
+			const tr = this._threadRuns.get(opts.threadId)!
+			const item = tr.pendingApprovals.get(opts.toolCallId)
+			if (item) {
+				resolver = item.resolve
+				tr.pendingApprovals.delete(opts.toolCallId)
+			}
+		} else {
+			for (const [tId, tr] of this._threadRuns.entries()) {
+				const item = tr.pendingApprovals.get(opts.toolCallId)
+				if (item) {
+					resolver = item.resolve
+					resolvedThreadId = tId
+					tr.pendingApprovals.delete(opts.toolCallId)
+					break
+				}
+			}
+		}
+
+		if (!resolver) {
+			resolver = this._pendingApprovals.get(opts.toolCallId)
+			this._pendingApprovals.delete(opts.toolCallId)
+		}
+
 		if (resolver) {
 			const dec = opts.decision === "decline" ? "decline" : "approve"
 			resolver(dec)
-			this._pendingApprovals.delete(opts.toolCallId)
+			this.emit({
+				type: "tool_approval_resolved" as any,
+				threadId: resolvedThreadId || this._currentThreadId,
+				toolCallId: opts.toolCallId,
+				decision: dec,
+			} as any)
 		}
 	}
 
@@ -818,12 +960,46 @@ export class Session<TState = any> {
 		content: any
 		files?: any[]
 		requestContext?: RequestContext
+		threadId?: string
 		[key: string]: unknown
 	}): Promise<void> {
 		if (!this._currentThreadId) {
 			await this.thread.create({ title: "New Session" })
 		}
-		const threadId = this._currentThreadId
+		const threadId = (options.threadId as string) || this._currentThreadId
+
+		// Per-thread serialization queue: ensures sequential execution on the same thread
+		const previousRun = this._threadQueues.get(threadId) || Promise.resolve()
+		let runResolve: () => void = () => {}
+		const queuePromise = new Promise<void>((r) => {
+			runResolve = r
+		})
+		this._threadQueues.set(
+			threadId,
+			previousRun.catch(() => {}).then(() => queuePromise),
+		)
+
+		await previousRun.catch(() => {})
+		try {
+			await this._executeSendMessage(options, threadId)
+		} finally {
+			runResolve()
+			if (this._threadQueues.get(threadId) === queuePromise) {
+				this._threadQueues.delete(threadId)
+			}
+		}
+	}
+
+	private async _executeSendMessage(
+		options: {
+			content: any
+			files?: any[]
+			requestContext?: RequestContext
+			threadId?: string
+			[key: string]: unknown
+		},
+		threadId: string,
+	): Promise<void> {
 		const resourceId = this.resourceId
 
 		let releaseLock: (() => void) | null = null
@@ -844,6 +1020,26 @@ export class Session<TState = any> {
 		const runId = randomUUID()
 		let recorder: any = null
 		let replayModelUsed: any = null
+
+		const threadRunState = {
+			threadId,
+			runId,
+			abortController,
+			pendingApprovals: new Map<
+				string,
+				{
+					toolCallId: string
+					toolName: string
+					args: any
+					category?: string
+					categoryLabel?: string
+					resolve: (decision: "approve" | "decline") => void
+				}
+			>(),
+			currentAssistantMessage: null as any,
+			startTime,
+		}
+		this._threadRuns.set(threadId, threadRunState)
 
 		const runState = this.state.get() as Record<string, any>
 		logger.info("run", "sendMessage", {
@@ -943,11 +1139,13 @@ export class Session<TState = any> {
 			// Emit user message events
 			this.emit({
 				type: "message_start",
+				threadId,
 				id: userMessageId,
 				message: userDbMessage,
 			})
 			this.emit({
 				type: "message_end",
+				threadId,
 				id: userMessageId,
 				message: userDbMessage,
 			})
@@ -1055,15 +1253,29 @@ export class Session<TState = any> {
 						// dropped and the run would hang.
 						const decisionPromise = new Promise<"approve" | "decline">(
 							(resolve) => {
+								threadRunState.pendingApprovals.set(toolCallId, {
+									toolCallId,
+									toolName,
+									args,
+									category,
+									categoryLabel: category
+										? category.charAt(0).toUpperCase() + category.slice(1)
+										: undefined,
+									resolve,
+								})
 								this._pendingApprovals.set(toolCallId, resolve)
 							},
 						)
 						this.emit({
 							type: "tool_approval_required",
+							threadId,
 							toolCallId,
 							toolName,
 							args,
 							category,
+							categoryLabel: category
+								? category.charAt(0).toUpperCase() + category.slice(1)
+								: undefined,
 						})
 
 						const decision = await decisionPromise
@@ -1075,6 +1287,7 @@ export class Session<TState = any> {
 
 					this.emit({
 						type: "tool_start",
+						threadId,
 						toolName,
 						toolCallId,
 						args,
@@ -1102,6 +1315,7 @@ export class Session<TState = any> {
 
 						this.emit({
 							type: "tool_end",
+							threadId,
 							toolName,
 							toolCallId,
 							result,
@@ -1117,6 +1331,7 @@ export class Session<TState = any> {
 
 						this.emit({
 							type: "tool_end",
+							threadId,
 							toolName,
 							toolCallId,
 							result: toolErr?.message || String(toolErr),
@@ -1305,13 +1520,25 @@ export class Session<TState = any> {
 			// 6. Create assistant message placeholder
 			const assistantMessageId = randomUUID()
 
+			threadRunState.currentAssistantMessage = {
+				id: assistantMessageId,
+				role: "assistant",
+				content: [],
+				threadId,
+				resourceId,
+				isStreaming: true,
+				createdAt: new Date(),
+			}
+
 			this.emit({
 				type: "message_start",
+				threadId,
 				id: assistantMessageId,
 				message: {
 					id: assistantMessageId,
 					role: "assistant",
 					content: [],
+					isStreaming: true,
 				},
 			})
 
@@ -1362,7 +1589,21 @@ export class Session<TState = any> {
 				instructions,
 				executableTools: activeExecutableTools,
 				abortSignal: abortController.signal,
-				emit: (ev) => this.emit(ev),
+				emit: (ev) => {
+					if (ev && typeof ev === "object" && !(ev as any).threadId) {
+						;(ev as any).threadId = threadId
+					}
+					if (ev?.type === "message_update" && ev.message) {
+						threadRunState.currentAssistantMessage = {
+							...(ev.message as any),
+							threadId,
+							resourceId,
+							durationMs: Date.now() - startTime,
+							isStreaming: true,
+						}
+					}
+					this.emit(ev)
+				},
 				store,
 				resourceId,
 				threadId,
@@ -1425,6 +1666,8 @@ export class Session<TState = any> {
 				durationMs,
 			}
 
+			threadRunState.currentAssistantMessage = null
+
 			if (store?.saveMessages) {
 				await store.saveMessages({ messages: [assistantDbMessage] })
 			}
@@ -1442,6 +1685,7 @@ export class Session<TState = any> {
 			})
 			this.emit({
 				type: "message_end",
+				threadId,
 				id: assistantMessageId,
 				message: assistantDbMessage,
 			})
@@ -1476,6 +1720,38 @@ export class Session<TState = any> {
 				}
 			}
 			const durationMs = Date.now() - startTime
+
+			// Persist partial / interrupted assistant message so history is not blank on crash/abort
+			try {
+				const partial = threadRunState?.currentAssistantMessage
+				const hasContent =
+					(Array.isArray(partial?.content) && partial.content.length > 0) ||
+					(typeof partial?.content === "string" &&
+						partial.content.trim().length > 0)
+
+				if (hasContent) {
+					const assistantDbMessage = {
+						id: partial?.id || randomUUID(),
+						role: "assistant",
+						content: partial!.content,
+						threadId,
+						resourceId,
+						createdAt: partial?.createdAt || new Date(),
+						durationMs,
+					}
+
+					const store = await this.getMemoryStore()
+					if (store?.saveMessages) {
+						await store.saveMessages({ messages: [assistantDbMessage] })
+					}
+				}
+			} catch (persistErr) {
+				console.warn(
+					"[Session] Failed to persist interrupted assistant message:",
+					persistErr,
+				)
+			}
+
 			this.emit({
 				type: "agent_end",
 				id: runId,
@@ -1486,8 +1762,11 @@ export class Session<TState = any> {
 			})
 			throw err
 		} finally {
-			this._isRunning = false
-			this._activeAbortController = null
+			this._threadRuns.delete(threadId)
+			this._isRunning = this._threadRuns.size > 0
+			if (this._activeAbortController === abortController) {
+				this._activeAbortController = null
+			}
 			if (threadId) {
 				sessionRecordingManager.finishRecorder(threadId)
 			}

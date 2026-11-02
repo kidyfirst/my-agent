@@ -37,6 +37,9 @@ interface MainContentProps {
 	replaySource?: string
 	/** The user stopped this thread's run (renderer-only, never persisted). */
 	interrupted?: boolean
+	onRevert?: () => void
+	reverting?: boolean
+	reverted?: boolean
 	onSend: (content: string, files?: AttachedFile[]) => void
 	onQueue: (content: string, files?: AttachedFile[]) => void
 	onAbort: () => void
@@ -277,6 +280,7 @@ export function MainContent(props: MainContentProps) {
 				}}
 			>
 				<ChatView
+					threadId={props.activeThreadKey}
 					messages={chat.messages}
 					tools={chat.tools}
 					subagents={chat.subagents}
@@ -289,6 +293,9 @@ export function MainContent(props: MainContentProps) {
 					isActivelyReplaying={props.isReplaying}
 					replaySource={props.replaySource}
 					interrupted={props.interrupted}
+					onRevert={props.onRevert}
+					reverting={props.reverting}
+					reverted={props.reverted}
 				/>
 				<EditorInput
 					onSend={props.onSend}

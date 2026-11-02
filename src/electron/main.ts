@@ -96,9 +96,20 @@ if (process.platform === "darwin") {
 // App state
 // =============================================================================
 let mainWindow: BrowserWindow | null = null
+let isForceQuitting = false
 
 const sessions = new Map<string, WorktreeSession>()
 let activeSessionPath: string = process.cwd()
+
+function hasAnyRunningTasks(): boolean {
+	for (const s of sessions.values()) {
+		try {
+			if (s.harness?.isRunning?.()) return true
+			if ((s.harness as any)?.getRunningThreadIds?.().length > 0) return true
+		} catch {}
+	}
+	return false
+}
 
 // =============================================================================
 // Developer logging — loaded before anything else so startup problems are
@@ -614,6 +625,31 @@ function createWindow() {
 		safeSend(mainWindow, "window-focus")
 	})
 
+	mainWindow.on("close", (event) => {
+		if (isForceQuitting) return
+		if (hasAnyRunningTasks()) {
+			event.preventDefault()
+			const choice = dialog.showMessageBoxSync(win, {
+				type: "warning",
+				buttons: ["继续等待 (Keep Running)", "终止任务并退出 (Stop & Quit)"],
+				defaultId: 0,
+				cancelId: 0,
+				title: "任务正在运行",
+				message:
+					"当前有任务正在执行中，直接退出将中断正在进行的回复或文件修改。\n\n确定要退出应用吗？",
+			})
+			if (choice === 1) {
+				isForceQuitting = true
+				for (const s of sessions.values()) {
+					try {
+						s.harness?.abort?.()
+					} catch {}
+				}
+				win.destroy()
+			}
+		}
+	})
+
 	// Update mainWindowRef for helpers
 	setMainWindowRef(mainWindow)
 
@@ -996,7 +1032,36 @@ app.whenReady().then(async () => {
 	})
 })
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+	if (isForceQuitting) {
+		// proceed
+	} else if (hasAnyRunningTasks()) {
+		event.preventDefault()
+		const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
+		const choice = win
+			? dialog.showMessageBoxSync(win, {
+					type: "warning",
+					buttons: ["Keep Running", "Stop & Quit"],
+					defaultId: 0,
+					cancelId: 0,
+					title: "Task in Progress",
+					message:
+						"A task is currently running. Quitting now will interrupt in-progress replies and modifications.",
+					detail: "Are you sure you want to quit?",
+				})
+			: 1
+		if (choice === 1) {
+			isForceQuitting = true
+			for (const s of sessions.values()) {
+				try {
+					s.harness?.abort?.()
+				} catch {}
+			}
+			app.quit()
+		}
+		return
+	}
+
 	log.info("boot", "app quitting")
 	shutdownLogging()
 	setMainWindowRef(null)

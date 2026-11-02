@@ -100,10 +100,14 @@ export function App() {
 	const [interruptedThreadKey, setInterruptedThreadKey] = useState<
 		string | null
 	>(null)
+	const [revertingTask, setRevertingTask] = useState(false)
+	const [revertedTask, setRevertedTask] = useState(false)
+
 	// Switching away from the stopped turn drops the note: coming back later
 	// should show the stored transcript, not a marker from another session.
 	useEffect(() => {
 		setInterruptedThreadKey(null)
+		setRevertedTask(false)
 	}, [currentThreadId])
 	const threadModel = useThreadModelPermissions(currentThreadId)
 	const modelsByThread = threadModel.modelsByThread
@@ -148,6 +152,10 @@ export function App() {
 	const [replayingProjects, setReplayingProjects] = useState<Set<string>>(
 		new Set(),
 	)
+	const [runningThreads, setRunningThreads] = useState<Set<string>>(new Set())
+	const [threadsWithApproval, setThreadsWithApproval] = useState<
+		Map<string, any>
+	>(new Map())
 	const [showReplayModal, setShowReplayModal] = useState(false)
 	const [sessionExportData, setSessionExportData] =
 		useState<SessionExportData | null>(null)
@@ -211,6 +219,31 @@ export function App() {
 				}
 				if (res?.recordingProjects) {
 					setRecordingProjects(new Set(res.recordingProjects))
+				}
+			})
+			.catch(() => {})
+
+		window.api
+			.invoke({ type: "getRunningThreads" })
+			.then((res: any) => {
+				const list = res?.runningThreads || res?.runningThreadIds
+				if (list && Array.isArray(list)) {
+					setRunningThreads(new Set(list))
+				}
+			})
+			.catch(() => {})
+
+		window.api
+			.invoke({ type: "getPendingApprovals" })
+			.then((res: any) => {
+				if (res?.pendingApprovals && Array.isArray(res.pendingApprovals)) {
+					const map = new Map<string, any>()
+					for (const item of res.pendingApprovals) {
+						if (item.threadId) {
+							map.set(item.threadId, item)
+						}
+					}
+					setThreadsWithApproval(map)
 				}
 			})
 			.catch(() => {})
@@ -321,7 +354,10 @@ export function App() {
 				(targetProjectPath ? recordingProjects.has(targetProjectPath) : false)
 
 			if (!isCurrentlyRecording && chat.isAgentActive) {
-				showToast("任务执行中，不允许录制", "error")
+				showToast(
+					"Cannot start recording while a task is running in this session",
+					"error",
+				)
 				return
 			}
 
@@ -538,7 +574,7 @@ export function App() {
 				}
 				resolvedThreadId = targetThreadId
 				if (targetThreadId) {
-					window.api
+					await window.api
 						.invoke({
 							type: "switchThread",
 							threadId: targetThreadId,
@@ -557,6 +593,10 @@ export function App() {
 							targetThreadId,
 						)
 					}
+					const isRunning = runningThreads.has(targetThreadId)
+					dispatch({ type: "SET_AGENT_ACTIVE", active: isRunning })
+					setRunningThreadId(isRunning ? targetThreadId : null)
+					await loadMessages(targetThreadId)
 
 					const targetThread = session.threads?.find(
 						(t) => t.id === targetThreadId,
@@ -976,6 +1016,10 @@ export function App() {
 		setRecordingProjects,
 		setReplayingThreads,
 		setReplayingProjects,
+		setRunningThreads,
+		setThreadsWithApproval,
+		runningThreads,
+		threadsWithApproval,
 		setLoggingEnabled,
 		projectInfoRef: project.projectInfoRef,
 		notificationPrefRef: project.notificationPrefRef,
@@ -1090,6 +1134,7 @@ export function App() {
 			// A new send also means the previous turn is no longer the last thing
 			// on screen, so any "interrupted" note goes with it.
 			setInterruptedThreadKey(null)
+			setRevertedTask(false)
 			flushSync(() => {
 				dispatch({
 					type: "MESSAGE_START",
@@ -1104,6 +1149,9 @@ export function App() {
 				dispatch({ type: "AGENT_START" })
 			})
 			setRunningThreadId(currentThreadId)
+			if (currentThreadId) {
+				setRunningThreads((prev) => new Set(prev).add(currentThreadId))
+			}
 			const ipcImages = imageFiles?.map(({ mimeType, data, name }) => ({
 				mediaType: mimeType || "image/png",
 				mimeType: mimeType || "image/png",
@@ -1120,6 +1168,7 @@ export function App() {
 				await nextPaint()
 				await window.api.invoke({
 					type: "sendMessage",
+					threadId: currentThreadId || undefined,
 					content: finalContent,
 					...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
 					...(ipcFiles && ipcFiles.length > 0 ? { files: ipcFiles } : {}),
@@ -1151,38 +1200,138 @@ export function App() {
 		// is on screen the moment the stop button is pressed.
 		setInterruptedThreadKey(runningThreadId ?? currentThreadId ?? "default")
 		setRunningThreadId(null)
-		await window.api.invoke({ type: "abort" })
+		await window.api.invoke({
+			type: "abort",
+			threadId: currentThreadId ?? undefined,
+		})
 	}, [runningThreadId, currentThreadId])
 
-	// A dropped agent_end (renderer reload, harness crash) leaves isAgentActive
-	// stuck, which keeps the stop button up and stalls the message queue. While
-	// a run is marked active, ask the harness whether it really is. Two
-	// consecutive idle readings, so a slow model/auth resolution isn't cut off.
+	const handleAbortThread = useCallback(
+		async (targetThreadId?: string) => {
+			if (!targetThreadId || targetThreadId === currentThreadId) {
+				await handleAbort()
+				return
+			}
+			ensureAudioContext()
+			setInterruptedThreadKey(targetThreadId)
+			setRunningThreads((prev) => {
+				const next = new Set(prev)
+				next.delete(targetThreadId)
+				return next
+			})
+			await window.api.invoke({
+				type: "abort",
+				threadId: targetThreadId,
+			})
+		},
+		[currentThreadId, handleAbort],
+	)
+
+	const handleRevertTask = useCallback(async () => {
+		if (!currentThreadId) return
+		setRevertingTask(true)
+		try {
+			const res = (await window.api.invoke({
+				type: "revertTaskChanges",
+				threadId: currentThreadId,
+			})) as { success: boolean; revertedFiles?: string[]; error?: string }
+			if (res?.success) {
+				setRevertedTask(true)
+				showToast(
+					`Reverted changes in ${res.revertedFiles?.length ?? 0} file(s)`,
+					"success",
+				)
+			} else {
+				showToast(res?.error || "Rollback failed", "error")
+			}
+		} catch (err: any) {
+			showToast(`Rollback failed: ${err?.message || String(err)}`, "error")
+		} finally {
+			setRevertingTask(false)
+		}
+	}, [currentThreadId, showToast])
+
+	// Reconcile running threads and agent status periodically to heal any dropped
+	// agent_end events or IPC race conditions.
 	useEffect(() => {
-		if (!chat.isAgentActive) {
-			if (runningThreadId) setRunningThreadId(null)
+		if (runningThreads.size === 0 && !chat.isAgentActive && !runningThreadId) {
 			return
 		}
 		let cancelled = false
 		let idleReads = 0
 		const reconcile = async () => {
 			try {
-				const running = await window.api.invoke({ type: "isRunning" })
+				const res: any = await window.api.invoke({ type: "getRunningThreads" })
 				if (cancelled) return
-				if (running !== false) {
+				const runningList: string[] =
+					res?.runningThreads || res?.runningThreadIds || []
+				const activeSet = new Set(runningList)
+
+				setRunningThreads((prev) => {
+					if (prev.size === activeSet.size) {
+						let same = true
+						for (const id of activeSet) {
+							if (!prev.has(id)) {
+								same = false
+								break
+							}
+						}
+						if (same) return prev
+					}
+					return activeSet
+				})
+
+				const curThread = currentThreadId || ""
+				if (!activeSet.has(curThread)) {
+					if (runningThreadId === curThread) {
+						setRunningThreadId(null)
+					}
+					if (chat.isAgentActive) {
+						idleReads += 1
+						if (idleReads >= 2) {
+							dispatch({ type: "SET_AGENT_ACTIVE", active: false })
+						}
+					}
+				} else {
 					idleReads = 0
-					return
+					if (!chat.isAgentActive) {
+						dispatch({ type: "SET_AGENT_ACTIVE", active: true })
+					}
+					if (runningThreadId !== curThread) {
+						setRunningThreadId(curThread)
+					}
 				}
-				idleReads += 1
-				if (idleReads >= 2) dispatch({ type: "AGENT_END" })
+
+				const approvalRes: any = await window.api.invoke({
+					type: "getPendingApprovals",
+				})
+				if (!cancelled && approvalRes?.pendingApprovals) {
+					const map = new Map<string, any>()
+					for (const item of approvalRes.pendingApprovals) {
+						if (item.threadId) {
+							map.set(item.threadId, item)
+						}
+					}
+					setThreadsWithApproval(map)
+					if (curThread && map.has(curThread)) {
+						dialogs.setPendingApproval(map.get(curThread))
+					}
+				}
 			} catch {}
 		}
-		const interval = setInterval(reconcile, 4000)
+		const interval = setInterval(reconcile, 3000)
 		return () => {
 			cancelled = true
 			clearInterval(interval)
 		}
-	}, [chat.isAgentActive])
+	}, [
+		runningThreads.size,
+		chat.isAgentActive,
+		runningThreadId,
+		currentThreadId,
+		dispatch,
+		dialogs.setPendingApproval,
+	])
 
 	const {
 		handleResumeQueue,
@@ -1213,6 +1362,11 @@ export function App() {
 		dialogs,
 		applyPermissionMode,
 		loadThreads,
+		loadMessages,
+		runningThreads,
+		threadsWithApproval,
+		setPendingApproval: dialogs.setPendingApproval,
+		setRunningThreadId,
 		projectRootPath: project.projectInfo?.rootPath,
 		isAgentActive: chat.isAgentActive,
 		handleToggleRecording,
@@ -1446,9 +1600,11 @@ export function App() {
 				recordingProjects={recordingProjects}
 				replayingThreads={replayingThreads}
 				replayingProjects={replayingProjects}
+				runningThreads={runningThreads}
+				threadsWithApproval={threadsWithApproval}
 				onToggleRecording={handleToggleRecording}
 				onStopReplay={handleStopReplay}
-				onAbort={handleAbort}
+				onAbort={handleAbortThread}
 				activeWorktrees={project.activeWorktrees}
 				unreadWorktrees={project.unreadWorktrees}
 				worktreeStatuses={project.worktreeStatuses}
@@ -1556,6 +1712,9 @@ export function App() {
 					isReplaySession={isCurrentThreadReplaySession}
 					replaySource={currentThreadReplaySource}
 					interrupted={interruptedThreadKey === (currentThreadId || "default")}
+					onRevert={handleRevertTask}
+					reverting={revertingTask}
+					reverted={revertedTask}
 					onSend={handleSend}
 					onQueue={handleQueue}
 					onAbort={handleAbort}

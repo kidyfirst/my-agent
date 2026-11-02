@@ -11,8 +11,14 @@
  */
 export function InterruptedNotice({
 	label = "User actively interrupts task",
+	onRevert,
+	reverting,
+	reverted,
 }: {
 	label?: string
+	onRevert?: () => void
+	reverting?: boolean
+	reverted?: boolean
 }) {
 	return (
 		<div
@@ -60,6 +66,31 @@ export function InterruptedNotice({
 					/>
 				</svg>
 				{label}
+				{onRevert && (
+					<button
+						onClick={onRevert}
+						disabled={reverting || reverted}
+						style={{
+							marginLeft: 8,
+							padding: "3px 8px",
+							fontSize: 11,
+							borderRadius: 4,
+							border: "1px solid var(--border-muted)",
+							background: "var(--bg-surface)",
+							color: reverted ? "var(--success)" : "var(--accent)",
+							cursor: reverting || reverted ? "default" : "pointer",
+							display: "inline-flex",
+							alignItems: "center",
+							gap: 4,
+						}}
+					>
+						{reverted
+							? "✓ Rolled back"
+							: reverting
+								? "Rolling back..."
+								: "↩ Rollback"}
+					</button>
+				)}
 			</span>
 			<span
 				aria-hidden="true"

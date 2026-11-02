@@ -59,6 +59,7 @@ export interface HandlerContext {
 		h: Harness,
 		userMessage: string,
 		resolveModel: ModelResolver,
+		targetThreadId?: string,
 	) => Promise<void>
 	deleteThread: (h: Harness, threadId: string) => Promise<void>
 }

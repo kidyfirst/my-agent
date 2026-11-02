@@ -80,7 +80,9 @@ async function fetchProvidersFromGateways(): Promise<{
 						: `${gateway.id}/${providerId}`
 
 				allProviders[typeProviderId] = config
-				allModels[typeProviderId] = config.models.sort()
+				allModels[typeProviderId] = Array.isArray(config?.models)
+					? [...config.models].sort()
+					: []
 			}
 		} catch (error) {
 			console.warn(`[GatewaySync] Failed to fetch from ${gateway.id}:`, error)

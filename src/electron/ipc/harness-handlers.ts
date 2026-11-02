@@ -23,6 +23,7 @@ import {
 	captureGitSnapshot,
 	diffBetweenSnapshots,
 	diffFileBetweenSnapshots,
+	revertToGitSnapshot,
 	type GitSnapshot,
 } from "../git-task-snapshot.js"
 import {
@@ -31,6 +32,9 @@ import {
 	getThreadTaskChanges,
 	saveTaskChanges,
 	saveTaskDuration,
+	saveActiveTaskBaseline,
+	getActiveTaskBaseline,
+	clearActiveTaskBaseline,
 } from "../task-changes-store.js"
 import { CURATED_CHAT_MODELS } from "../../constants/models.js"
 import {
@@ -241,6 +245,8 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				safeSend(ctx.mainWindow, "harness:event", {
 					type: "agent_end",
 					reason: "error",
+					threadId:
+						(command.threadId as string) || h.getCurrentThreadId() || undefined,
 					worktreePath: ctx.activeSessionPath,
 				})
 				return
@@ -249,6 +255,15 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const currentModelId = h.getCurrentModelId() || ""
 			const baseline = beginTaskSnapshot(ctx.getActiveSession().projectRoot)
 			if (baseline && ctx.mainWindow) {
+				const threadId =
+					(command.threadId as string) || h.getCurrentThreadId() || ""
+				if (threadId && baseline.tree) {
+					saveActiveTaskBaseline({
+						threadId,
+						projectRoot: ctx.getActiveSession().projectRoot,
+						baselineTree: baseline.tree,
+					})
+				}
 				// Lets the renderer know a fresh task baseline exists, so it can
 				// request the changed files once the task ends.
 				safeSend(ctx.mainWindow, "harness:event", {
@@ -288,11 +303,13 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const startTime = Date.now()
 			h.sendMessage({
 				content: messageContent,
+				threadId: (command.threadId as string) || undefined,
 				...(allFiles.length > 0 ? { files: allFiles } : {}),
 				...(imageFiles.length > 0 ? { images: imageFiles } : {}),
 			})
 				.then(async () => {
-					const threadAfter = h.getCurrentThreadId()
+					const threadAfter =
+						(command.threadId as string) || h.getCurrentThreadId()
 					const durationMs = Date.now() - startTime
 					if (threadAfter) {
 						try {
@@ -325,7 +342,12 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					}
 					if (needsTitle) {
 						ctx
-							.generateThreadTitle(h, command.content, s.resolveModel)
+							.generateThreadTitle(
+								h,
+								command.content,
+								s.resolveModel,
+								threadAfter,
+							)
 							.catch((err) => console.warn("Title gen catch:", err))
 					}
 				})
@@ -340,13 +362,47 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					safeSend(ctx.mainWindow, "harness:event", {
 						type: "agent_end",
 						reason: "error",
+						threadId:
+							(command.threadId as string) ||
+							h.getCurrentThreadId() ||
+							undefined,
 						worktreePath: ctx.activeSessionPath,
 					})
 				})
 			return
 		},
 		abort: async (command, ctx) => {
-			ctx.getActiveSession().harness.abort()
+			const targetThreadId = command.threadId as string | undefined
+			if (targetThreadId) {
+				for (const session of ctx.sessions.values()) {
+					if ((session?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+						await session.harness.abort({ threadId: targetThreadId })
+						return
+					}
+				}
+			}
+			await ctx.getActiveSession().harness.abort({
+				threadId: targetThreadId,
+			})
+		},
+		getRunningThreads: async (_command, ctx) => {
+			const allRunning = new Set<string>()
+			for (const session of ctx.sessions.values()) {
+				const ids = (session?.harness as any)?.getRunningThreadIds?.() || []
+				for (const id of ids) allRunning.add(id)
+			}
+			const list = Array.from(allRunning)
+			return { runningThreads: list, runningThreadIds: list }
+		},
+		getPendingApprovals: async (command, ctx) => {
+			const threadId = command.threadId as string | undefined
+			const allPending: any[] = []
+			for (const session of ctx.sessions.values()) {
+				const pending =
+					(session?.harness as any)?.getPendingApprovals?.(threadId) || []
+				if (Array.isArray(pending)) allPending.push(...pending)
+			}
+			return { pendingApprovals: allPending }
 		},
 		// Files changed by the current task, with +/- line counts
 		getTaskChangedFiles: async (command, ctx) => {
@@ -386,6 +442,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					} else if (durationMs != null) {
 						saveTaskDuration({ threadId, messageId, durationMs })
 					}
+					clearActiveTaskBaseline(threadId)
 				}
 				return { files }
 			} catch (err) {
@@ -457,6 +514,45 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				console.warn("getTaskFileDiff failed:", err)
 				return { diff: "" }
 			}
+		},
+		revertTaskChanges: async (command, ctx) => {
+			const threadId =
+				(command.threadId as string) ||
+				ctx.getActiveSession().harness.getCurrentThreadId() ||
+				""
+			const baselineRecord = getActiveTaskBaseline(threadId)
+			const root =
+				baselineRecord?.projectRoot || ctx.getActiveSession().projectRoot
+			if (!root || !baselineRecord?.baselineTree) {
+				return {
+					success: false,
+					error: "No baseline snapshot found for rollback",
+				}
+			}
+			const res = revertToGitSnapshot(root, {
+				tree: baselineRecord.baselineTree,
+			})
+			if (res.success) {
+				clearActiveTaskBaseline(threadId)
+			}
+			return res
+		},
+		getActiveTaskChanges: async (command, ctx) => {
+			const threadId =
+				(command.threadId as string) ||
+				ctx.getActiveSession().harness.getCurrentThreadId() ||
+				""
+			const baselineRecord = getActiveTaskBaseline(threadId)
+			if (!baselineRecord?.baselineTree) return { files: [], canRevert: false }
+			const root =
+				baselineRecord.projectRoot || ctx.getActiveSession().projectRoot
+			const current = captureGitSnapshot(root)
+			const files = diffBetweenSnapshots(
+				root,
+				{ tree: baselineRecord.baselineTree },
+				current,
+			)
+			return { files, canRevert: files.length > 0 }
 		},
 		steer: async (command, ctx) => {
 			await ctx.getActiveSession().harness.steer({ content: command.content })
@@ -593,19 +689,90 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 		},
 		getMessages: async (command, ctx) => {
-			if (!command.threadId && !isActiveProject(ctx)) return []
-			const h = ctx.getActiveSession().harness
-			const threadId = command.threadId || h.getCurrentThreadId()
-			if (!threadId) return []
+			const threadId = command.threadId as string | undefined
+			if (!threadId && !isActiveProject(ctx)) return []
+			let h = ctx.getActiveSession().harness
+			if (threadId) {
+				for (const s of ctx.sessions.values()) {
+					if ((s?.harness as any)?.isThreadRunning?.(threadId)) {
+						h = s.harness
+						break
+					}
+				}
+			}
+			const targetThreadId = threadId || h.getCurrentThreadId()
+			if (!targetThreadId) return []
 			try {
 				const rawMessages = await h.listMessages({
-					threadId,
+					threadId: targetThreadId,
 					limit: command.limit,
 				})
+				// If live assistant message wasn't attached because it ran in a different session,
+				// check all sessions for an in-flight assistant message for this thread
+				if (targetThreadId && Array.isArray(rawMessages)) {
+					let liveMsg: any = null
+					for (const s of ctx.sessions.values()) {
+						const msg = (
+							s?.harness?.activeSession as any
+						)?.getCurrentAssistantMessage?.(targetThreadId)
+						if (msg) {
+							liveMsg = { ...msg, isStreaming: true }
+							break
+						}
+					}
+					if (liveMsg) {
+						const existingIdx = rawMessages.findIndex(
+							(m: any) => m.id === liveMsg.id,
+						)
+						if (existingIdx >= 0) {
+							rawMessages[existingIdx] = liveMsg
+						} else {
+							rawMessages.push(liveMsg)
+						}
+					}
+
+					let isTargetRunning = false
+					for (const s of ctx.sessions.values()) {
+						if ((s?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+							isTargetRunning = true
+							break
+						}
+					}
+					if (isTargetRunning && rawMessages.length > 0) {
+						for (let i = rawMessages.length - 1; i >= 0; i--) {
+							const m = rawMessages[i] as any
+							if (m?.role === "user") break
+							if (m?.role === "assistant") {
+								m.isStreaming = true
+								break
+							}
+						}
+					} else if (!isTargetRunning && rawMessages.length > 0) {
+						const lastMsg = rawMessages[rawMessages.length - 1] as any
+						if (
+							lastMsg &&
+							(lastMsg.role === "user" || lastMsg.role === "system")
+						) {
+							rawMessages.push({
+								id: `interrupted-${lastMsg.id || Date.now()}`,
+								role: "assistant",
+								content: [
+									{
+										type: "text",
+										text: "⚠️ The previous task was interrupted due to application exit or unexpected shutdown. Incomplete operations were stopped.",
+									},
+								],
+								threadId: targetThreadId,
+								createdAt: new Date().toISOString(),
+								interrupted: true,
+							})
+						}
+					}
+				}
 				const messages = (rawMessages ?? []).map(normalizeControllerMessage)
 				// Restore the files each task changed, saved when the task ended, so
 				// the records survive an app restart.
-				const stored = getThreadTaskChanges(threadId)
+				const stored = getThreadTaskChanges(targetThreadId)
 				return messages.map((m) => {
 					const id = (m as { id?: string })?.id
 					const storedItem = id ? stored[id] : undefined
@@ -690,8 +857,18 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const ds = ctx.getActiveSession().harness.getDisplayState()
 			return ds?.omProgress ?? null
 		},
-		isRunning: async (_command, ctx) => {
-			return ctx.getActiveSession().harness.isRunning()
+		isRunning: async (command, ctx) => {
+			const threadId = command?.threadId as string | undefined
+			if (threadId) {
+				for (const s of ctx.sessions.values()) {
+					if ((s?.harness as any)?.isThreadRunning?.(threadId)) return true
+				}
+				return false
+			}
+			for (const s of ctx.sessions.values()) {
+				if ((s?.harness as any)?.getRunningThreadIds?.().length > 0) return true
+			}
+			return false
 		},
 		getCurrentModeId: async (_command, ctx) => {
 			return ctx.getActiveSession().harness.getCurrentModeId()

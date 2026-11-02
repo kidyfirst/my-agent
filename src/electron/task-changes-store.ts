@@ -162,3 +162,76 @@ export function deleteThreadTaskChanges(threadId: string): void {
 	delete store[threadId]
 	persist(store)
 }
+
+export interface ActiveTaskBaseline {
+	threadId: string
+	projectRoot: string
+	baselineTree: string
+	startedAt: string
+}
+
+let baselinesCache: Record<string, ActiveTaskBaseline> | null = null
+
+function baselinesStorePath(): string {
+	return path.join(getAppDataDir(), "active-baselines.json")
+}
+
+function loadBaselines(): Record<string, ActiveTaskBaseline> {
+	if (baselinesCache) return baselinesCache
+	try {
+		const parsed = JSON.parse(fs.readFileSync(baselinesStorePath(), "utf-8"))
+		baselinesCache =
+			parsed && typeof parsed === "object"
+				? (parsed as Record<string, ActiveTaskBaseline>)
+				: {}
+	} catch {
+		baselinesCache = {}
+	}
+	return baselinesCache
+}
+
+function persistBaselines(store: Record<string, ActiveTaskBaseline>): void {
+	const target = baselinesStorePath()
+	try {
+		fs.mkdirSync(path.dirname(target), { recursive: true })
+		fs.writeFileSync(target, JSON.stringify(store))
+	} catch (err) {
+		console.warn("Failed to persist active baselines:", err)
+	}
+}
+
+/** Record active task baseline so uncommitted changes can be rolled back if interrupted. */
+export function saveActiveTaskBaseline(params: {
+	threadId: string
+	projectRoot: string
+	baselineTree: string
+}): void {
+	const { threadId, projectRoot, baselineTree } = params
+	if (!threadId || !baselineTree) return
+	const store = loadBaselines()
+	store[threadId] = {
+		threadId,
+		projectRoot,
+		baselineTree,
+		startedAt: new Date().toISOString(),
+	}
+	persistBaselines(store)
+}
+
+/** Get the active task baseline tree for a thread. */
+export function getActiveTaskBaseline(
+	threadId: string,
+): ActiveTaskBaseline | null {
+	if (!threadId) return null
+	return loadBaselines()[threadId] || null
+}
+
+/** Clear active task baseline once task finishes or is rolled back. */
+export function clearActiveTaskBaseline(threadId: string): void {
+	if (!threadId) return
+	const store = loadBaselines()
+	if (store[threadId]) {
+		delete store[threadId]
+		persistBaselines(store)
+	}
+}

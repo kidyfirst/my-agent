@@ -257,6 +257,7 @@ export type ChatAction =
 	| { type: "REORDER_THREAD_QUEUE"; threadId: string; queue: QueuedMessage[] }
 	| { type: "CLEAR_THREAD_QUEUE"; threadId: string }
 	| { type: "SET_QUEUE_PAUSED"; paused: boolean }
+	| { type: "SET_AGENT_ACTIVE"; active: boolean }
 	| { type: "CLEAR" }
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
@@ -824,11 +825,38 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				}
 			}
 
+			const finalMessages = hasPendingError
+				? [...cleanedMessages, lastCurrent]
+				: cleanedMessages
+
+			const hasLiveMsg = finalMessages
+				.slice()
+				.reverse()
+				.find((m: any) => m?.isStreaming)
+			const lastAssistant = finalMessages
+				.slice()
+				.reverse()
+				.find((m) => m.role === "assistant")
+			const isAgentActive = state.isAgentActive || Boolean(hasLiveMsg)
+			const streamingMessageId = isAgentActive
+				? state.streamingMessageId ||
+					hasLiveMsg?.id ||
+					lastAssistant?.id ||
+					null
+				: null
+			const agentStartedAt = isAgentActive
+				? state.agentStartedAt ||
+					(lastAssistant?.durationMs
+						? Date.now() - lastAssistant.durationMs
+						: Date.now())
+				: null
+
 			return {
 				...state,
-				messages: hasPendingError
-					? [...cleanedMessages, lastCurrent]
-					: cleanedMessages,
+				messages: finalMessages,
+				isAgentActive,
+				agentStartedAt,
+				streamingMessageId,
 				tools: state.tools,
 				subagents: state.subagents,
 			}
@@ -885,6 +913,28 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 			return {
 				...state,
 				isQueuePaused: action.paused,
+			}
+		}
+		case "SET_AGENT_ACTIVE": {
+			const lastAssistant = action.active
+				? state.messages
+						.slice()
+						.reverse()
+						.find((m) => m.role === "assistant")
+				: null
+			const calculatedStartedAt = action.active
+				? state.agentStartedAt ||
+					(lastAssistant?.durationMs
+						? Date.now() - lastAssistant.durationMs
+						: Date.now())
+				: null
+			return {
+				...state,
+				isAgentActive: action.active,
+				agentStartedAt: calculatedStartedAt,
+				streamingMessageId: action.active
+					? state.streamingMessageId || lastAssistant?.id || null
+					: null,
 			}
 		}
 		case "CLEAR":

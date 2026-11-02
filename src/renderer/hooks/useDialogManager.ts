@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react"
 
 interface PendingApproval {
+	threadId?: string
 	toolCallId: string
 	toolName: string
 	args: unknown
@@ -44,26 +45,36 @@ export function useDialogManager() {
 		modeId: string
 	} | null>(null)
 
-	const handleApprove = useCallback(async (toolCallId: string) => {
-		await window.api.invoke({ type: "approveToolCall", toolCallId })
-		setPendingApproval(null)
-	}, [])
+	const handleApprove = useCallback(
+		async (toolCallId: string) => {
+			const threadId = pendingApproval?.threadId
+			await window.api.invoke({ type: "approveToolCall", toolCallId, threadId })
+			setPendingApproval(null)
+		},
+		[pendingApproval],
+	)
 
-	const handleDecline = useCallback(async (toolCallId: string) => {
-		await window.api.invoke({ type: "declineToolCall", toolCallId })
-		setPendingApproval(null)
-	}, [])
+	const handleDecline = useCallback(
+		async (toolCallId: string) => {
+			const threadId = pendingApproval?.threadId
+			await window.api.invoke({ type: "declineToolCall", toolCallId, threadId })
+			setPendingApproval(null)
+		},
+		[pendingApproval],
+	)
 
 	const handleAlwaysAllow = useCallback(
 		async (toolCallId: string, category: string) => {
+			const threadId = pendingApproval?.threadId
 			await window.api.invoke({
 				type: "approveToolCallAlwaysCategory",
 				toolCallId,
 				category,
+				threadId,
 			})
 			setPendingApproval(null)
 		},
-		[],
+		[pendingApproval],
 	)
 
 	const handleQuestionResponse = useCallback(

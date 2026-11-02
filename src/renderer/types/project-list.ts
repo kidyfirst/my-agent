@@ -88,5 +88,7 @@ export interface ProjectListProps {
 	onNewThread: (projectPath?: string) => void
 	onDeleteThread: (threadId: string) => void
 	onRenameThread: (threadId: string, title: string) => void
-	onAbort?: () => void
+	runningThreads?: Set<string>
+	threadsWithApproval?: Map<string, any>
+	onAbort?: (threadId?: string) => void
 }

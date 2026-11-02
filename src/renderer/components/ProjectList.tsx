@@ -100,6 +100,8 @@ export function ProjectList({
 	recordingThreads,
 	replayingProjects,
 	replayingThreads,
+	runningThreads,
+	threadsWithApproval,
 	onToggleRecording,
 	onStopReplay,
 	linkedIssues,
@@ -364,12 +366,18 @@ export function ProjectList({
 	const sessionRow = (thread: ThreadInfo, ownerPath: string) => {
 		const owned = isActive(ownerPath)
 		const manageable = owned || Boolean(onMutateForeignThread)
+		const isRunning =
+			runningThreads !== undefined
+				? runningThreads.has(thread.id) || thread.id === activeRunningThreadId
+				: thread.id === activeRunningThreadId
+		const needsApproval = Boolean(threadsWithApproval?.has(thread.id))
 		return (
 			<ProjectSessionRow
 				key={thread.id}
 				thread={thread}
 				active={thread.id === currentThreadId}
-				running={thread.id === activeRunningThreadId}
+				running={isRunning}
+				needsApproval={needsApproval}
 				recording={Boolean(recordingThreads?.has(thread.id))}
 				replayActive={Boolean(replayingThreads?.has(thread.id))}
 				isReplay={Boolean(
@@ -394,7 +402,7 @@ export function ProjectList({
 				}
 				onStopReplay={() => onStopReplay?.(thread.id, ownerPath)}
 				onToggleRecording={() => onToggleRecording?.(thread.id, ownerPath)}
-				onAbort={onAbort}
+				onAbort={() => onAbort?.(thread.id)}
 			/>
 		)
 	}
@@ -921,9 +929,7 @@ export function ProjectList({
 								// Same rule as the project row: the open session owns
 								// the selection styling.
 								const wtSelected = wtIsActive && !sessionSelected
-								const wtIsSpinning =
-									activeWorktrees.has(wt.rootPath) ||
-									(wtIsActive && isAgentActive)
+								const wtIsSpinning = false
 								const wtIsGlowing = unreadWorktrees.has(wt.rootPath)
 								const issue = linkedIssues?.[wt.rootPath]
 								// A search always reveals what it matched.

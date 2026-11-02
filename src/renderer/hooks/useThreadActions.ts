@@ -46,6 +46,11 @@ export interface ThreadActionsOptions {
 		threadId?: string,
 	) => Promise<void>
 	loadThreads: () => Promise<ThreadInfo[] | undefined>
+	loadMessages?: (threadId?: string) => Promise<void>
+	runningThreads?: Set<string>
+	threadsWithApproval?: Map<string, any>
+	setPendingApproval?: (approval: any) => void
+	setRunningThreadId?: (id: string | null) => void
 	projectRootPath?: string
 	isAgentActive?: boolean
 	handleToggleRecording?: () => void
@@ -142,9 +147,8 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 
 	const handleSwitchThread = useCallback(
 		async (threadId: string) => {
-			if (threadId !== currentThreadId) {
-				dispatch({ type: "CLEAR" })
-			}
+			if (threadId === currentThreadId) return
+
 			await window.api.invoke({ type: "switchThread", threadId })
 			setCurrentThreadId(threadId)
 			tabs.setOpenThreadTabs((prev) =>
@@ -153,6 +157,34 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 			tabs.setActiveTab(`thread:${threadId}`)
 			if (projectRootPath) {
 				localStorage.setItem(`myagent-last-thread-${projectRootPath}`, threadId)
+			}
+
+			// Synchronize agent active state for the target thread
+			let isRunning = opts.runningThreads
+				? opts.runningThreads.has(threadId)
+				: false
+			if (!isRunning) {
+				try {
+					isRunning = Boolean(
+						await window.api.invoke({
+							type: "isRunning",
+							threadId,
+						}),
+					)
+				} catch {}
+			}
+			dispatch({ type: "SET_AGENT_ACTIVE", active: isRunning })
+			opts.setRunningThreadId?.(isRunning ? threadId : null)
+
+			// Restore pending approval if target thread is waiting for one
+			const pending = opts.threadsWithApproval?.get(threadId)
+			if (opts.setPendingApproval) {
+				opts.setPendingApproval(pending || null)
+			}
+
+			// Load the target thread's messages (persisted + live assistant message if running)
+			if (opts.loadMessages) {
+				await opts.loadMessages(threadId)
 			}
 
 			// 1. Apply thread-scoped model
@@ -212,6 +244,11 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 			thinkingLevel,
 			applyPermissionMode,
 			projectRootPath,
+			opts.loadMessages,
+			opts.runningThreads,
+			opts.threadsWithApproval,
+			opts.setPendingApproval,
+			opts.setRunningThreadId,
 		],
 	)
 

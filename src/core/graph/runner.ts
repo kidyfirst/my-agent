@@ -97,6 +97,7 @@ export class GraphRunner {
 							const dur = Date.now() - nodeStartTime
 							ctx.emit({
 								type: "graph_node_completed",
+								threadId: ctx.threadId,
 								nodeId: previousNodeId,
 								nodeLabel: this.getNodeLabel(graphDef, previousNodeId),
 								modeId: graphDef.id,
@@ -109,6 +110,7 @@ export class GraphRunner {
 
 						ctx.emit({
 							type: "graph_node_started",
+							threadId: ctx.threadId,
 							nodeId: nodeName,
 							nodeLabel: this.getNodeLabel(graphDef, nodeName),
 							modeId: graphDef.id,
@@ -123,6 +125,7 @@ export class GraphRunner {
 				const dur = Date.now() - nodeStartTime
 				ctx.emit({
 					type: "graph_node_completed",
+					threadId: ctx.threadId,
 					nodeId: previousNodeId,
 					nodeLabel: this.getNodeLabel(graphDef, previousNodeId),
 					modeId: graphDef.id,

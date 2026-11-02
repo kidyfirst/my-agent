@@ -25,27 +25,56 @@ function activeHarness(ctx: {
 	}
 }
 
+function findHarnessForApproval(
+	ctx: {
+		getActiveSession: () => WorktreeSession
+		sessions?: Map<string, WorktreeSession>
+	},
+	threadId?: string,
+): MyAgentHarness | null {
+	if (threadId && ctx.sessions) {
+		for (const session of ctx.sessions.values()) {
+			if ((session?.harness as any)?.isThreadRunning?.(threadId)) {
+				return session.harness as MyAgentHarness
+			}
+		}
+	}
+	return activeHarness(ctx)
+}
+
 export function getPermissionHandlers(): Record<string, IpcCommandHandler> {
 	return {
 		approveToolCall: async (command, ctx) => {
-			activeHarness(ctx)?.respondToToolApproval({
+			findHarnessForApproval(
+				ctx as any,
+				command.threadId,
+			)?.respondToToolApproval({
 				decision: "approve",
 				toolCallId: command.toolCallId,
+				threadId: command.threadId,
 			})
 		},
 		declineToolCall: async (command, ctx) => {
-			activeHarness(ctx)?.respondToToolApproval({
+			findHarnessForApproval(
+				ctx as any,
+				command.threadId,
+			)?.respondToToolApproval({
 				decision: "decline",
 				toolCallId: command.toolCallId,
+				threadId: command.threadId,
 				...(command.reason
 					? { declineContext: { reason: command.reason } }
 					: {}),
 			})
 		},
 		approveToolCallAlwaysCategory: async (command, ctx) => {
-			activeHarness(ctx)?.respondToToolApproval({
+			findHarnessForApproval(
+				ctx as any,
+				command.threadId,
+			)?.respondToToolApproval({
 				decision: "always_allow_category",
 				toolCallId: command.toolCallId,
+				threadId: command.threadId,
 			})
 		},
 		getPermissionRules: async (_command, ctx) => {

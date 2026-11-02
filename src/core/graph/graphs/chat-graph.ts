@@ -74,6 +74,7 @@ export const chatGraphDefinition: AgentGraphDefinition = {
 					initialReasoningText: state.reasoningText,
 					initialExecutedTools: state.executedTools,
 					recorder: ctx.recorder,
+					threadId: ctx.threadId,
 				})
 
 				return {

@@ -17,6 +17,7 @@ export interface StreamLLMOptions {
 	recorder?: any
 	turn?: number
 	step?: number
+	threadId?: string
 }
 
 export interface StreamLLMResult {
@@ -200,14 +201,22 @@ export async function executeStreamLLM(
 		stopWhen,
 		abortSignal,
 		assistantMessageId,
-		emit,
+		emit: rawEmit,
 		initialExecutedTools = [],
 		initialAssistantText = "",
 		initialReasoningText = "",
 		recorder,
 		turn = 1,
 		step = 1,
+		threadId,
 	} = options
+
+	const emit = (ev: any) => {
+		if (ev && typeof ev === "object" && threadId && !ev.threadId) {
+			ev.threadId = threadId
+		}
+		rawEmit(ev)
+	}
 
 	const effectiveModel = createEffectiveModel(model, modelIdStr, recorder)
 	const executedTools = [...initialExecutedTools]

@@ -107,6 +107,7 @@ export async function generateThreadTitle(
 	h: Harness,
 	userMessage: string,
 	resolveModel: ModelResolver,
+	targetThreadId?: string,
 ) {
 	try {
 		const modelId = h.getCurrentModelId()
@@ -147,10 +148,11 @@ export async function generateThreadTitle(
 
 		title = title.trim().replace(/^["']|["']$/g, "")
 		if (title) {
-			await h.renameThread({ title })
+			const tid = targetThreadId || h.getCurrentThreadId()
+			await h.renameThread({ threadId: tid, title })
 			safeSend(mainWindowRef, "harness:event", {
 				type: "thread_title_updated",
-				threadId: h.getCurrentThreadId(),
+				threadId: tid,
 				title,
 			})
 		}

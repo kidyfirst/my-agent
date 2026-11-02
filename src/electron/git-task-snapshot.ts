@@ -153,3 +153,52 @@ export function diffFileBetweenSnapshots(
 		return ""
 	}
 }
+
+/**
+ * Revert the working tree back to a previous snapshot.
+ * - Files added by the task since the snapshot are removed.
+ * - Files modified or deleted by the task are restored to their snapshot state.
+ */
+export function revertToGitSnapshot(
+	root: string,
+	snapshot: GitSnapshot,
+): { success: boolean; revertedFiles: string[]; error?: string } {
+	if (!root || !snapshot.tree) {
+		return {
+			success: false,
+			revertedFiles: [],
+			error: "Invalid snapshot or root",
+		}
+	}
+	try {
+		const current = captureGitSnapshot(root)
+		const changed = diffBetweenSnapshots(root, snapshot, current)
+		if (changed.length === 0) {
+			return { success: true, revertedFiles: [] }
+		}
+
+		const revertedFiles: string[] = []
+
+		for (const file of changed) {
+			const fullPath = join(root, file.path)
+			if (file.status === "added") {
+				// File was created by the task; remove it
+				rmSync(fullPath, { recursive: true, force: true })
+				revertedFiles.push(file.path)
+			} else if (file.status === "modified" || file.status === "deleted") {
+				// File was modified or deleted; restore its content from the snapshot tree
+				git(root, ["checkout", snapshot.tree, "--", file.path])
+				revertedFiles.push(file.path)
+			}
+		}
+
+		return { success: true, revertedFiles }
+	} catch (err: any) {
+		console.warn("revertToGitSnapshot failed:", err)
+		return {
+			success: false,
+			revertedFiles: [],
+			error: err?.message || String(err),
+		}
+	}
+}

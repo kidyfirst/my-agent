@@ -299,7 +299,7 @@ export function TerminalPanel({
 			container.appendChild(instance.term.element)
 		}
 
-		// Fit + start PTY + focus
+		// Fit + start PTY
 		const raf = requestAnimationFrame(() => {
 			try {
 				instance.fitAddon.fit()
@@ -307,7 +307,6 @@ export function TerminalPanel({
 				// ignore
 			}
 			startPty(instance)
-			instance.term.focus()
 		})
 
 		return () => cancelAnimationFrame(raf)

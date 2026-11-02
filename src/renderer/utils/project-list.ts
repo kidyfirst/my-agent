@@ -192,7 +192,14 @@ export function rememberLiveList<T extends { id: string }>(
 	if (previous && previous.length === list.length) {
 		let same = true
 		for (let i = 0; i < list.length; i++) {
-			if (previous[i]?.id !== list[i]?.id) {
+			const a = previous[i] as any
+			const b = list[i] as any
+			if (
+				a?.id !== b?.id ||
+				a?.title !== b?.title ||
+				a?.updatedAt !== b?.updatedAt ||
+				a?.createdAt !== b?.createdAt
+			) {
 				same = false
 				break
 			}

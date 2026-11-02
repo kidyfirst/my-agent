@@ -629,9 +629,8 @@ function ShareIcon({ size = 14 }: { size?: number }) {
 			strokeLinejoin="round"
 			aria-hidden="true"
 		>
-			<path d="M4 13.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.5" />
-			<path d="M12 15.5V3.5" />
-			<path d="M8.25 7.25 12 3.5l3.75 3.75" />
+            <path d="M13.5 5 20 11.5 13.5 18" />
+            <path d="M20 11.5H9.5A5.5 5.5 0 0 0 4 17v2" />
 		</svg>
 	)
 }

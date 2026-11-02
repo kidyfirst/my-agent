@@ -37,7 +37,7 @@ interface SidebarProps {
 	enrichedProjects: EnrichedProject[]
 	activeProjectPath: string | null
 	isAgentActive: boolean
-	onAbort?: () => void
+	onAbort?: (threadId?: string) => void
 	activeWorktrees: Set<string>
 	unreadWorktrees: Set<string>
 	worktreeStatuses: Map<string, WorktreeStatus>
@@ -45,6 +45,8 @@ interface SidebarProps {
 	recordingProjects?: Set<string>
 	replayingThreads?: Set<string>
 	replayingProjects?: Set<string>
+	runningThreads?: Set<string>
+	threadsWithApproval?: Map<string, any>
 	onToggleRecording?: (threadId?: string, projectPath?: string) => void
 	onStopReplay?: (threadId?: string, projectPath?: string) => void
 	linkedIssues?: Record<
@@ -148,6 +150,8 @@ export function Sidebar({
 	recordingProjects,
 	replayingThreads,
 	replayingProjects,
+	runningThreads,
+	threadsWithApproval,
 	onToggleRecording,
 	onStopReplay,
 	linkedIssues,
@@ -508,6 +512,8 @@ export function Sidebar({
 						recordingThreads={recordingThreads}
 						replayingProjects={replayingProjects}
 						replayingThreads={replayingThreads}
+						runningThreads={runningThreads}
+						threadsWithApproval={threadsWithApproval}
 						onToggleRecording={onToggleRecording}
 						onStopReplay={onStopReplay}
 						linkedIssues={linkedIssues}

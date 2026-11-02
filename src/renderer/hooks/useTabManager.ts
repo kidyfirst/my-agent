@@ -6,19 +6,35 @@ export type TabManager = ReturnType<typeof useTabManager>
 export function useTabManager(currentThreadId: string | null) {
 	const [openFiles, setOpenFiles] = useState<string[]>([])
 	const [openThreadTabs, setOpenThreadTabs] = useState<string[]>([])
-	const [activeTab, setActiveTab] = useState<string>("chat")
+	const [activeTab, setActiveTabState] = useState<string>("chat")
 	const [settingsSection, setSettingsSection] = useState<string | undefined>(
 		undefined,
 	)
 	const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set())
 	const [pendingCloseTab, setPendingCloseTab] = useState<string | null>(null)
 	const fileEditorRef = useRef<FileEditorHandle>(null)
+	const currentThreadIdRef = useRef(currentThreadId)
+	currentThreadIdRef.current = currentThreadId
 
-	// Sync harness thread when active tab changes to a thread tab
+	const setActiveTab = useCallback(
+		(tab: string | ((prev: string) => string)) => {
+			setActiveTabState((prev) => {
+				const next = typeof tab === "function" ? tab(prev) : tab
+				if (next.startsWith("thread:")) {
+					currentThreadIdRef.current = next.slice(7)
+				}
+				return next
+			})
+		},
+		[],
+	)
+
+	// Sync harness thread when active tab changes to a thread tab (e.g. from tab bar click)
 	useEffect(() => {
 		if (activeTab.startsWith("thread:")) {
 			const threadId = activeTab.slice(7)
-			if (threadId !== currentThreadId) {
+			if (threadId !== currentThreadIdRef.current) {
+				currentThreadIdRef.current = threadId
 				window.api.invoke({ type: "switchThread", threadId })
 			}
 		}

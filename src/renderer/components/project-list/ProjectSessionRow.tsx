@@ -5,6 +5,48 @@ import { ConfirmDialog } from "../ConfirmDialog"
 import { RowActions, rowMenuAnchor, rowTextFade } from "../RowActions"
 import { formatRelativeTime } from "../../utils/relativeTime"
 
+/** A session awaiting tool approval: amber exclamation mark badge that pulses. */
+function SessionApprovalBadge({
+	onClick,
+}: {
+	onClick: (e: React.MouseEvent) => void
+}) {
+	const [hovered, setHovered] = useState(false)
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			onMouseEnter={() => setHovered(true)}
+			onMouseLeave={() => setHovered(false)}
+			title="Waiting for tool approval — click to review"
+			aria-label="Waiting for tool approval"
+            style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: hovered
+                    ? "color-mix(in srgb, var(--warning) 30%, transparent)"
+                    : "color-mix(in srgb, var(--warning) 18%, transparent)",
+                color: "var(--warning)",
+                border: "none",
+                fontSize: 11,
+				fontWeight: 800,
+				lineHeight: 1,
+				flexShrink: 0,
+				cursor: "pointer",
+				padding: 0,
+				animation: "pulse 1.4s infinite ease-in-out",
+				transition: "background-color 0.15s, border-color 0.15s",
+			}}
+		>
+			!
+		</button>
+	)
+}
+
 /** Recording a session: red pulsing dot, turns into ■ on hover (stop + export). */
 function SessionRecordButton({
 	onClick,
@@ -197,6 +239,7 @@ export interface ProjectSessionRowProps {
 	active: boolean
 	/** It is this session that currently has a run in flight. */
 	running: boolean
+	needsApproval?: boolean
 	recording: boolean
 	replayActive: boolean
 	/** Session is a replay (recorded run), live or not. */
@@ -225,6 +268,7 @@ export function ProjectSessionRow({
 	thread,
 	active,
 	running,
+	needsApproval,
 	recording,
 	replayActive,
 	isReplay,
@@ -362,20 +406,8 @@ export function ProjectSessionRow({
 					hovered={hovered}
 					menuLabel="Session actions"
 					onOpenMenu={(rect) => setMenuAnchor(rowMenuAnchor(rect))}
-				>
-					{when && (
-						<span
-							style={{
-								fontSize: 10,
-								color: "var(--dim)",
-								flexShrink: 0,
-								fontVariantNumeric: "tabular-nums",
-							}}
-						>
-							{when}
-						</span>
-					)}
-					{queuedCount > 0 && (
+                >
+                    {queuedCount > 0 && (
 						<span
 							title={`${queuedCount} queued message${queuedCount > 1 ? "s" : ""}`}
 							style={{
@@ -392,7 +424,14 @@ export function ProjectSessionRow({
 							⏳ {queuedCount}
 						</span>
 					)}
-					{replayActive || isReplay ? (
+					{needsApproval ? (
+						<SessionApprovalBadge
+							onClick={(e) => {
+								e.stopPropagation()
+								onSelect()
+							}}
+						/>
+					) : replayActive || isReplay ? (
 						<SessionReplayButton
 							onClick={(e) => {
 								e.stopPropagation()
@@ -417,11 +456,28 @@ export function ProjectSessionRow({
 						) : (
 							<SessionRunningSpinner />
 						)
-					) : null}
-				</RowActions>
-			)}
+                    ) : null}
+                </RowActions>
+            )}
 
-			{menuAnchor && (
+            {!editing && manageable && when && (
+                // Pinned to the row's far right, outside RowActions: the hover
+                // actions occupy a fixed slot inside it, which would otherwise
+                // push the timestamp between the ⋯ trigger and the status icons.
+                <span
+                    style={{
+                        fontSize: 10,
+                        color: "var(--dim)",
+                        flexShrink: 0,
+                        paddingRight: 8,
+                        fontVariantNumeric: "tabular-nums",
+                    }}
+                >
+                    {when}
+                </span>
+            )}
+
+            {menuAnchor && (
 				<ContextMenu
 					x={menuAnchor.x}
 					y={menuAnchor.y}
