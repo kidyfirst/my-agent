@@ -1,0 +1,207 @@
+import { existsSync, promises as fs } from "fs"
+import * as path from "path"
+import * as yaml from "js-yaml"
+
+/**
+ * Metadata for a slash command
+ */
+export interface SlashCommandMetadata {
+	/** Command name (e.g., "git:commit") */
+	name: string
+	/** Human-readable description */
+	description: string
+	/** The command template with variables */
+	template: string
+	/** Source file path */
+	sourcePath: string
+	/** Namespace derived from directory structure */
+	namespace?: string
+}
+
+/**
+ * Parse a command file and extract metadata and template
+ * Supports both frontmatter-based and plain markdown files
+ */
+async function parseCommandFile(
+	filePath: string,
+	baseDir?: string,
+): Promise<SlashCommandMetadata | null> {
+	try {
+		const content = await fs.readFile(filePath, "utf-8")
+		const trimmedContent = content.trim()
+
+		// Check if file has frontmatter (starts with ---)
+		if (!trimmedContent.startsWith("---")) {
+			// No frontmatter - treat entire file as template
+			// Derive name from file path
+			const name = baseDir
+				? extractCommandName(filePath, baseDir)
+				: path.basename(filePath, ".md")
+
+			return {
+				name,
+				description: "",
+				template: content,
+				sourcePath: filePath,
+			}
+		}
+
+		// Split frontmatter and template
+		const parts = content.split("---")
+		if (parts.length < 3) {
+			return null
+		}
+
+		const frontmatter = parts[1].trim()
+		const template = parts.slice(2).join("---").trim()
+
+		// Parse YAML frontmatter
+		const metadata = yaml.load(frontmatter) as Record<string, string>
+
+		// Derive name from file path if not specified in frontmatter
+		let name: string
+		if (metadata?.name) {
+			name = metadata.name
+		} else if (baseDir) {
+			name = extractCommandName(filePath, baseDir)
+		} else {
+			name = path.basename(filePath, ".md")
+		}
+
+		return {
+			name,
+			description: metadata?.description || "",
+			template,
+			sourcePath: filePath,
+			namespace: metadata?.namespace,
+		}
+	} catch (error) {
+		console.error(`Error parsing command file ${filePath}:`, error)
+		return null
+	}
+}
+
+/**
+ * Extract command name from file path
+ * Converts path like "git/commit.md" to "git:commit"
+ */
+function extractCommandName(filePath: string, baseDir: string): string {
+	const relativePath = path.relative(baseDir, filePath)
+	const dirName = path.dirname(relativePath)
+	const baseName = path.basename(relativePath, ".md")
+
+	if (dirName === "." || dirName === "") {
+		return baseName
+	}
+
+	// Replace path separators with colons for namespacing
+	const namespace = dirName.replace(/[\\/]/g, ":")
+	return `${namespace}:${baseName}`
+}
+
+/**
+ * Recursively scan a directory for command files
+ */
+async function scanCommandDirectory(
+	dirPath: string,
+): Promise<SlashCommandMetadata[]> {
+	const commands: SlashCommandMetadata[] = []
+
+	try {
+		const entries = await fs.readdir(dirPath, { withFileTypes: true })
+
+		for (const entry of entries) {
+			const fullPath = path.join(dirPath, entry.name)
+
+			if (entry.isDirectory()) {
+				// Recursively scan subdirectories
+				const subCommands = await scanCommandDirectory(fullPath)
+				commands.push(...subCommands)
+			} else if (entry.isFile() && entry.name.endsWith(".md")) {
+				// Parse markdown command files, passing dirPath as baseDir for name derivation
+				const command = await parseCommandFile(fullPath, dirPath)
+				if (command) {
+					commands.push(command)
+				}
+			}
+		}
+	} catch {
+		// Directory doesn't exist or can't be read - silently skip
+	}
+
+	return commands
+}
+/**
+ * Load custom slash commands from all configured directories
+ * Priority: myagent project > claude project > opencode project > myagent user > claude user > opencode user
+ */
+export async function loadCustomCommands(
+	projectDir?: string,
+): Promise<SlashCommandMetadata[]> {
+	const commands: SlashCommandMetadata[] = []
+	const seenNames = new Set<string>()
+
+	// Helper to add commands without duplicates (later commands override earlier ones)
+	const addCommands = (newCommands: SlashCommandMetadata[]) => {
+		for (const cmd of newCommands) {
+			if (!seenNames.has(cmd.name)) {
+				seenNames.add(cmd.name)
+				commands.push(cmd)
+			}
+		}
+	}
+
+	const homeDir = process.env.HOME || process.env.USERPROFILE
+
+	// 1. Load from opencode user directory ~/.opencode/command (lowest priority)
+	if (homeDir) {
+		const opencodeUserDir = path.join(homeDir, ".opencode", "command")
+		const opencodeUserCommands = await scanCommandDirectory(opencodeUserDir)
+		addCommands(opencodeUserCommands)
+	}
+
+	// 2. Load from claude user directory ~/.claude/commands (Claude Code compat)
+	if (homeDir) {
+		const claudeUserDir = path.join(homeDir, ".claude", "commands")
+		const claudeUserCommands = await scanCommandDirectory(claudeUserDir)
+		addCommands(claudeUserCommands)
+	}
+
+	// 3. Load from myagent user directory ~/.myagent/commands
+	if (homeDir) {
+		const myAgentUserDir = path.join(homeDir, ".myagent", "commands")
+		const myAgentUserCommands = await scanCommandDirectory(myAgentUserDir)
+		addCommands(myAgentUserCommands)
+	}
+
+	// 4. Load from opencode project directory .opencode/command
+	if (projectDir) {
+		const opencodeProjectDir = path.join(projectDir, ".opencode", "command")
+		const opencodeProjectCommands =
+			await scanCommandDirectory(opencodeProjectDir)
+		addCommands(opencodeProjectCommands)
+	}
+
+	// 5. Load from claude project directory .claude/commands (Claude Code compat)
+	if (projectDir) {
+		const claudeProjectDir = path.join(projectDir, ".claude", "commands")
+		const claudeProjectCommands = await scanCommandDirectory(claudeProjectDir)
+		addCommands(claudeProjectCommands)
+	}
+
+	// 6. Load from myagent project directory .myagent/commands (highest priority)
+	if (projectDir) {
+		const myAgentProjectDir = path.join(projectDir, ".myagent", "commands")
+		const myAgentProjectCommands = await scanCommandDirectory(myAgentProjectDir)
+		addCommands(myAgentProjectCommands)
+	}
+
+	return commands
+}
+
+/**
+ * Get the commands directory path for a project
+ */
+function getProjectCommandsDir(projectDir: string): string {
+	return path.join(projectDir, ".myagent", "commands")
+}

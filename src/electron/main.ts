@@ -64,6 +64,11 @@ import {
 	setMainWindowRef,
 	safeSend,
 } from "./helpers.js"
+import { startA2AServer } from "@my-agent/a2a"
+import {
+	setA2AServerInstance,
+	getA2AServerInstance,
+} from "./ipc/a2a-handlers.js"
 import { initLogging, setLogStreaming, shutdownLogging } from "./logging.js"
 import { logger } from "../core/logger/index.js"
 
@@ -984,6 +989,19 @@ app.whenReady().then(async () => {
 		if (initialSession.mcpManager?.hasServers()) {
 			await initialSession.mcpManager.init()
 		}
+
+		// Start A2A server so external agents (Codex, Claude) and CLI can operate My Agent
+		try {
+			const a2aInst = await startA2AServer({
+				harness: initialSession.harness as any,
+				port: 3888,
+				host: "127.0.0.1",
+			})
+			setA2AServerInstance(a2aInst)
+			log.info("a2a", `A2A server ready at ${a2aInst.baseUrl}/a2a`)
+		} catch (err: any) {
+			log.warn("a2a", `Could not start A2A server: ${err?.message || err}`)
+		}
 	}
 
 	// Check for application updates on startup
@@ -1063,6 +1081,9 @@ app.on("before-quit", (event) => {
 	}
 
 	log.info("boot", "app quitting")
+	try {
+		getA2AServerInstance()?.close?.()
+	} catch {}
 	shutdownLogging()
 	setMainWindowRef(null)
 	const recent = loadRecentProjects()

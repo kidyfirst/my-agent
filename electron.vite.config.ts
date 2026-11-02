@@ -4,6 +4,13 @@ import { resolve } from "path"
 
 export default defineConfig({
 	main: {
+		resolve: {
+			alias: {
+				"@my-agent/core": resolve(__dirname, "packages/core/src/index.ts"),
+				"@my-agent/a2a": resolve(__dirname, "packages/a2a/src/index.ts"),
+				"@my-agent/cli": resolve(__dirname, "packages/cli/src/index.ts"),
+			},
+		},
 		plugins: [
 			externalizeDepsPlugin({
 				include: ["@ast-grep/napi", "node-pty", "playwright-core"],

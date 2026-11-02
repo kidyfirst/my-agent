@@ -1,0 +1,12 @@
+{
+	"name": "@my-agent/desktop",
+	"version": "0.1.3",
+	"description": "Desktop GUI client for My Agent powered by Electron and React",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@my-agent/core": "workspace:*",
+		"@my-agent/a2a": "workspace:*",
+		"@my-agent/cli": "workspace:*"
+	}
+}
