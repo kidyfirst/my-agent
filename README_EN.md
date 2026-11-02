@@ -293,7 +293,7 @@ A high-performance IDE-grade interface built with **React 19** + **Vite**, drive
 3. **Flush strategy**: when a body block or subagent is encountered, `flushExecution()` is called to settle the currently accumulated steps into one execution block; when a reasoning chain or tool block is encountered, `flushText()` is called, and **an assistant item is only produced when the body text is non-empty (or the tail is an error)** — so no empty bubbles appear during streaming.
 4. **Message finalization**: once a message has been parsed it is flushed again, and `msg.changedFiles` is attached to the last assistant item of this turn; if there is no body item at all, an assistant item containing only the files card is appended.
 5. **Gap filling**: tools that already appeared in the state machine but have no matching block in the message body are appended into `live-execution-block`; subagents that were never rendered are filled in as standalone cards.
-6. **Placeholder**: while the Agent is running and the last item is a user message, `active-execution-placeholder` is inserted so that `Thinking for …` becomes visible immediately, instead of waiting for the first tool call.
+6. **Placeholder**: while the Agent is running and the last item is a user message, `active-execution-placeholder` is inserted so that `Working for …` becomes visible immediately, instead of waiting for the first tool call.
 7. **Final merge**: first merge adjacent execution blocks (deduplicating steps by id) and discard blocks that are empty and inactive; then apply the "one active block per turn" collapse — the cursor resets at `user` / `system` items, all subsequent execution blocks of the same turn are merged into the first one, and `isActive` / `startedAt` / `durationMs` / `changedFiles` take the latest values.
 
 Step 7 is the key to "only one `Worked for …` per turn": the early implementation gave every assistant message its own execution block, so several titles would pop up inside a single turn; now they are collapsed uniformly at the render layer.
@@ -302,10 +302,18 @@ Step 7 is the key to "only one `Worked for …` per turn": the early implementat
 
 `ExecutionBlock.tsx` carries both states in one component; the shape is decided by `isActive`:
 
-- **Running**: the title is `Thinking for 12.3s` (or `1m 20s`), followed by an `(N steps)` count and a downward arrow; in the collapsed state there is an 82px-high step preview pane below that auto-scrolls to the bottom as new steps arrive; click the title or the preview pane to expand all steps.
+- **Running**: the title is `Working for 12.3s` (or `1m 20s`), followed by an `(N steps)` count and a downward arrow; in the collapsed state there is an 82px-high step preview pane below that auto-scrolls to the bottom as new steps arrive; click the title or the preview pane to expand all steps.
 - **Finished**: only one line remains for the whole turn, `Worked for 1m 6s ⌄`; steps are fully hidden by default and expand only on click; if the block has no steps at all and is not active, the component returns `null` directly.
 - **Duration source**: `durationMs` written onto the message at `agent_end`; when it is missing, fall back to `turnDurationById` from 3.3.1. There is no duration column in the database, so `SET_MESSAGES` in `chatReducer` keeps the old duration held in memory and backfills it onto the last assistant message of the turn for historical sessions — earlier historical turns may still show a `Worked` without a duration.
 - **Duration format**: under 60 seconds shows one decimal (`12.3s`), above that shows `Xm Ys`; while running, a 100ms timer refreshes it based on `startedAt`.
+
+**Character-by-character entrance for the running title**: the active title is rendered by `AnimatedWorkingLabel`, split into per-character `<span class="working-char">` nodes. Each character plays `working-char-in` (`opacity: 0 → 1`, `260ms` ease-out) with a `28ms` stagger (`WORKING_CHAR_STAGGER_MS`), so the whole line lights up in roughly 350ms and reads as "alive" the moment it appears. Three constraints make this work:
+
+1. **Only while running.** A finished `Worked for …` takes the plain-text branch; otherwise the animation would replay every time the block re-enters view.
+2. **Two render runs.** The title is split into a stable prefix (`Working`) and the ticking duration (`12.3s`). The prefix keeps constant keys, so a duration that changes every 100ms does not re-mount it and restart the whole line; only the newly added characters of the duration run get an entrance.
+3. **Character keys are indices, not characters.** `staggeredChars` keys by index, so transitions like `3.4s → 3.5s` or `9.9s → 10.0s` only change text and never rebuild DOM nodes. If the key included the character, the changing last digit would re-mount ten times a second and visibly flicker.
+
+Under `prefers-reduced-motion: reduce` the `.working-char` animation is explicitly disabled.
 
 #### 3.3.3 Sticky and collapsible user messages
 
@@ -744,7 +752,7 @@ sequenceDiagram
         Harness->>Main: emit("message_update", msg)
         Main->>Preload: webContents.send("harness:event", msg)
         Preload->>React: window.api.onEvent callback
-        React->>React: Update the Thinking for … preview (82px auto-scroll)
+        React->>React: Update the Working for … preview (82px auto-scroll)
 
         Agent-->>Harness: Emit answer text delta (type: "text")
         Harness->>Main: emit("message_update", msg)
@@ -919,7 +927,7 @@ src/
 │   ├── components/            # Core UI panels and interactive components
 │   │   ├── ChatView.tsx              # Conversation pipeline: message grouping, one execution block per turn, sticky user messages
 │   │   ├── AssistantMessage.tsx      # Assistant body rendering (Markdown / highlighting / copy)
-│   │   ├── ExecutionBlock.tsx        # Execution block: "Thinking for …" while running, "Worked for …" when done
+│   │   ├── ExecutionBlock.tsx        # Execution block: "Working for …" (staggered entrance) while running, "Worked for …" when done
 │   │   ├── UserMessage.tsx           # User bubble: sticky, collapsible, image preview
 │   │   ├── FilesChangedBar.tsx       # Changed-files card and inline diff for the turn
 │   │   ├── TodoProgress.tsx          # Task progress bar

@@ -186,29 +186,33 @@ export function App() {
 				: "var(--muted)"
 	const toastGlyph =
 		toast?.type === "error" ? "⚠" : toast?.type === "success" ? "✓" : "•"
-
-	const loadMessages = useCallback(
-		async (threadIdOverride?: string) => {
-			try {
-				const tid =
-					threadIdOverride || currentThreadId || currentThreadIdRef.current
-				if (!tid) {
-					dispatch({ type: "SET_MESSAGES", messages: [] })
-					return
-				}
-				const msgs = (await window.api.invoke({
-					type: "getMessages",
-					threadId: tid,
-				})) as Message[]
-				if (Array.isArray(msgs)) {
-					dispatch({ type: "SET_MESSAGES", messages: msgs })
-				}
-			} catch {
-				// Thread may not exist yet
-			}
-		},
-		[currentThreadId, dispatch],
-	)
+    const loadMessages = useCallback(
+        async (threadIdOverride?: string) => {
+            const tid =
+                threadIdOverride || currentThreadId || currentThreadIdRef.current
+            if (!tid) {
+                dispatch({ type: "SET_MESSAGES", messages: [] })
+                return
+            }
+            // Clear the outgoing transcript and show a wait state before the
+            // round-trip, so the switch never looks like a frozen old thread.
+            dispatch({ type: "BEGIN_THREAD_LOAD", threadId: tid })
+            try {
+                const msgs = (await window.api.invoke({
+                    type: "getMessages",
+                    threadId: tid,
+                })) as Message[]
+                if (Array.isArray(msgs)) {
+                    dispatch({ type: "SET_MESSAGES", messages: msgs, threadId: tid })
+                }
+            } catch {
+                // Thread may not exist yet
+            } finally {
+                dispatch({ type: "END_THREAD_LOAD", threadId: tid })
+            }
+        },
+        [currentThreadId, dispatch],
+    )
 
 	useEffect(() => {
 		window.api

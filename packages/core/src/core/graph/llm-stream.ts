@@ -42,6 +42,7 @@ export function createEffectiveModel(
 	recorder?: any,
 ): LanguageModel {
 	const legacyImageParts = modelIdStr.includes("deepseek")
+	const isAnthropic = modelIdStr.startsWith("anthropic")
 	return wrapLanguageModel({
 		model: model as any,
 		middleware: {
@@ -51,8 +52,25 @@ export function createEffectiveModel(
 					for (const msg of params.prompt) {
 						if (!Array.isArray(msg.content)) continue
 						for (const part of msg.content) {
-							if (part.type === "file" && typeof part.data === "string") {
-								;(part as any).data = { type: "data", data: part.data }
+							if (part.type === "file") {
+								if (isAnthropic && typeof part.data === "string") {
+									;(part as any).data = { type: "data", data: part.data }
+								} else if (
+									!isAnthropic &&
+									typeof (part as any).data === "object" &&
+									(part as any).data?.type === "data"
+								) {
+									;(part as any).data = (part as any).data.data
+								}
+								if (
+									typeof (part as any).data === "string" &&
+									(part as any).data.startsWith("data:")
+								) {
+									const comma = (part as any).data.indexOf(",")
+									if (comma !== -1) {
+										;(part as any).data = (part as any).data.slice(comma + 1)
+									}
+								}
 							}
 							if (legacyImageParts && (part as any).type === "image") {
 								const url = (part as any).image_url

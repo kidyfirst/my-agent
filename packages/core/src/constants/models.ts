@@ -139,9 +139,9 @@ export const PROVIDER_THINKING_LEVELS: Record<string, ThinkingLevelOption[]> = {
 	deepseek: [
 		{ id: "off", label: "Off", description: "Thinking disabled" },
 		{ id: "low", label: "Low", description: "Low reasoning effort" },
-		{ id: "medium", label: "Med", description: "High reasoning effort" },
+		{ id: "medium", label: "Med", description: "Maps to high effort" },
 		{ id: "high", label: "High", description: "High reasoning effort" },
-		{ id: "xhigh", label: "Max", description: "Maximum reasoning effort" },
+		{ id: "xhigh", label: "Max", description: "Maps to high effort" },
 	],
 }
 

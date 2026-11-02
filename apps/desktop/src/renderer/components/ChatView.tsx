@@ -14,10 +14,11 @@ import {
 import { isUserMessage, getMessageText } from "../types/chat"
 import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
 import { shouldPinToBottom } from "../utils/chatScroll"
-
 export interface ChatViewProps {
-	threadId?: string | null
-	messages: Message[]
+    threadId?: string | null
+    /** Transcript for `threadId` is still being fetched; show a wait state. */
+    isLoadingThread?: boolean
+    messages: Message[]
 	tools: Map<
 		string,
 		{
@@ -263,10 +264,10 @@ export function decideDuplicateUser(
 	// are a double-send and collapse.
 	return nextIsReplay ? "keep" : "skip"
 }
-
 export function ChatView({
-	threadId,
-	messages,
+    threadId,
+    isLoadingThread = false,
+    messages,
 	tools,
 	subagents,
 	isAgentActive,
@@ -297,9 +298,11 @@ export function ChatView({
 	// Auto-scroll on new messages or tool updates. A message the user just sent
 	// always belongs in view: reading history first must not push the fresh
 	// bubble below the fold, or the send looks ignored until the answer streams.
-	useEffect(() => {
-		const pin = isAutoScroll.current || shouldPinToBottom(messages)
-		if (pin && scrollRef.current) {
+    useEffect(() => {
+        // The wait state is a fixed placeholder; there is nothing to pin.
+        if (isLoadingThread) return
+        const pin = isAutoScroll.current || shouldPinToBottom(messages)
+        if (pin && scrollRef.current) {
 			if (scrollRafRef.current != null) {
 				cancelAnimationFrame(scrollRafRef.current)
 			}
@@ -319,7 +322,15 @@ export function ChatView({
 				scrollRafRef.current = null
 			}
 		}
-	}, [messages.length, messages, tools, subagents, isAgentActive, interrupted])
+    }, [
+        messages.length,
+        messages,
+        tools,
+        subagents,
+        isAgentActive,
+        interrupted,
+        isLoadingThread,
+    ])
 
 	const handleScroll = () => {
 		if (!scrollRef.current) return
@@ -1113,10 +1124,13 @@ export function ChatView({
 						)}
 					</div>
 				)}
+                {isLoadingThread ? (
+                    <ThreadLoadingState />
+                ) : (
+                    <>
+                        {cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
 
-				{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
-
-				{renderedTurns.map((turn) => {
+                        {renderedTurns.map((turn) => {
 					const replayTurn = isReplayTurn(turn)
 					const playbackKey = replayTurn ? replayTurnPlaybackKey(turn) : null
 					const playbackPass = playbackKey
@@ -1205,13 +1219,17 @@ export function ChatView({
 				    keeps the truncated answer from reading like a crash. Shown the
 				    moment Stop is pressed — waiting for the harness to confirm the
 				    abort would put the note a round trip behind the click. */}
-				{interrupted && (
-					<InterruptedNotice
-						onRevert={onRevert}
-						reverting={reverting}
-						reverted={reverted}
-					/>
-				)}
+                        {interrupted && (
+                            <InterruptedNotice
+                                onRevert={onRevert}
+                                reverting={reverting}
+                                reverted={reverted}
+                            />
+                        )}
+                    </>
+                )}
+
+
 
 				<style>{`
 				@keyframes pulse {
@@ -1237,6 +1255,40 @@ export function ChatView({
 			</div>
 		</div>
 	)
+}
+
+/**
+ * Placeholder for a thread switch whose transcript has not arrived yet.
+ * The previous thread's messages are already cleared at this point, so this
+ * must fill the viewport area — otherwise the switch reads as a blank screen.
+ */
+function ThreadLoadingState() {
+    return (
+        <div
+            data-testid="thread-loading"
+            style={{
+                display: "flex",
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 160,
+            }}
+        >
+            <div
+                aria-label="Loading conversation"
+                role="status"
+                style={{
+                    width: 18,
+                    height: 18,
+                    border: "2px solid var(--border)",
+                    borderTopColor: "var(--muted)",
+                    borderRadius: "50%",
+                    animation: "thread-load-spin 0.8s linear infinite",
+                }}
+            />
+            <style>{`@keyframes thread-load-spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+    )
 }
 
 /**

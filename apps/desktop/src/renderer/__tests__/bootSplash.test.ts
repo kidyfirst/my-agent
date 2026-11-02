@@ -146,10 +146,16 @@ describe("App hands the splash over to the sidebar", () => {
 			"booted && (project.enrichedProjects.length === 0 || projectThreadsLoaded)",
 		)
 	})
-
 	it("marks the boot as done even when initialization throws", () => {
-		const start = app.indexOf("} finally {")
-		expect(start).toBeGreaterThan(-1)
-		expect(app.slice(start, start + 240)).toContain("setBooted(true)")
+		// Anchor on the initializer itself and then on the finally that closes
+		// it. Neither a bare `} finally {` nor the boot comment works: App.tsx
+		// has earlier finally blocks, and the comment sits *inside* this one,
+		// so searching forward from it finds the next unrelated block.
+		const init = app.indexOf("async function initializeApp()")
+		expect(init).toBeGreaterThan(-1)
+		const finallyStart = app.indexOf("} finally {", init)
+		expect(finallyStart).toBeGreaterThan(-1)
+		const body = app.slice(finallyStart, finallyStart + 240)
+		expect(body).toContain("setBooted(true)")
 	})
 })

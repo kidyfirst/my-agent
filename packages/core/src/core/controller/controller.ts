@@ -1395,12 +1395,11 @@ export class Session<TState = any> {
 									(histUserText ? histUserText + "\n" : "") + p.text
 							} else if (p.type === "image") {
 								if (canVision) {
+									const rawImg = p.data || p.image || p.url
 									const imgData =
-										p.data ||
-										p.image ||
-										(typeof p.url === "string" && p.url.startsWith("data:")
-											? p.url.split(",")[1]
-											: p.url)
+										typeof rawImg === "string" && rawImg.startsWith("data:")
+											? rawImg.slice(rawImg.indexOf(",") + 1)
+											: rawImg
 									if (imgData) {
 										const mediaType = p.mimeType || p.mediaType || "image/png"
 										parts.push({
@@ -1432,11 +1431,11 @@ export class Session<TState = any> {
 								mime.startsWith("image/") ||
 								/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(String(att.name || ""))
 							if (isImg) {
-								if (canVision && (att.data || att.preview)) {
-									const rawData = att.data || att.preview
+								if (canVision && (att.data || att.preview || att.url)) {
+									const rawData = att.data || att.preview || att.url
 									const cleanData =
 										typeof rawData === "string" && rawData.startsWith("data:")
-											? rawData.split(",")[1]
+											? rawData.slice(rawData.indexOf(",") + 1)
 											: rawData
 									parts.push({
 										type: "image",

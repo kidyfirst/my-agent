@@ -167,46 +167,47 @@ function ThoughtStepItem({
 const WORKING_CHAR_STAGGER_MS = 28
 
 /**
- * A running turn's header fades its characters in one after another so the
- * line reads as "alive" the moment it appears, then goes still. A finished
- * turn renders plain text, otherwise the animation would replay every time
- * the block re-enters view.
+ * A running turn's header fades the word "Working" in one character at a time
+ * so the line reads as "alive" the moment it appears, then goes still. A
+ * finished turn renders plain text, otherwise the animation would replay every
+ * time the block re-enters view.
  *
- * The label is split into two runs — the stable prefix ("Working for") and the
- * ticking duration — because the duration changes every 100ms. Animating the
- * whole string on every tick would make the line flicker; only new characters
- * in the duration run get an entrance.
+ * Only the prefix is staggered. The duration ticks every 100ms, which is
+ * shorter than the entrance animation itself (260ms), so staggering it meant
+ * every digit was replaced mid-fade and nothing ever finished animating — the
+ * line looked static. The duration therefore renders as one plain run with no
+ * animation: it can change freely without restarting anything.
  */
-function staggeredChars(text: string, offset: number) {
+function staggeredChars(text: string) {
     return Array.from(text).map((char, i) => (
         <span
-            key={`${i}-${char}`}
+            key={i}
             className="working-char"
-            style={{ animationDelay: `${(offset + i) * WORKING_CHAR_STAGGER_MS}ms` }}
+            style={{ animationDelay: `${i * WORKING_CHAR_STAGGER_MS}ms` }}
         >
             {char === " " ? "\u00a0" : char}
         </span>
     ))
 }
 
-function AnimatedWorkingLabel({
-    prefix,
-    duration,
-}: {
-    prefix: string
-    duration: string | null
-}) {
-    const label = duration ? `${prefix} ${duration}` : prefix
+/**
+ * The duration renders with `tabular-nums` so the digits keep a fixed width as
+ * the tenths tick over, and with no entrance of its own, so a running turn's
+ * label never re-animates. It is aria-hidden because the parent supplies the
+ * full label — a screen reader should read "Working for 4.2s", not the pieces.
+ */
+function AnimatedWorkingLabel({ duration }: { duration: string | null }) {
+    const label = duration ? `Working for ${duration}` : "Working"
     return (
-        <span aria-label={label}>
-            {/* The prefix keeps stable keys, so a ticking duration does not
-                re-mount it and restart its entrance. */}
-            {staggeredChars(prefix, 0)}
+        <span aria-label={label} role="status">
+            {staggeredChars("Working for")}
             {duration && (
-                <>
-                    <span className="working-char">{"\u00a0"}</span>
-                    {staggeredChars(duration, prefix.length + 1)}
-                </>
+                <span
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                    aria-hidden="true"
+                >
+                    {` ${duration}`}
+                </span>
             )}
         </span>
     )
@@ -337,10 +338,7 @@ export const ExecutionBlock = memo(function ExecutionBlock({
                     }
                 `}</style>
                 {isActive ? (
-                    <AnimatedWorkingLabel
-                        prefix="Working"
-                        duration={formattedDuration}
-                    />
+                    <AnimatedWorkingLabel duration={formattedDuration} />
                 ) : (
                     <span>{headerLabel}</span>
                 )}

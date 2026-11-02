@@ -291,7 +291,7 @@ contextBridge.exposeInMainWorld("api", {
 3. **刷新策略**：遇到正文块或子智能体时调用 `flushExecution()`，把当前累积的步骤落成一个执行块；遇到思维链或工具块时调用 `flushText()`，且**只在正文非空（或尾部为错误）时产出 assistant 项**，因此流式过程中不会出现空气泡。
 4. **消息收尾**：消息解析完成后再次 flush，并把 `msg.changedFiles` 挂到本轮最后一条 assistant 项上；若没有任何正文项，则补一个只含文件卡片的 assistant 项。
 5. **补漏**：状态机里已出现、但消息体中没有对应块的工具会被补进 `live-execution-block`；未渲染过的子智能体补成独立卡片。
-6. **占位**：Agent 运行中且最后一项是用户消息时，插入 `active-execution-placeholder`，让 `Thinking for …` 立刻可见，而不必等第一个工具调用。
+6. **占位**：Agent 运行中且最后一项是用户消息时，插入 `active-execution-placeholder`，让 `Working for …` 立刻可见，而不必等第一个工具调用。
 7. **收尾归并**：先合并相邻执行块（步骤按 id 去重）、丢弃空且非活跃的块；再做「一轮一个活动块」折叠——游标在 `user` / `system` 项处重置，同一轮后续所有执行块并入第一个块，`isActive` / `startedAt` / `durationMs` / `changedFiles` 取最新值。
 
 第 7 步是「一轮只出现一个 `Worked for …`」的关键：早期实现每个 assistant 消息各带一个执行块，一轮里就会冒出多个标题，现在统一在渲染层折叠。
@@ -300,10 +300,18 @@ contextBridge.exposeInMainWorld("api", {
 
 `ExecutionBlock.tsx` 用同一组件承载两种状态，形态由 `isActive` 决定：
 
-- **运行中**：标题为 `Thinking for 12.3s`（或 `1m 20s`），后面带 `(N steps)` 计数与向下箭头；折叠态下方是 82px 高的步骤预览窗，随新步骤自动滚到底，点击标题或预览窗展开全部步骤。
+- **运行中**：标题为 `Working for 12.3s`（或 `1m 20s`），后面带 `(N steps)` 计数与向下箭头；折叠态下方是 82px 高的步骤预览窗，随新步骤自动滚到底，点击标题或预览窗展开全部步骤。
 - **已结束**：整轮只留一行 `Worked for 1m 6s ⌄`，步骤默认完全隐藏，点击才展开；若该块没有任何步骤且非活跃，组件直接返回 `null`。
 - **耗时来源**：`agent_end` 时写入消息的 `durationMs`；缺失时回退到 3.3.1 的 `turnDurationById`。数据库中没有耗时列，因此 `chatReducer` 的 `SET_MESSAGES` 会保留内存中的旧耗时，并给历史会话补到本轮最后一条 assistant 消息——更早的历史轮次仍可能只显示不带时长的 `Worked`。
 - **时长格式**：不足 60 秒显示一位小数（`12.3s`），超过则显示 `Xm Ys`；运行中由 100ms 定时器按 `startedAt` 刷新。
+
+**运行中标题的逐字入场**：活跃态的标题由 `AnimatedWorkingLabel` 渲染，按字符拆成若干 `<span class="working-char">`，每个字符以 `28ms` 的步长（`WORKING_CHAR_STAGGER_MS`）依次播放 `working-char-in`（`opacity: 0 → 1`，`260ms` ease-out），整行约 350ms 内点亮，让这一行在出现时就显得「在工作」。实现上有三个关键约束：
+
+1. **只在运行中启用**。已结束的 `Worked for …` 走普通文本分支，否则每次滚动或展开都会重播入场动画。
+2. **拆成两段渲染**。标题被拆成稳定前缀（`Working`）与跳动的时长（`12.3s`）两段：前缀的 key 恒定，因此时长每 100ms 变化时不会重挂前缀、把整行重新入场；只有时长段里新增的字符获得入场。
+3. **字符 key 用下标而非字符本身**。`staggeredChars` 的 key 是索引，所以 `3.4s → 3.5s`、`9.9s → 10.0s` 这类变化只改文本、不重建 DOM 节点——若 key 里带上字符，变化的最后一位会每 100ms 重挂一次，表现为持续闪烁。
+
+`prefers-reduced-motion: reduce` 下 `.working-char` 的动画被显式关闭。
 
 #### 3.3.3 用户消息吸顶与折叠
 
@@ -742,7 +750,7 @@ sequenceDiagram
         Harness->>Main: emit("message_update", msg)
         Main->>Preload: webContents.send("harness:event", msg)
         Preload->>React: window.api.onEvent 回调
-        React->>React: 更新 Thinking for … 预览（82px 自动滚动）
+        React->>React: 更新 Working for … 预览（82px 自动滚动）
 
         Agent-->>Harness: 吐出回答文本增量 (type: "text")
         Harness->>Main: emit("message_update", msg)
@@ -921,7 +929,7 @@ src/
 │   ├── components/            # 核心 UI 面板与交互组件
 │   │   ├── ChatView.tsx              # 会话渲染管线：消息分组、一轮一个执行块、吸顶用户消息
 │   │   ├── AssistantMessage.tsx      # 助手正文渲染 (Markdown / 代码高亮 / 复制)
-│   │   ├── ExecutionBlock.tsx        # 执行块：运行中 Thinking for … / 结束 Worked for …
+│   │   ├── ExecutionBlock.tsx        # 执行块：运行中 Working for …（逐字入场）/ 结束 Worked for …
 │   │   ├── UserMessage.tsx           # 用户消息气泡：吸顶、折叠、图片预览
 │   │   ├── FilesChangedBar.tsx       # 本轮变更文件卡片与行内 diff
 │   │   ├── TodoProgress.tsx          # 任务进度条

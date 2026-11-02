@@ -279,9 +279,13 @@ export function MainContent(props: MainContentProps) {
 					minWidth: 0,
 				}}
 			>
-				<ChatView
-					threadId={props.activeThreadKey}
-					messages={chat.messages}
+                <ChatView
+                    threadId={props.activeThreadKey}
+                    isLoadingThread={
+                        chat.loadingThreadId !== null &&
+                        chat.loadingThreadId === props.activeThreadKey
+                    }
+                    messages={chat.messages}
 					tools={chat.tools}
 					subagents={chat.subagents}
 					isAgentActive={chat.isAgentActive}

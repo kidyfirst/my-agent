@@ -1,5 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAI } from "@ai-sdk/openai"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import {
 	ModelRouterLanguageModel,
 	DEFAULT_EXECUTION_MODE,
@@ -223,10 +224,11 @@ export function createModelResolver(authStorage: AuthStorage) {
 					bareModelId = "deepseek-flash"
 				}
 				return withThinkingOptions(
-					createOpenAI({
+					createOpenAICompatible({
+						name: "deepseek",
 						apiKey,
 						baseURL,
-					}).chat(bareModelId),
+					}).chatModel(bareModelId),
 					"deepseek",
 					thinkingLevel,
 				)

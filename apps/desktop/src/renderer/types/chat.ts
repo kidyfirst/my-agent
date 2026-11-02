@@ -200,6 +200,16 @@ export type ChatState = {
 	subagents: Map<string, SubagentState>
 	queuesByThread: Record<string, QueuedMessage[]>
 	isQueuePaused?: boolean
+	/**
+	 * Thread whose transcript is being fetched right now. ChatView renders a
+	 * wait state instead of the previous thread's messages while this is set.
+	 */
+	loadingThreadId: string | null
+	/**
+	 * Thread the last SET_MESSAGES belonged to. Guards against a slow response
+	 * for an abandoned switch overwriting the thread the user is on now.
+	 */
+	messagesThreadId: string | null
 }
 
 export type ChatAction =
@@ -249,7 +259,7 @@ export type ChatAction =
 			isError: boolean
 			durationMs: number
 	  }
-	| { type: "SET_MESSAGES"; messages: Message[] }
+	| { type: "SET_MESSAGES"; messages: Message[]; threadId?: string }
 	| { type: "SET_THREAD_QUEUE"; threadId: string; queue: QueuedMessage[] }
 	| { type: "ENQUEUE_MESSAGE"; threadId: string; message: QueuedMessage }
 	| { type: "DEQUEUE_MESSAGE"; threadId: string; id: string }
@@ -258,6 +268,8 @@ export type ChatAction =
 	| { type: "CLEAR_THREAD_QUEUE"; threadId: string }
 	| { type: "SET_QUEUE_PAUSED"; paused: boolean }
 	| { type: "SET_AGENT_ACTIVE"; active: boolean }
+	| { type: "BEGIN_THREAD_LOAD"; threadId: string }
+	| { type: "END_THREAD_LOAD"; threadId: string }
 	| { type: "CLEAR" }
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
@@ -652,9 +664,46 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 			}
 			return { ...state, subagents }
 		}
+		case "BEGIN_THREAD_LOAD": {
+			// Drop the outgoing thread's transcript immediately: keeping it on
+			// screen while the new one loads shows the wrong conversation under
+			// the new thread's title.
+			return {
+				...state,
+				messages: [],
+				tools: new Map(),
+				subagents: new Map(),
+				isAgentActive: false,
+				agentStartedAt: null,
+				streamingMessageId: null,
+				messagesThreadId: null,
+				loadingThreadId: action.threadId,
+			}
+		}
+		case "END_THREAD_LOAD": {
+			// A newer load already owns the slot; this one is stale.
+			if (state.loadingThreadId !== action.threadId) return state
+			return { ...state, loadingThreadId: null }
+		}
 		case "SET_MESSAGES": {
+			// A response for a thread the user has already navigated away from
+			// would otherwise paint that thread under the current one's title.
+			if (
+				action.threadId !== undefined &&
+				state.messagesThreadId !== null &&
+				state.messagesThreadId !== action.threadId
+			) {
+				return state
+			}
+
 			// If new message list is empty but state already has messages, avoid wiping out the active conversation.
-			if (action.messages.length === 0 && state.messages.length > 0) {
+			// Exempt the just-cleared slot: after a switch the list is legitimately
+			// empty and must render as such instead of resurrecting the old one.
+			if (
+				action.messages.length === 0 &&
+				state.messages.length > 0 &&
+				state.loadingThreadId === null
+			) {
 				return state
 			}
 
@@ -850,7 +899,6 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 						? Date.now() - lastAssistant.durationMs
 						: Date.now())
 				: null
-
 			return {
 				...state,
 				messages: finalMessages,
@@ -859,6 +907,7 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				streamingMessageId,
 				tools: state.tools,
 				subagents: state.subagents,
+				messagesThreadId: action.threadId ?? state.messagesThreadId,
 			}
 		}
 		case "SET_THREAD_QUEUE": {
@@ -961,4 +1010,6 @@ export const initialChatState: ChatState = {
 	subagents: new Map(),
 	queuesByThread: {},
 	isQueuePaused: false,
+	loadingThreadId: null,
+	messagesThreadId: null,
 }
