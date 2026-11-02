@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from "react"
+import { useEffect, useRef, useMemo, useState } from "react"
 import { AssistantMessage } from "./AssistantMessage"
 import { UserMessage } from "./UserMessage"
 import { ExecutionBlock, ExecutionStep, ExecutionTool } from "./ExecutionBlock"
@@ -285,6 +285,7 @@ export function ChatView({
 }: ChatViewProps) {
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const isAutoScroll = useRef(true)
+	const [isScrolledUp, setIsScrolledUp] = useState(false)
 	const prevThreadIdRef = useRef(threadId)
 	const scrollRafRef = useRef<number | null>(null)
 
@@ -292,6 +293,7 @@ export function ChatView({
 		if (prevThreadIdRef.current !== threadId) {
 			prevThreadIdRef.current = threadId
 			isAutoScroll.current = true
+			setIsScrolledUp(false)
 		}
 	}, [threadId])
 
@@ -313,6 +315,7 @@ export function ChatView({
 					scrollRef.current
 				) {
 					scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+					setIsScrolledUp(false)
 				}
 			})
 		}
@@ -335,7 +338,25 @@ export function ChatView({
 	const handleScroll = () => {
 		if (!scrollRef.current) return
 		const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-		isAutoScroll.current = scrollHeight - scrollTop - clientHeight < 100
+		const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+		const scrolledUp = distanceFromBottom > 80
+		isAutoScroll.current = !scrolledUp
+		setIsScrolledUp(scrolledUp)
+	}
+
+	const scrollToLatest = () => {
+		if (scrollRef.current) {
+			if (typeof scrollRef.current.scrollTo === "function") {
+				scrollRef.current.scrollTo({
+					top: scrollRef.current.scrollHeight,
+					behavior: "smooth",
+				})
+			} else {
+				scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+			}
+		}
+		isAutoScroll.current = true
+		setIsScrolledUp(false)
 	}
 
 	// Build a structured list of renderable items:
@@ -1001,24 +1022,36 @@ export function ChatView({
 
 	return (
 		<div
-			ref={scrollRef}
-			onScroll={handleScroll}
 			style={{
+				position: "relative",
 				flex: 1,
-				overflowY: "scroll",
-				overflowX: "hidden",
-				// No padding on the scroll container itself: padding here opens a
-				// strip beside sticky children where scrolled content still shows,
-				// and top padding keeps them from reaching the viewport top.
-				// Horizontal padding lives on the inner column instead.
-				minWidth: 0,
 				display: "flex",
 				flexDirection: "column",
-				// Reserve the scrollbar gutter so sticky cards are never painted
-				// under an overlay scrollbar.
-				scrollbarGutter: "stable",
+				minHeight: 0,
+				minWidth: 0,
+				overflow: "hidden",
 			}}
 		>
+			<div
+				ref={scrollRef}
+				data-chat-scroll-container="true"
+				onScroll={handleScroll}
+				style={{
+					flex: 1,
+					overflowY: "scroll",
+					overflowX: "hidden",
+					// No padding on the scroll container itself: padding here opens a
+					// strip beside sticky children where scrolled content still shows,
+					// and top padding keeps them from reaching the viewport top.
+					// Horizontal padding lives on the inner column instead.
+					minWidth: 0,
+					display: "flex",
+					flexDirection: "column",
+					// Reserve the scrollbar gutter so sticky cards are never painted
+					// under an overlay scrollbar.
+					scrollbarGutter: "stable",
+				}}
+			>
 			<div
 				style={{
 					maxWidth: 800,
@@ -1251,9 +1284,87 @@ export function ChatView({
 			`}</style>
 
 				{/* Bottom padding */}
-				<div style={{ height: 16 }} />
+				<div style={{ height: 28 }} />
 			</div>
 		</div>
+
+		{/* Gradient fade at bottom when scrolled away from latest */}
+		<div
+			data-testid="chat-bottom-fade"
+			aria-hidden="true"
+			style={{
+				position: "absolute",
+				bottom: 0,
+				left: 0,
+				right: 0,
+				height: 56,
+				background: "linear-gradient(to bottom, transparent, var(--bg))",
+				pointerEvents: "none",
+				zIndex: 10,
+				opacity: isScrolledUp ? 1 : 0,
+				transition: "opacity 0.2s ease",
+			}}
+		/>
+
+		{/* Floating button to jump to latest message */}
+		<button
+			type="button"
+			data-testid="scroll-to-latest-button"
+			onClick={scrollToLatest}
+			title="Scroll to latest"
+			aria-label="Scroll to latest"
+			style={{
+				position: "absolute",
+				bottom: 16,
+				left: "50%",
+				transform: isScrolledUp
+					? "translateX(-50%)"
+					: "translateX(-50%) translateY(8px)",
+				width: 34,
+				height: 34,
+				borderRadius: "50%",
+				background: "var(--bg)",
+				border: "1px solid var(--border)",
+				boxShadow: "var(--shadow-sm)",
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				color: "var(--text)",
+				cursor: isScrolledUp ? "pointer" : "default",
+				zIndex: 20,
+				opacity: isScrolledUp ? 1 : 0,
+				pointerEvents: isScrolledUp ? "auto" : "none",
+				transition:
+					"opacity 0.2s ease, transform 0.2s ease, background-color 0.15s ease, box-shadow 0.15s ease",
+			}}
+			onMouseEnter={(e) => {
+				if (isScrolledUp) {
+					e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+					e.currentTarget.style.boxShadow = "var(--shadow-popover)"
+				}
+			}}
+			onMouseLeave={(e) => {
+				if (isScrolledUp) {
+					e.currentTarget.style.backgroundColor = "var(--bg)"
+					e.currentTarget.style.boxShadow = "var(--shadow-sm)"
+				}
+			}}
+		>
+			<svg
+				width="15"
+				height="15"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="2.2"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
+				<line x1="12" y1="5" x2="12" y2="19" />
+				<polyline points="19 12 12 19 5 12" />
+			</svg>
+		</button>
+	</div>
 	)
 }
 

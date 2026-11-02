@@ -25,7 +25,44 @@ export const UserMessage = memo(function UserMessage({
 	const [previewImage, setPreviewImage] = useState<string | null>(null)
 	const [expanded, setExpanded] = useState(false)
 	const [overflowing, setOverflowing] = useState(false)
+	const [isStuck, setIsStuck] = useState(false)
 	const contentRef = useRef<HTMLDivElement>(null)
+	const sentinelRef = useRef<HTMLDivElement>(null)
+
+	useEffect(() => {
+		if (!pinned || expanded) {
+			setIsStuck(false)
+			return
+		}
+		const sentinel = sentinelRef.current
+		if (!sentinel) return
+
+		if (typeof IntersectionObserver === "undefined") {
+			setIsStuck(true)
+			return
+		}
+
+		const scrollParent = sentinel.closest(
+			"[data-chat-scroll-container='true']",
+		)
+		if (!scrollParent) return
+
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				const rootTop = entry.rootBounds ? entry.rootBounds.top : 0
+				const stuck =
+					!entry.isIntersecting && entry.boundingClientRect.top < rootTop
+				setIsStuck(stuck)
+			},
+			{
+				root: scrollParent,
+				threshold: [0, 1],
+			},
+		)
+
+		observer.observe(sentinel)
+		return () => observer.disconnect()
+	}, [pinned, expanded])
 
 	const contentArray = normalizeMessageContent(
 		message.content,
@@ -205,31 +242,45 @@ export const UserMessage = memo(function UserMessage({
 	const timeStr = formatTime(message.createdAt)
 
 	return (
-		// Spacing lives in padding rather than margin so the pinned card's
-		// background reaches the very top edge; otherwise scrolled content
-		// shows through the gap above it.
-		<div
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				alignItems: "flex-end",
-				// Negative side margins + matching padding bleed the sticky
-				// background over the column's side padding, so no strip of the
-				// scrolled content peeks out beside the pinned card. The bubble
-				// itself keeps exactly the same box.
-				margin: pinned ? "0 -24px" : "0",
-				padding: pinned ? "10px 24px 14px" : "2px 0 8px",
-				minWidth: 0,
-				maxWidth: "none",
-				// Collapsed user messages stick to the top of the scroll viewport so
-				// the latest one in view stays visible; a newer one paints over it.
-				// Nested messages must not stick — the fade would leave the turn box.
-				position: pinned && !expanded ? "sticky" : undefined,
-				top: pinned && !expanded ? 0 : undefined,
-				zIndex: pinned && !expanded ? 20 : undefined,
-				background: pinned && !expanded ? "var(--bg)" : undefined,
-			}}
-		>
+		<>
+			{pinned && !expanded && (
+				<div
+					ref={sentinelRef}
+					data-testid="sticky-sentinel"
+					aria-hidden="true"
+					style={{
+						height: 1,
+						marginBottom: -1,
+						pointerEvents: "none",
+						visibility: "hidden",
+					}}
+				/>
+			)}
+			{/* Spacing lives in padding rather than margin so the pinned card's
+			    background reaches the very top edge; otherwise scrolled content
+			    shows through the gap above it. */}
+			<div
+				style={{
+					display: "flex",
+					flexDirection: "column",
+					alignItems: "flex-end",
+					// Negative side margins + matching padding bleed the sticky
+					// background over the column's side padding, so no strip of the
+					// scrolled content peeks out beside the pinned card. The bubble
+					// itself keeps exactly the same box.
+					margin: pinned ? "0 -24px" : "0",
+					padding: pinned ? "10px 24px 14px" : "2px 0 8px",
+					minWidth: 0,
+					maxWidth: "none",
+					// Collapsed user messages stick to the top of the scroll viewport so
+					// the latest one in view stays visible; a newer one paints over it.
+					// Nested messages must not stick — the fade would leave the turn box.
+					position: pinned && !expanded ? "sticky" : undefined,
+					top: pinned && !expanded ? 0 : undefined,
+					zIndex: pinned && !expanded ? 20 : undefined,
+					background: pinned && !expanded ? "var(--bg)" : undefined,
+				}}
+			>
 			<div
 				style={{
 					padding: "10px 14px",
@@ -471,6 +522,26 @@ export const UserMessage = memo(function UserMessage({
 				src={previewImage}
 				onClose={() => setPreviewImage(null)}
 			/>
+
+			{/* Gradient fade under sticky header */}
+			{pinned && !expanded && (
+				<div
+					data-testid="sticky-fade-bottom"
+					aria-hidden="true"
+					style={{
+						position: "absolute",
+						top: "100%",
+						left: 0,
+						right: 0,
+						height: 24,
+						background: "linear-gradient(to bottom, var(--bg), transparent)",
+						pointerEvents: "none",
+						opacity: isStuck ? 1 : 0,
+						transition: "opacity 0.2s ease",
+					}}
+				/>
+			)}
 		</div>
+		</>
 	)
 })
