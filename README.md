@@ -71,7 +71,7 @@
 
 <!-- LATEST_RELEASE_END -->
 
-<!-- TIP_JAR_START — 二维码就是 src/renderer/assets/alipay-qr.png，同一份文件，别再放副本 -->
+<!-- TIP_JAR_START — 二维码就是 apps/desktop/src/renderer/assets/alipay-qr.png，同一份文件，别再放副本 -->
 
 ## ☕ 打赏猫球
 
@@ -79,7 +79,7 @@
 
 如果你觉得项目对你有帮助，打赏猫球吧 🐱
 
-<img src="src/renderer/assets/alipay-qr.png" width="200" alt="支付宝收款二维码" />
+<img src="apps/desktop/src/renderer/assets/alipay-qr.png" width="200" alt="支付宝收款二维码" />
 
 <sub>支付宝扫一扫 · 金额随意，不打赏也一样好用</sub>
 

@@ -68,7 +68,7 @@ describe("execFileQuiet", () => {
 })
 
 describe("main-process call sites", () => {
-	const dirs = ["src/electron", "src/utils"]
+	const dirs = ["apps/desktop/src/electron", "packages/core/src/utils"]
 
 	function sources(dir: string, found: string[] = []): string[] {
 		for (const name of readdirSync(dir)) {

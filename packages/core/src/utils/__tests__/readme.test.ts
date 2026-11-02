@@ -13,7 +13,7 @@ const ZH = read("README.md")
 const EN = read("README_EN.md")
 
 /** The QR image both editions point at. */
-const QR = "src/renderer/assets/alipay-qr.png"
+const QR = "apps/desktop/src/renderer/assets/alipay-qr.png"
 
 describe("release sync", () => {
 	const pkg = JSON.parse(read("package.json")) as { version: string }

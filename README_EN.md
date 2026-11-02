@@ -73,7 +73,7 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 
 <!-- LATEST_RELEASE_END -->
 
-<!-- TIP_JAR_START — the QR is src/renderer/assets/alipay-qr.png itself; do not add a second copy -->
+<!-- TIP_JAR_START — the QR is apps/desktop/src/renderer/assets/alipay-qr.png itself; do not add a second copy -->
 
 ## ☕ Treat the cat
 
@@ -81,7 +81,7 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 
 If this project has been useful to you, treat the cat 🐱
 
-<img src="src/renderer/assets/alipay-qr.png" width="200" alt="Alipay payment QR code" />
+<img src="apps/desktop/src/renderer/assets/alipay-qr.png" width="200" alt="Alipay payment QR code" />
 
 <sub>Scan with Alipay · any amount, and it works just as well without</sub>
 

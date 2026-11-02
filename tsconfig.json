@@ -19,11 +19,15 @@
 			"@my-agent/cli": ["packages/cli/src/index.ts"]
 		}
 	},
-	"include": ["src/**/*", "electron-vite.config.ts"],
+	"include": [
+		"apps/desktop/src/**/*",
+		"packages/*/src/**/*",
+		"electron-vite.config.ts"
+	],
 	"exclude": [
 		"node_modules",
 		"dist",
-		"src/**/__tests__/**",
+		"apps/desktop/src/**/__tests__/**",
 		"packages/**/__tests__/**",
 		"packages/**/tests/**"
 	]
