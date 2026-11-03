@@ -18,6 +18,7 @@ import {
 	type ThinkingLevelOption,
 } from "@my-agent/core"
 import type { AttachedFile, QueuedMessage } from "../types/chat"
+import { ToolApprovalCard, type PendingApprovalData } from "./ToolApprovalCard"
 
 export type { AttachedFile }
 
@@ -52,6 +53,16 @@ interface EditorInputProps {
 	onStopReplay?: () => void
 	projectRootPath?: string | null
 	openFiles?: string[]
+	pendingApproval?: PendingApprovalData | null
+	onRespondApproval?: (options: {
+		decision: "approve" | "decline"
+		scope: "once" | "conversation" | "project" | "global"
+		toolCallId: string
+		threadId?: string
+		toolName?: string
+		category?: string | null
+		args?: unknown
+	}) => void
 }
 
 const MODE_OPTIONS = [
@@ -213,6 +224,8 @@ export function EditorInput({
 	onStopReplay,
 	projectRootPath,
 	openFiles,
+	pendingApproval,
+	onRespondApproval,
 }: EditorInputProps) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
 	const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1059,6 +1072,15 @@ export function EditorInput({
 						</svg>
 						<span>{busyPrompt}</span>
 					</div>
+				)}
+				{pendingApproval && (
+					<ToolApprovalCard
+						approval={pendingApproval}
+						onRespond={onRespondApproval || (() => {})}
+						onDecline={() => {
+							textareaRef.current?.focus()
+						}}
+					/>
 				)}
 				<div
 					style={{

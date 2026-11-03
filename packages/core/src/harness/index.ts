@@ -222,9 +222,14 @@ export interface QueuedMessage {
 }
 
 export interface ToolApprovalOptions {
-	decision?: "approve" | "decline" | "always_allow_category"
+	decision?: "approve" | "decline" | "always_allow_category" | string
 	approved?: boolean
+	scope?: "once" | "conversation" | "project" | "global" | string
 	toolCallId?: string
+	threadId?: string
+	toolName?: string
+	category?: string
+	args?: unknown
 	requestContext?: RequestContext
 	declineContext?: {
 		reason?: string
@@ -1010,8 +1015,12 @@ export async function createMyAgent(
 				options.decision ?? (options.approved !== false ? "approve" : "decline")
 			return activeSession?.respondToToolApproval?.({
 				decision,
+				scope: options.scope ?? "once",
 				toolCallId: options.toolCallId ?? "",
 				threadId: options.threadId,
+				toolName: options.toolName,
+				category: options.category,
+				args: options.args,
 				...(options.requestContext
 					? { requestContext: options.requestContext }
 					: {}),

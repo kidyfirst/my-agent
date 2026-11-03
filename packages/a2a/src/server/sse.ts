@@ -1,5 +1,6 @@
 import type { ServerResponse, IncomingMessage } from "node:http"
 import type { MyAgentHarness } from "@my-agent/core"
+import { getLoopbackOrigin } from "./cors.js"
 
 export interface HandleStreamParams {
 	contextId?: string
@@ -14,11 +15,17 @@ export async function handleSSEStream(
 	harness: MyAgentHarness,
 	params: HandleStreamParams,
 ): Promise<void> {
+	const origin = getLoopbackOrigin(req.headers.origin)
 	res.writeHead(200, {
 		"Content-Type": "text/event-stream; charset=utf-8",
 		"Cache-Control": "no-cache, no-transform",
 		Connection: "keep-alive",
-		"Access-Control-Allow-Origin": "*",
+		...(origin
+			? {
+					"Access-Control-Allow-Origin": origin,
+					Vary: "Origin",
+				}
+			: {}),
 	})
 
 	const sendEvent = (event: string, data: any) => {

@@ -520,4 +520,18 @@ describe("live list attribution", () => {
 			html.indexOf(">beta</span>"),
 		)
 	})
+
+	it("renders session approval badge with 14px SVG, transparent default background, and 4px radius", () => {
+		const html = render({
+			threadsWithApproval: new Map([["t1", { toolCallId: "call-1" }]]),
+		})
+		expect(html).toContain('aria-label="Waiting for tool approval"')
+		expect(html).toContain('title="Waiting for tool approval — click to review"')
+		expect(html).toContain('width="14"')
+		expect(html).toContain('height="14"')
+		expect(html).toContain("border-radius:4px")
+		expect(html).toContain("background:transparent")
+		expect(html).not.toContain("animation:pulse")
+		expect(html).not.toContain("border-radius:50%")
+	})
 })

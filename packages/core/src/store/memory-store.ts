@@ -9,6 +9,7 @@ import type {
 	StorageListMessagesInput,
 	StorageListMessagesOutput,
 	ObservationalMemoryRecord,
+	ToolApprovalRecord,
 } from "./types.js"
 import type { MyAgentDBMessage } from "../core/index.js"
 
@@ -751,6 +752,68 @@ export class SQLiteMemoryStore {
 				)
 				.run(duration, args.threadId)
 		}
+	}
+
+	async recordToolApproval(record: {
+		id?: string
+		threadId: string
+		toolCallId: string
+		toolName: string
+		args?: unknown
+		category?: string | null
+		decision: string
+		scope: string
+	}): Promise<ToolApprovalRecord> {
+		const id = record.id || crypto.randomUUID()
+		const createdAt = new Date().toISOString()
+		const argsText =
+			typeof record.args === "string"
+				? record.args
+				: record.args !== undefined
+					? JSON.stringify(record.args)
+					: null
+
+		this.db
+			.prepare(
+				`INSERT INTO myagent_tool_approvals (
+					id, thread_id, tool_call_id, tool_name, args, category, decision, scope, created_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			)
+			.run(
+				id,
+				record.threadId,
+				record.toolCallId,
+				record.toolName,
+				argsText,
+				record.category ?? null,
+				record.decision,
+				record.scope,
+				createdAt,
+			)
+
+		return {
+			id,
+			thread_id: record.threadId,
+			tool_call_id: record.toolCallId,
+			tool_name: record.toolName,
+			args: argsText,
+			category: record.category ?? null,
+			decision: record.decision,
+			scope: record.scope,
+			created_at: createdAt,
+		}
+	}
+
+	async listToolApprovals(threadId: string): Promise<ToolApprovalRecord[]> {
+		const rows = this.db
+			.prepare(
+				`SELECT id, thread_id, tool_call_id, tool_name, args, category, decision, scope, created_at
+				FROM myagent_tool_approvals
+				WHERE thread_id = ?
+				ORDER BY created_at ASC`,
+			)
+			.all(threadId) as any[]
+		return rows
 	}
 
 	private mapOMRow(row: any): ObservationalMemoryRecord {

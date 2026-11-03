@@ -88,6 +88,10 @@ export function App() {
 	useEffect(() => {
 		currentThreadIdRef.current = currentThreadId
 	}, [currentThreadId])
+	/** Thread whose transcript request is currently in flight. */
+	const inFlightThreadRef = useRef<string | null>(null)
+	/** Thread whose transcript is already on screen, so a repeat load is a no-op. */
+	const lastLoadedThreadRef = useRef<string | null>(null)
 	const [runningThreadId, setRunningThreadId] = useState<string | null>(null)
 	/**
 	 * The thread whose run the user stopped, if it happened in this session.
@@ -186,14 +190,23 @@ export function App() {
 				: "var(--muted)"
 	const toastGlyph =
 		toast?.type === "error" ? "⚠" : toast?.type === "success" ? "✓" : "•"
+    // Two independent paths load the same thread: the caller that initiated the
+    // switch, and the `thread_changed` broadcast the main process emits after
+    // it. Without this guard the transcript loads twice, so the user watches
+    // loading -> content -> loading -> content. In-flight calls for one thread
+    // share the first promise; a repeat for an already-loaded thread is ignored
+    // unless the caller explicitly asked for a refresh.
     const loadMessages = useCallback(
-        async (threadIdOverride?: string) => {
+        async (threadIdOverride?: string, force = false) => {
             const tid =
                 threadIdOverride || currentThreadId || currentThreadIdRef.current
             if (!tid) {
                 dispatch({ type: "SET_MESSAGES", messages: [] })
                 return
             }
+            if (inFlightThreadRef.current === tid) return
+            if (!force && lastLoadedThreadRef.current === tid) return
+            inFlightThreadRef.current = tid
             // Clear the outgoing transcript and show a wait state before the
             // round-trip, so the switch never looks like a frozen old thread.
             dispatch({ type: "BEGIN_THREAD_LOAD", threadId: tid })
@@ -205,9 +218,11 @@ export function App() {
                 if (Array.isArray(msgs)) {
                     dispatch({ type: "SET_MESSAGES", messages: msgs, threadId: tid })
                 }
+                lastLoadedThreadRef.current = tid
             } catch {
                 // Thread may not exist yet
             } finally {
+                inFlightThreadRef.current = null
                 dispatch({ type: "END_THREAD_LOAD", threadId: tid })
             }
         },
@@ -435,7 +450,9 @@ export function App() {
 							else s.add(targetThreadId)
 							return s
 						})
-						await loadMessages(targetThreadId)
+						// The recording replaced this thread's transcript, so the
+						// cached copy no longer matches what is on disk.
+						await loadMessages(targetThreadId, true)
 					}
 					if (project.projectInfo?.rootPath) {
 						const rootPath = project.projectInfo.rootPath
@@ -759,10 +776,12 @@ export function App() {
 			await project.loadEnrichedProjects()
 			auth.setIsAuthenticated(authenticated)
 			if (resolvedThreadId) {
-				await loadMessages(resolvedThreadId)
+				// A thread id is only unique within its project, so the cached
+				// transcript belongs to whatever project we just left.
+				await loadMessages(resolvedThreadId, true)
 				project.loadPRStatus()
 			} else if (proj) {
-				await loadMessages()
+				await loadMessages(undefined, true)
 				project.loadPRStatus()
 			} else {
 				dispatch({ type: "CLEAR" })
@@ -1405,6 +1424,33 @@ export function App() {
 		],
 	)
 
+	const handleRespondApproval = useCallback(
+		async (opts: {
+			decision: "approve" | "decline"
+			scope: "once" | "conversation" | "project" | "global"
+			toolCallId: string
+			threadId?: string
+			toolName?: string
+			category?: string | null
+			args?: unknown
+		}) => {
+			const targetThreadId = opts.threadId || currentThreadId || undefined
+			if (targetThreadId) {
+				setThreadsWithApproval((prev) => {
+					if (!prev.has(targetThreadId)) return prev
+					const next = new Map(prev)
+					next.delete(targetThreadId)
+					return next
+				})
+			}
+			await dialogs.handleRespondToApproval({
+				...opts,
+				threadId: targetThreadId,
+			})
+		},
+		[currentThreadId, dialogs],
+	)
+
 	/**
 	 * Rename or delete a session of a project that isn't open.
 	 *
@@ -1730,6 +1776,9 @@ export function App() {
 					onDeleteQueued={handleDeleteQueued}
 					onReorderQueue={handleReorderQueue}
 					onClearQueue={handleClearQueue}
+					threadsWithApproval={threadsWithApproval}
+					pendingApproval={dialogs.pendingApproval}
+					onRespondApproval={handleRespondApproval}
 				/>
 			</div>
 

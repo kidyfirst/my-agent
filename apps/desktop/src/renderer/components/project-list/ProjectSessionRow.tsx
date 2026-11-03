@@ -5,7 +5,7 @@ import { ConfirmDialog } from "../ConfirmDialog"
 import { RowActions, rowMenuAnchor, rowTextFade } from "../RowActions"
 import { formatRelativeTime } from "../../utils/relativeTime"
 
-/** A session awaiting tool approval: amber exclamation mark badge that pulses. */
+/** A session awaiting tool approval: amber shield-alert icon matching running icon style & dimensions. */
 function SessionApprovalBadge({
 	onClick,
 }: {
@@ -20,29 +20,37 @@ function SessionApprovalBadge({
 			onMouseLeave={() => setHovered(false)}
 			title="Waiting for tool approval — click to review"
 			aria-label="Waiting for tool approval"
-            style={{
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: hovered
-                    ? "color-mix(in srgb, var(--warning) 30%, transparent)"
-                    : "color-mix(in srgb, var(--warning) 18%, transparent)",
-                color: "var(--warning)",
-                border: "none",
-                fontSize: 11,
-				fontWeight: 800,
-				lineHeight: 1,
+			style={{
+				width: 20,
+				height: 20,
+				borderRadius: 4,
+				display: "inline-flex",
+				alignItems: "center",
+				justifyContent: "center",
+				background: hovered ? "var(--bg-hover)" : "transparent",
+				color: "var(--warning)",
+				border: "none",
 				flexShrink: 0,
 				cursor: "pointer",
 				padding: 0,
-				animation: "pulse 1.4s infinite ease-in-out",
-				transition: "background-color 0.15s, border-color 0.15s",
+				transition: "background-color 0.15s, color 0.15s",
 			}}
 		>
-			!
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="2"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+				<line x1="12" y1="8" x2="12" y2="12" />
+				<line x1="12" y1="16" x2="12.01" y2="16" />
+			</svg>
 		</button>
 	)
 }

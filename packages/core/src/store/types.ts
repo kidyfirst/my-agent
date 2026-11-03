@@ -104,3 +104,15 @@ export interface ObservationalMemoryRecord {
 	createdAt: Date
 	updatedAt: Date
 }
+
+export interface ToolApprovalRecord {
+	id: string
+	thread_id: string
+	tool_call_id: string
+	tool_name: string
+	args?: string | null
+	category?: string | null
+	decision: "approve" | "decline" | string
+	scope: "once" | "conversation" | "project" | "global" | string
+	created_at: string
+}

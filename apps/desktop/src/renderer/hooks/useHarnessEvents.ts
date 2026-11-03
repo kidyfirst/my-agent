@@ -75,7 +75,7 @@ export interface HarnessCallbacks {
 	setLoggingEnabled?: (enabled: boolean) => void
 	projectInfoRef: React.RefObject<ProjectInfo | null>
 	notificationPrefRef: React.RefObject<string>
-	loadMessages: (threadId?: string) => Promise<void>
+	loadMessages: (threadId?: string, force?: boolean) => Promise<void>
 	/** Id of the last assistant message, used to attach task results to it. */
 	getLastAssistantMessageId: () => string | null
 	getAgentDurationMs?: () => number | undefined
@@ -695,7 +695,8 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 								resumeThreadId,
 							)
 						}
-						cb.loadMessages(resumeThreadId)
+						// Same thread id in a different project is different data.
+						cb.loadMessages(resumeThreadId, true)
 						// Tagged with the project that just opened: the sidebar must
 						// never render this list under the project it came from.
 						cb.loadThreads(proj.rootPath)

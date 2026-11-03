@@ -63,6 +63,23 @@ export const MIGRATIONS: Array<(db: DatabaseSync) => void> = [
 	/* → 1 */ (db) => {
 		addColumnIfMissing(db, "myagent_messages", "durationMs", "INTEGER")
 	},
+	/* → 2 */ (db) => {
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS myagent_tool_approvals (
+				id TEXT PRIMARY KEY,
+				thread_id TEXT NOT NULL,
+				tool_call_id TEXT NOT NULL,
+				tool_name TEXT NOT NULL,
+				args TEXT,
+				category TEXT,
+				decision TEXT NOT NULL,
+				scope TEXT NOT NULL,
+				created_at TEXT NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_tool_approvals_thread_created_at 
+				ON myagent_tool_approvals (thread_id, created_at);
+		`)
+	},
 	// 未来每列/每表一条，只增不改
 ]
 

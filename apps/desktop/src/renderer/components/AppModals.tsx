@@ -4,7 +4,6 @@ import { LoginDialog } from "./LoginDialog"
 import { ModelSelector } from "./ModelSelector"
 import { PlanApproval } from "./PlanApproval"
 import { QuickFileOpen } from "./QuickFileOpen"
-import { ToolApprovalDialog } from "./ToolApprovalDialog"
 import { GraphViewerModal } from "./graph/GraphViewerModal"
 import { Settings } from "./Settings"
 import { AgentDashboard } from "./AgentDashboard"
@@ -51,19 +50,6 @@ export function AppModals(props: AppModalsProps) {
 
 	return (
 		<>
-			{dialogs.pendingApproval && (
-				<ToolApprovalDialog
-					toolCallId={dialogs.pendingApproval.toolCallId}
-					toolName={dialogs.pendingApproval.toolName}
-					args={dialogs.pendingApproval.args}
-					category={dialogs.pendingApproval.category}
-					categoryLabel={dialogs.pendingApproval.categoryLabel}
-					onApprove={dialogs.handleApprove}
-					onDecline={dialogs.handleDecline}
-					onAlwaysAllow={dialogs.handleAlwaysAllow}
-				/>
-			)}
-
 			{dialogs.pendingQuestion && (
 				<AskQuestionDialog
 					questionId={dialogs.pendingQuestion.questionId}

@@ -45,36 +45,77 @@ export function useDialogManager() {
 		modeId: string
 	} | null>(null)
 
-	const handleApprove = useCallback(
-		async (toolCallId: string) => {
-			const threadId = pendingApproval?.threadId
-			await window.api.invoke({ type: "approveToolCall", toolCallId, threadId })
-			setPendingApproval(null)
+	const handleRespondToApproval = useCallback(
+		async (options: {
+			decision: "approve" | "decline"
+			scope?: "once" | "conversation" | "project" | "global"
+			toolCallId?: string
+			threadId?: string
+			toolName?: string
+			category?: string | null
+			args?: unknown
+			reason?: string
+		}) => {
+			const toolCallId = options.toolCallId || pendingApproval?.toolCallId
+			const threadId = options.threadId || pendingApproval?.threadId
+			if (!toolCallId) return
+			await window.api.invoke({
+				type: "respondToToolApproval",
+				decision: options.decision,
+				scope: options.scope ?? "once",
+				toolCallId,
+				threadId,
+				toolName: options.toolName || pendingApproval?.toolName,
+				category:
+					options.category !== undefined
+						? options.category
+						: pendingApproval?.category,
+				args: options.args !== undefined ? options.args : pendingApproval?.args,
+				...(options.reason ? { reason: options.reason } : {}),
+			})
+			setPendingApproval((prev) => {
+				if (!prev || prev.toolCallId === toolCallId) return null
+				return prev
+			})
 		},
 		[pendingApproval],
+	)
+
+	const handleApprove = useCallback(
+		async (toolCallId: string, threadId?: string) => {
+			await handleRespondToApproval({
+				decision: "approve",
+				scope: "once",
+				toolCallId,
+				threadId,
+			})
+		},
+		[handleRespondToApproval],
 	)
 
 	const handleDecline = useCallback(
-		async (toolCallId: string) => {
-			const threadId = pendingApproval?.threadId
-			await window.api.invoke({ type: "declineToolCall", toolCallId, threadId })
-			setPendingApproval(null)
+		async (toolCallId: string, threadId?: string) => {
+			await handleRespondToApproval({
+				decision: "decline",
+				scope: "once",
+				toolCallId,
+				threadId,
+			})
 		},
-		[pendingApproval],
+		[handleRespondToApproval],
 	)
 
 	const handleAlwaysAllow = useCallback(
-		async (toolCallId: string, category: string) => {
-			const threadId = pendingApproval?.threadId
-			await window.api.invoke({
-				type: "approveToolCallAlwaysCategory",
+		async (toolCallId: string, category: string, threadId?: string) => {
+			await handleRespondToApproval({
+				decision: "approve",
+				scope: "project",
 				toolCallId,
 				category,
 				threadId,
 			})
-			setPendingApproval(null)
 		},
-		[pendingApproval],
+		[handleRespondToApproval],
 	)
 
 	const handleQuestionResponse = useCallback(
@@ -201,6 +242,7 @@ export function useDialogManager() {
 		setActiveGraphNode,
 		handleOpenGraphViewer,
 		handleCloseGraphViewer,
+		handleRespondToApproval,
 		handleApprove,
 		handleDecline,
 		handleAlwaysAllow,

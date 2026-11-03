@@ -51,6 +51,17 @@ interface MainContentProps {
 	onDeleteQueued: QueueHandlers["handleDeleteQueued"]
 	onReorderQueue: QueueHandlers["handleReorderQueue"]
 	onClearQueue: QueueHandlers["handleClearQueue"]
+	threadsWithApproval?: Map<string, any>
+	pendingApproval?: any
+	onRespondApproval?: (options: {
+		decision: "approve" | "decline"
+		scope: "once" | "conversation" | "project" | "global"
+		toolCallId: string
+		threadId?: string
+		toolName?: string
+		category?: string | null
+		args?: unknown
+	}) => void
 }
 
 const isChatTab = (tab: string) => tab === "chat" || tab.startsWith("thread:")
@@ -267,6 +278,12 @@ export function MainContent(props: MainContentProps) {
 	const activeTab = tabs.activeTab
 	const fileTabOpen = !isChatTab(activeTab) && activeTab !== "settings"
 
+	const activeApproval =
+		props.threadsWithApproval?.get(props.activeThreadKey) ||
+		(props.pendingApproval?.threadId === props.activeThreadKey
+			? props.pendingApproval
+			: null)
+
 	return (
 		<>
 			<div
@@ -330,6 +347,8 @@ export function MainContent(props: MainContentProps) {
 					onSelectPermissionMode={props.onSelectPermissionMode}
 					projectRootPath={props.project.projectInfo?.rootPath ?? null}
 					openFiles={props.tabs.openFiles}
+					pendingApproval={activeApproval}
+					onRespondApproval={props.onRespondApproval}
 				/>
 			</div>
 

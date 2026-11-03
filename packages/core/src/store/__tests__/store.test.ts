@@ -503,4 +503,52 @@ describe("src/store - Native SQLiteStore Implementation", () => {
 			expect(recalledContent).toBe("Hello from native Memory via SQLiteStore!")
 		})
 	})
+
+	describe("Tool Approval Records", () => {
+		it("records and lists tool approvals by thread", async () => {
+			const mem = await store.getStore("memory")
+			const thread = await mem.saveThread({
+				thread: {
+					id: "thread-approval-1",
+					resourceId: "res-app",
+					title: "Approval Session",
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			})
+
+			const rec1 = await mem.recordToolApproval({
+				threadId: thread.id,
+				toolCallId: "call_123",
+				toolName: "execute_command",
+				args: { command: "curl -s http://localhost:3888/a2a" },
+				category: "bash",
+				decision: "approve",
+				scope: "conversation",
+			})
+
+			expect(rec1.id).toBeDefined()
+			expect(rec1.tool_name).toBe("execute_command")
+			expect(rec1.decision).toBe("approve")
+			expect(rec1.scope).toBe("conversation")
+
+			const rec2 = await mem.recordToolApproval({
+				threadId: thread.id,
+				toolCallId: "call_456",
+				toolName: "delete_file",
+				args: { path: "/tmp/foo" },
+				category: "fs",
+				decision: "decline",
+				scope: "once",
+			})
+
+			expect(rec2.decision).toBe("decline")
+
+			const list = await mem.listToolApprovals(thread.id)
+			expect(list).toHaveLength(2)
+			expect(list[0].tool_call_id).toBe("call_123")
+			expect(list[1].tool_call_id).toBe("call_456")
+			expect(list[1].decision).toBe("decline")
+		})
+	})
 })

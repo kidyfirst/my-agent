@@ -65,4 +65,19 @@ CREATE TABLE IF NOT EXISTS myagent_observational_memory (
 
 CREATE INDEX IF NOT EXISTS idx_om_lookup_key 
   ON myagent_observational_memory (lookupKey);
+
+CREATE TABLE IF NOT EXISTS myagent_tool_approvals (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL,
+  tool_call_id TEXT NOT NULL,
+  tool_name TEXT NOT NULL,
+  args TEXT,
+  category TEXT,
+  decision TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tool_approvals_thread_created_at 
+  ON myagent_tool_approvals (thread_id, created_at);
 `

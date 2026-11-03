@@ -44,14 +44,35 @@ function findHarnessForApproval(
 
 export function getPermissionHandlers(): Record<string, IpcCommandHandler> {
 	return {
+		respondToToolApproval: async (command, ctx) => {
+			findHarnessForApproval(
+				ctx as any,
+				command.threadId,
+			)?.respondToToolApproval({
+				decision: command.decision ?? "approve",
+				scope: command.scope ?? "once",
+				toolCallId: command.toolCallId,
+				threadId: command.threadId,
+				toolName: command.toolName,
+				category: command.category,
+				args: command.args,
+				...(command.reason
+					? { declineContext: { reason: command.reason } }
+					: {}),
+			})
+		},
 		approveToolCall: async (command, ctx) => {
 			findHarnessForApproval(
 				ctx as any,
 				command.threadId,
 			)?.respondToToolApproval({
 				decision: "approve",
+				scope: command.scope ?? "once",
 				toolCallId: command.toolCallId,
 				threadId: command.threadId,
+				toolName: command.toolName,
+				category: command.category,
+				args: command.args,
 			})
 		},
 		declineToolCall: async (command, ctx) => {
@@ -60,8 +81,12 @@ export function getPermissionHandlers(): Record<string, IpcCommandHandler> {
 				command.threadId,
 			)?.respondToToolApproval({
 				decision: "decline",
+				scope: "once",
 				toolCallId: command.toolCallId,
 				threadId: command.threadId,
+				toolName: command.toolName,
+				category: command.category,
+				args: command.args,
 				...(command.reason
 					? { declineContext: { reason: command.reason } }
 					: {}),

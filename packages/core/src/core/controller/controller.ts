@@ -19,6 +19,7 @@ import {
 	DEFAULT_EXECUTION_MODE,
 	type GraphExecutionContext,
 } from "../graph/index.js"
+import { setRuntimeCategoryPolicy } from "../../permissions.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
 export type ToolCategory =
@@ -895,19 +896,25 @@ export class Session<TState = any> {
 
 	respondToToolApproval(opts: {
 		decision?: "approve" | "decline" | "always_allow_category" | string
+		scope?: "once" | "conversation" | "project" | "global" | string
 		toolCallId: string
 		threadId?: string
+		toolName?: string
+		category?: string
+		args?: any
 		requestContext?: any
 		declineContext?: any
 	}): void {
 		let resolver: ((decision: "approve" | "decline") => void) | undefined
 		let resolvedThreadId = opts.threadId
+		let matchedItem: any = null
 
 		if (opts.threadId && this._threadRuns.has(opts.threadId)) {
 			const tr = this._threadRuns.get(opts.threadId)!
 			const item = tr.pendingApprovals.get(opts.toolCallId)
 			if (item) {
 				resolver = item.resolve
+				matchedItem = item
 				tr.pendingApprovals.delete(opts.toolCallId)
 			}
 		} else {
@@ -915,6 +922,7 @@ export class Session<TState = any> {
 				const item = tr.pendingApprovals.get(opts.toolCallId)
 				if (item) {
 					resolver = item.resolve
+					matchedItem = item
 					resolvedThreadId = tId
 					tr.pendingApprovals.delete(opts.toolCallId)
 					break
@@ -929,12 +937,75 @@ export class Session<TState = any> {
 
 		if (resolver) {
 			const dec = opts.decision === "decline" ? "decline" : "approve"
+			const toolName = opts.toolName || matchedItem?.toolName || ""
+			const category = opts.category || matchedItem?.category || ""
+			const args = opts.args !== undefined ? opts.args : matchedItem?.args
+			const scope =
+				opts.scope ||
+				(opts.decision === "always_allow_category" ? "project" : "once")
+
+			// Handle permission grants based on scope
+			if (dec === "approve") {
+				if (scope === "conversation") {
+					if (toolName) this.grantTool(toolName)
+					if (category) this.grantCategory(category as any)
+				} else if (scope === "project") {
+					if (toolName) {
+						this._toolPolicies[toolName] = "allow"
+						this.grantTool(toolName)
+					}
+					if (category) {
+						this._categoryPolicies[category] = "allow"
+						this.grantCategory(category as any)
+					}
+				} else if (scope === "global") {
+					if (toolName) {
+						this._toolPolicies[toolName] = "allow"
+						this.grantTool(toolName)
+					}
+					if (category) {
+						setRuntimeCategoryPolicy(category as any, "allow")
+						this._categoryPolicies[category] = "allow"
+						this.grantCategory(category as any)
+					}
+				} else if (opts.decision === "always_allow_category" && category) {
+					this.grantCategory(category as any)
+				}
+			}
+
 			resolver(dec)
+
+			// Record approval decision to database store
+			const targetThreadId = resolvedThreadId || this._currentThreadId
+			if (targetThreadId) {
+				this.getMemoryStore()
+					.then((store) => {
+						if (
+							store &&
+							typeof (store as any).recordToolApproval === "function"
+						) {
+							;(store as any)
+								.recordToolApproval({
+									threadId: targetThreadId,
+									toolCallId: opts.toolCallId,
+									toolName: toolName || "unknown_tool",
+									args,
+									category: category || null,
+									decision: dec,
+									scope,
+								})
+								.catch(() => {})
+						}
+					})
+					.catch(() => {})
+			}
+
 			this.emit({
 				type: "tool_approval_resolved" as any,
-				threadId: resolvedThreadId || this._currentThreadId,
+				threadId: targetThreadId,
 				toolCallId: opts.toolCallId,
 				decision: dec,
+				scope,
 			} as any)
 		}
 	}

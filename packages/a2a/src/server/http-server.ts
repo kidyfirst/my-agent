@@ -2,6 +2,7 @@ import http, { type IncomingMessage, type ServerResponse } from "node:http"
 import type { MyAgentHarness } from "@my-agent/core"
 import { A2ARouter } from "./router.js"
 import { handleSSEStream } from "./sse.js"
+import { getLoopbackOrigin } from "./cors.js"
 import { createAgentCard } from "../card.js"
 
 export interface StartA2AServerOptions {
@@ -46,15 +47,20 @@ export function createA2ARequestHandler(
 		onSwitchProject,
 		onProjectListChanged,
 	})
-
 	return async (req: IncomingMessage, res: ServerResponse) => {
-		// CORS headers
-		res.setHeader("Access-Control-Allow-Origin", "*")
-		res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
-		res.setHeader(
-			"Access-Control-Allow-Headers",
-			"Content-Type, Authorization, X-Requested-With",
-		)
+		// CORS is limited to the loopback origins the desktop UI itself runs on.
+		// A wildcard here would let any web page reach this server, which can
+		// execute tools and rewrite the workspace.
+		const origin = getLoopbackOrigin(req.headers.origin)
+		if (origin) {
+			res.setHeader("Access-Control-Allow-Origin", origin)
+			res.setHeader("Vary", "Origin")
+			res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+			res.setHeader(
+				"Access-Control-Allow-Headers",
+				"Content-Type, Authorization, X-Requested-With",
+			)
+		}
 
 		if (req.method === "OPTIONS") {
 			res.writeHead(204)

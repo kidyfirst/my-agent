@@ -100,48 +100,61 @@
     - [核心设计原则](#核心设计原则)
   - [2. 进程划分与通信机制](#2-进程划分与通信机制)
   - [3. 核心模块实现说明](#3-核心模块实现说明)
-    - [3.1 主进程层 (`src/electron/`)](#31-主进程层-srcelectron)
-    - [3.2 预加载与桥接层 (`src/electron/preload.ts`)](#32-预加载与桥接层-srcelectronpreloadts)
-    - [3.3 渲染进程 UI 层 (`src/renderer/`)](#33-渲染进程-ui-层-srcrenderer)
+    - [3.1 主进程层 (`apps/desktop/src/electron/`)](#31-主进程层-appsdesktopsrcelectron)
+    - [3.2 预加载与桥接层 (`apps/desktop/src/electron/preload.ts`)](#32-预加载与桥接层-appsdesktopsrcelectronpreloadts)
+    - [3.3 渲染进程 UI 层 (`apps/desktop/src/renderer/`)](#33-渲染进程-ui-层-appsdesktopsrcrenderer)
       - [3.3.1 ChatView 渲染管线](#331-chatview-渲染管线)
       - [3.3.2 运行中与已结束两种展示形态](#332-运行中与已结束两种展示形态)
       - [3.3.3 用户消息吸顶与折叠](#333-用户消息吸顶与折叠)
       - [3.3.4 变更文件卡片与子智能体卡片](#334-变更文件卡片与子智能体卡片)
       - [3.3.5 滚动、空态与层叠](#335-滚动空态与层叠)
-    - [3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)](#34-agent-运行与能力层-智能体引擎--srctools)
-      - [3.4.1 核心运行时对象体系 (Harness / HarnessProxy / ActiveSession / Agent)](#341-核心运行时对象体系-harness--harnessproxy--activesession--agent)
+    - [3.4 Agent 运行与能力层 (智能体引擎 / `packages/core/`)](#34-agent-运行与能力层-智能体引擎--packagescore)
+      - [3.4.1 核心运行时对象体系 (AgentController / Session / Agent / HarnessProxy)](#341-核心运行时对象体系-agentcontroller--session--agent--harnessproxy)
         - [1. 四大核心实体的职责边界与类定义契约](#1-四大核心实体的职责边界与类定义契约)
         - [2. 核心类与接口定义结构](#2-核心类与接口定义结构)
-          - [(1) `Agent` 类定义（\[`src/core/agent/agent.ts`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/agent/agent.ts)）](#1-agent-类定义srccoreagentagenttsfileuserstimlyugitcodegithubmastra-code-uisrccoreagentagentts)
-          - [(2) `Harness` / `AgentController` 类定义（\[`src/core/controller/controller.ts`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts)）](#2-harness--agentcontroller-类定义srccorecontrollercontrollertsfileuserstimlyugitcodegithubmastra-code-uisrccorecontrollercontrollerts)
-          - [(3) `ActiveSession` (`Session<TState>`) 类定义（\[`src/core/controller/controller.ts:296`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts#L296)）](#3-activesession-sessiontstate-类定义srccorecontrollercontrollerts296fileuserstimlyugitcodegithubmastra-code-uisrccorecontrollercontrollertsl296)
-          - [(4) `HarnessProxy` 与 `adapter` 门面（\[`src/harness/index.ts`\](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/harness/index.ts)）](#4-harnessproxy-与-adapter-门面srcharnessindextsfileuserstimlyugitcodegithubmastra-code-uisrcharnessindexts)
+          - [(1) `Agent` 类定义（`packages/core/src/core/agent/agent.ts`）](#1-agent-类定义packagescoresrccoreagentagentts)
+          - [(2) `AgentController` 类定义（`packages/core/src/core/controller/controller.ts`）](#2-agentcontroller-类定义packagescoresrccorecontrollercontrollerts)
+          - [(3) `Session` (`ActiveSession`) 类定义（`packages/core/src/core/controller/controller.ts`）](#3-session-activesession-类定义packagescoresrccorecontrollercontrollerts324)
+          - [(4) `HarnessProxy` 与 `adapter` 门面（`packages/core/src/harness/index.ts`）](#4-harnessproxy-与-adapter-门面packagescoresrcharnessindexts)
         - [3. 为什么要在 `adapter` 外包裹一层 `Proxy`？](#3-为什么要在-adapter-外包裹一层-proxy)
       - [3.4.2 存储引擎与数据库持久化](#342-存储引擎与数据库持久化)
       - [3.4.3 观察性记忆 (Observational Memory)](#343-观察性记忆-observational-memory)
       - [3.4.4 Agent ReAct 循环机制与工具流](#344-agent-react-循环机制与工具流)
-      - [3.4.5 扩展工具生态与沙箱安全 (`src/tools/`, `src/lsp/`, `src/browser/`)](#345-扩展工具生态与沙箱安全-srctools-srclsp-srcbrowser)
+      - [3.4.5 扩展工具生态与沙箱安全 (`packages/core/src/tools/`, `lsp/`, `browser/`)](#345-扩展工具生态与沙箱安全-packagescoresrctools-lsp-browser)
       - [3.4.6 分级子智能体 (Subagents)](#346-分级子智能体-subagents)
-      - [3.4.7 执行模式与图调度 (`src/core/graph/`)](#347-执行模式与图调度-srccoregraph)
-      - [3.4.8 会话录制与离线回放 (`src/core/recorder/`)](#348-会话录制与离线回放-srccorerecorder)
-    - [3.5 Memory 记忆模块 (`src/memory/`)](#35-memory-记忆模块-srcmemory)
+      - [3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)](#347-执行模式与图调度-packagescoresrccoregraph)
+      - [3.4.8 会话录制与离线回放 (`packages/core/src/core/recorder/`)](#348-会话录制与离线回放-packagescoresrccorerecorder)
+    - [3.5 Memory 记忆模块 (`packages/core/src/memory/`)](#35-memory-记忆模块-packagescoresrcmemory)
       - [3.5.1 类继承关系与职责边界](#351-类继承关系与职责边界)
       - [3.5.2 存储域适配与线程/消息 CRUD](#352-存储域适配与线程消息-crud)
       - [3.5.3 Observational Memory 参数与触发阈值](#353-observational-memory-参数与触发阈值)
       - [3.5.4 动态 Memory 工厂与模型热切换](#354-动态-memory-工厂与模型热切换)
       - [3.5.5 分词估算与 Working Memory 空实现](#355-分词估算与-working-memory-空实现)
       - [3.5.6 配置入口与测试覆盖](#356-配置入口与测试覆盖)
+    - [3.6 A2A 协议服务 (`packages/a2a/`)](#36-a2a-协议服务-packagesa2a)
+    - [3.7 CLI 命令行与本地守护进程 (`packages/cli/`)](#37-cli-命令行与本地守护进程-packagescli)
   - [4. 核心业务与数据流时序](#4-核心业务与数据流时序)
     - [4.1 用户消息、思考链与执行块流式时序](#41-用户消息思考链与执行块流式时序)
     - [4.2 工具调用审批与人机协同流程](#42-工具调用审批与人机协同流程)
     - [4.3 Git Worktree 多会话隔离机制](#43-git-worktree-多会话隔离机制)
-  - [5. 源码目录结构映射](#5-源码目录结构映射)
+    - [4.4 A2A 远程会话驱动桌面工作区](#44-a2a-远程会话驱动桌面工作区)
+  - [5. 多包目录结构映射](#5-多包目录结构映射)
 
 ---
 
 ## 1. 整体架构设计
 
-项目采用典型的 **四层分层架构**，由上至下分别为 **UI 渲染表现层**、**安全桥接层**、**主进程调度层** 以及 **Agent 运行时引擎**：
+项目以 **pnpm workspace 多包仓库（monorepo）** 组织，分为 `apps/*`（可执行应用）与 `packages/*`（可复用库）两部分：
+
+| 包                  | 路径             | 职责                                                   |
+| :------------------ | :--------------- | :----------------------------------------------------- |
+| `my-agent`（根）    | `./`             | 构建编排、Electron 打包配置、发布脚本                  |
+| `@my-agent/desktop` | `apps/desktop/`  | Electron 桌面客户端（主进程 / preload / React 渲染层） |
+| `@my-agent/core`    | `packages/core/` | 无头智能体引擎：图调度、控制器、Harness、存储、工具集  |
+| `@my-agent/a2a`     | `packages/a2a/`  | Agent-to-Agent（A2A）JSON-RPC 服务端 / 客户端          |
+| `@my-agent/cli`     | `packages/cli/`  | 命令行入口与本地守护进程（daemon）                     |
+
+在运行时，项目采用典型的 **四层分层架构**，由上至下分别为 **UI 渲染表现层**、**安全桥接层**、**主进程调度层** 以及 **Agent 运行时引擎**：
 
 ```mermaid
 flowchart TD
@@ -158,13 +171,14 @@ flowchart TD
 
     subgraph Main ["3. 主进程调度层 (Electron Main Process)"]
         WindowMgr["窗口与生命周期 (main.ts)"]
-        IPCRegistry["IPC 分发中心 (src/electron/ipc/)"]
+        IPCRegistry["IPC 分发中心 (apps/desktop/src/electron/ipc/)"]
         SessionMgr["WorktreeSession / ElectronState (多工作区分离)"]
         PtyService["node-pty 终端服务"]
         PermService["权限策略引擎 (permissions.ts)"]
+        A2AService["A2A 服务托管 (a2a-handlers.ts)"]
     end
 
-    subgraph AgentRuntime ["4. Agent 运行与能力引擎 (智能体引擎 / MyAgent Core)"]
+    subgraph AgentRuntime ["4. Agent 运行与能力引擎 (@my-agent/core)"]
         Harness["Harness 编排与事件总线"]
         ModeGraph["执行模式图调度 (ReAct / Plan & Solve / Fast)"]
         ReActLoop["Agent ReAct 自主循环 (maxSteps: 1000)"]
@@ -175,9 +189,17 @@ flowchart TD
         Recorder["录制 / 回放引擎 (JSONL, ReplayLanguageModel)"]
     end
 
+    subgraph External ["外部入口"]
+        A2A["@my-agent/a2a<br/>JSON-RPC / SSE"]
+        CLI["@my-agent/cli<br/>serve / chat / run"]
+    end
+
     Hooks <--> |"window.api 上下文隔离"| ContextBridge
     IPCTunnel <--> |"IPC 双向消息通道"| IPCRegistry
     IPCRegistry <--> |"Harness 调度与事件总线"| Harness
+    A2AService --> A2A
+    A2A <--> |"复用同一 Harness 实例"| Harness
+    CLI <--> |"daemon 内持有 Harness"| Harness
     Harness --> ModeGraph
     ModeGraph --> ReActLoop
     Harness --> Recorder
@@ -191,6 +213,8 @@ flowchart TD
 4. **长上下文动态记忆压缩（Observational Memory）**：内置观察者与反思者模型，动态压缩长对话中的大量工具调用日志，防止上下文超出模型限制。
 5. **模式即执行图（Mode as Graph）**：ReAct / Plan & Solve / Fast 三套执行模式分别对应独立的图定义，切模式即换整张调度图与工具集，而非只改提示词。
 6. **可录制、可回放（Record & Replay）**：每次运行可落盘为紧凑 JSONL，回放时不触网、不落盘改动，配合运行时快照完整还原当时的模型、模式与权限上下文。
+7. **引擎与外壳解耦（Headless Core）**：`@my-agent/core` 不依赖 Electron，桌面端、A2A 服务与 CLI 守护进程共用同一套 `Harness` 实例与工具集，新增模型、工具或执行模式只需改一处。
+8. **本地优先与回环绑定（Loopback Only）**：A2A 与 CLI 守护进程默认只监听 `127.0.0.1`，CORS 仅对回环来源回显，避免任意网页驱动本地工具执行。
 
 ---
 
@@ -210,38 +234,42 @@ Electron 体系中进程通信采用强类型的 IPC 约定：
 
 ## 3. 核心模块实现说明
 
-### 3.1 主进程层 (`src/electron/`)
+### 3.1 主进程层 (`apps/desktop/src/electron/`)
 
 主进程负责操作系统的原生能力对接、窗口管理、会话生命周期维护与安全分发。
 
-- **窗口控制与入口 (`src/electron/main.ts`)**
+- **窗口控制与入口 (`apps/desktop/src/electron/main.ts`)**
   - 调用 `createWindow()` 实例化主窗口，配置 `webPreferences`（关闭 `nodeIntegration`，启用 `contextIsolation` 与 `preload`）。
   - 区分环境加载：开发环境读取 `process.env.ELECTRON_RENDERER_URL`（连接 Vite 开发服务器支持热更新）；生产环境通过 `mainWindow.loadFile` 加载打包后的 `dist/renderer/index.html`。
   - 注册应用全局菜单、macOS Dock 图标、外部链接拦截。
-- **IPC 命令调度中心 (`src/electron/ipc/`)**
-  主进程采用模块化 Handler 设计，在 `src/electron/ipc/index.ts` 中统合分发：
+- **IPC 命令调度中心 (`apps/desktop/src/electron/ipc/`)**
+  主进程采用模块化 Handler 设计，在 `apps/desktop/src/electron/ipc/index.ts` 中统合分发（21 个子模块）：
   - `harness-handlers.ts`：处理对话消息（`sendMessage`）、任务中断（`abort`）、用户插话（`steer`）、追加任务（`followUp`）、模式/模型切换。
   - `project-handlers.ts`：项目探测、工作区打开、Git Worktree 会话生命周期管理与多工程切换。
-  - `permission-handlers.ts`：工具调用审批拦截（同意、拒绝、按类别永久放行）与人机交互问题应答（`ask_question` / `plan_approval`）。
+  - `repo-handlers.ts`：仓库级操作（最近项目列表、项目级设置与清理）。
+  - `permission-handlers.ts`：工具调用审批统一入口 `respondToToolApproval`（含 `decision` / `scope` / `toolCallId`），兼容 `approveToolCall` / `declineToolCall`，并处理人机交互问题应答（`ask_question` / `plan_approval`）。
   - `pty-handlers.ts`：基于 `node-pty` 实现底层伪终端实例的创建、标准输入输出流中继与终端窗口尺寸重置（Resize）。
   - `git-handlers.ts`：处理本地 Git 仓库状态检查、Diff 生成、分支拉取与切换。
-  - `file-handlers.ts`：为前端编辑器面板提供受控的本地文件读取服务。
+  - `file-handlers.ts` / `context-handlers.ts`：为前端编辑器面板提供受控的本地文件读取与上下文（`@` 文件引用）解析服务。
   - `mcp-handlers.ts`：管理 Model Context Protocol（MCP）服务器连接、状态监控与外部工具重载。
   - `settings-handlers.ts`：配置持久化（Thinking 深度等级、通知模式、AST 智能编辑开关等）。
   - `integration-handlers.ts`：负责 Linear 与 GitHub 双向集成（工单拉取、关联提交、状态联动）。
   - `auth-handlers.ts`：Anthropic 及 OpenAI OAuth 鉴权流程控制。
   - `dashboard-handlers.ts`：汇总跨会话的 Token 消耗、执行耗时与任务指标。
-- **状态隔离与集成上下文 (`src/electron/electron-state.ts`)**
+  - `a2a-handlers.ts`：托管内置 A2A 服务（`a2a:start` / `a2a:stop` / `a2a:status`），把远程请求路由到当前激活的 `Harness`，并在远程切换项目时同步桌面侧会话与侧边栏。
+  - `feedback-handlers.ts` / `logging-handlers.ts` / `update-handlers.ts` / `slash-command-handlers.ts`：用户反馈上报、日志采集、自动更新与 Slash 指令注入。
+- **状态隔离与集成上下文 (`apps/desktop/src/electron/electron-state.ts`)**
   - 为每个工作区路径维护一份 `ElectronState`，持久化记录关联的 Linear 任务 ID、GitHub PR 链接及专属凭证。
-- **系统原生通知 (`src/electron/notifications.ts`)**
+- **系统原生通知 (`apps/desktop/src/electron/notifications.ts`)**
   - 当主窗口处于非聚焦（后台）状态时，若 Agent 任务完成或需要人工审批，调用系统原生通知与声效提示。
+- **任务变更与快照**：`task-changes-store.ts` 记录每个任务的变更文件与 diff；`git-task-snapshot.ts` 在任务开始时打 Git 快照，支持一键回滚（`revertToGitSnapshot`）。
 
-### 3.2 预加载与桥接层 (`src/electron/preload.ts`)
+### 3.2 预加载与桥接层 (`apps/desktop/src/electron/preload.ts`)
 
 `preload.ts` 在页面 DOM 加载前执行，依托 `contextBridge` 为网页注入安全的 `window.api` 命名空间：
 
 ```ts
-// src/electron/preload.ts
+// apps/desktop/src/electron/preload.ts
 contextBridge.exposeInMainWorld("api", {
   invoke: (command) => ipcRenderer.invoke("harness:command", command),
   onEvent: (callback) => { ... },
@@ -253,21 +281,21 @@ contextBridge.exposeInMainWorld("api", {
 })
 ```
 
-配合 `src/renderer/types/ipc.ts` 中的 `declare global { interface Window { api: ElectronAPI } }`，实现全链路的 TypeScript 静态类型推断与代码自动补全。
+配合 `apps/desktop/src/renderer/types/ipc.ts` 中的 `declare global { interface Window { api: ElectronAPI } }`，实现全链路的 TypeScript 静态类型推断与代码自动补全。
 
-### 3.3 渲染进程 UI 层 (`src/renderer/`)
+### 3.3 渲染进程 UI 层 (`apps/desktop/src/renderer/`)
 
 基于 **React 19** + **Vite** 构建的高性能 IDE 级界面，采用单向数据流与响应式订阅驱动：
 
-- **渲染挂载入口 (`src/renderer/index.html` & `main.tsx`)**
+- **渲染挂载入口 (`apps/desktop/src/renderer/index.html` & `main.tsx`)**
   - `index.html` 提供 `#root` 挂载点，引入 ES Module `main.tsx`，将根组件 `<App />` 渲染到 DOM。
-- **事件消费与状态机 (`src/renderer/hooks/useHarnessEvents.ts` & `src/renderer/types/chat.ts`)**
+- **事件消费与状态机 (`apps/desktop/src/renderer/hooks/useHarnessEvents.ts` & `types/chat.ts`)**
   - 订阅 `window.api.onEvent`，拦截主进程推送的 Agent 运行时事件。
   - 通过 `useChatReducer` 状态机处理动作：
     - `AGENT_START` / `AGENT_END`：标记全局运行态与加载光标。
     - `MESSAGE_START` / `MESSAGE_UPDATE` / `MESSAGE_END`：流式累加 Token 并实时更新对应消息块。
     - `TOOL_START` / `TOOL_UPDATE` / `TOOL_END`：更新工具调用入参与返回结果。
-- **会话消息渲染组件族 (`src/renderer/components/`)**
+- **会话消息渲染组件族 (`apps/desktop/src/renderer/components/`)**
   - `ChatView.tsx`：会话渲染管线，负责把 `messages` 归并为「用户消息 / 执行块 / 助手回复 / 子智能体 / 系统提示」五类渲染项，并把同一轮的多段工具调用折叠成一个执行块。
   - `AssistantMessage.tsx`：助手正文渲染，`text` 块走 `react-markdown` 富文本 + 代码高亮，每个代码块带独立复制按钮。
   - `ExecutionBlock.tsx`：执行块（思维链 + 工具调用）的统一展示组件，运行中与已结束两种形态见 [3.3.2](#332-运行中与已结束两种展示形态)。
@@ -277,7 +305,8 @@ contextBridge.exposeInMainWorld("api", {
   - `TerminalPanel.tsx`：基于 `@xterm/xterm` 与 `@xterm/addon-fit` 实现的高性能 ANSI 终端仿真器。
   - `FileTree.tsx` / `FileEditor.tsx` / `DiffEditor.tsx`：文件树浏览、代码高亮查看与 Git 变更 Side-by-Side 差异对比。
   - `TaskBoard.tsx`：集成 Linear/GitHub 工单看板，支持将 issue 一键绑定当前分支开发。
-  - `ToolApprovalDialog.tsx` / `PlanApproval.tsx`：人机交互弹窗，拦截危险操作请求用户确认。
+  - `ToolApprovalCard.tsx` / `PlanApproval.tsx` / `AskQuestionDialog.tsx`：人机交互组件，详见 [4.2](#42-工具调用审批与人机协同流程)。
+  - `AppModals.tsx`：模态层统一装配（登录、提问、计划审批、设置、命令面板等）。
 
 #### 3.3.1 ChatView 渲染管线
 
@@ -325,7 +354,7 @@ contextBridge.exposeInMainWorld("api", {
 #### 3.3.4 变更文件卡片与子智能体卡片
 
 - **变更文件卡片 (`FilesChangedBar.tsx`)**：`message.changedFiles` 非空时挂在 assistant 消息尾部。头部一行是 `N files changed +X -Y`，点击整行展开；展开后每个文件显示 `basename` + 目录 + 增删行数，`Review` 按钮阻止冒泡并直接打开差异编辑器。行内 diff 懒加载（`getTaskFileDiff`，按 `messageId` 取），`isLive` 表示任务仍在执行。
-- **持久化 (`src/electron/task-changes-store.ts`)**：任务结束时的文件列表与 diff 写入 `<appData>/task-changes.json`（thread → message → files/diff，上限 40 个线程 × 80 个任务、单条 diff 200KB），重启后 `getMessages` 会重新挂回 `changedFiles`，删除线程时同步清理。
+- **持久化 (`packages/core/src/snapshot/task-changes-store.ts`)**：任务结束时的文件列表与 diff 写入 `<appData>/task-changes.json`（thread → message → files/diff，上限 40 个线程 × 80 个任务、单条 diff 200KB），重启后 `getMessages` 会重新挂回 `changedFiles`，删除线程时同步清理。
 - **子智能体卡片 (`SubagentExecution.tsx`)**：整行可点，`🏗️` + `Agent` + 任务描述 + 完成耗时 + ✓/✗/运行中脉冲点；展开后展示子智能体内部的工具调用与最终结果。
 
 #### 3.3.5 滚动、空态与层叠
@@ -335,11 +364,11 @@ contextBridge.exposeInMainWorld("api", {
 - **空态与进度**：无渲染项且 Agent 空闲时展示 `AsciiLogo`；存在 `todos` 时在列表底部渲染 `TodoProgress`；`system` 消息渲染为带 `System Notice` 标签的提示块；连续重复的用户消息按文本去重。
 - **层叠顺序**：吸顶卡片使用 `zIndex: 20`，所有可能下探到聊天区的浮层必须高于它——`OpenInDropdown` 为 400，编辑器内的模型/权限浮层为 200，命令面板与模态框为 1000 以上。
 
-### 3.4 Agent 运行与能力层 (智能体引擎 / `src/tools/`)
+### 3.4 Agent 运行与能力层 (智能体引擎 / `packages/core/`)
 
-项目通过自主研发的智能体运行时架构装配底层能力，由四大核心实体协同工作，实现模型交互、工具受控调用、多会话隔离与事件流式渲染。
+项目通过自主研发的智能体运行时架构装配底层能力，由四大核心实体协同工作，实现模型交互、工具受控调用、多会话隔离与事件流式渲染。这些实现全部位于无头包 `@my-agent/core` 中，桌面端（`apps/desktop`）、A2A 服务与 CLI 守护进程共享同一份代码。
 
-#### 3.4.1 核心运行时对象体系 (Harness / HarnessProxy / ActiveSession / Agent)
+#### 3.4.1 核心运行时对象体系 (AgentController / Session / Agent / HarnessProxy)
 
 在运行时架构中，上层（Electron IPC 处理器与前端 UI）并不直接操作单一复杂的底层类，而是通过一个经过代理包装的统一门面对象（`harness`）与整个系统交互。
 
@@ -364,18 +393,18 @@ graph TD
 
 ##### 1. 四大核心实体的职责边界与类定义契约
 
-| 核心实体                                | 源码位置                                                                                                                             | 核心定位与职责                                                                                                                                                                                               |
-| :-------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`Agent`**                             | [`src/core/agent/agent.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/agent/agent.ts)                              | **原子智能体能力封装体**。管理 System Instructions、Model 解析、Tools 列表注入与 Memory 关联，提供基础流式生成 `stream()`。                                                                                  |
-| **`Harness`** (`AgentController`)       | [`src/core/controller/controller.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts)          | **工作区级调度宿主与 Session 工厂**。持有全局存储（Storage）、持久化记忆（Memory）、模式（Modes）、子智能体注册表（Subagents），负责多 Session 生命周期管理。                                                |
-| **`ActiveSession`** (`Session<TState>`) | [`src/core/controller/controller.ts:296`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts#L296) | **有状态的单项目/工作区分支执行实例**。每个项目或 Git Worktree 对应一个独立的 Session。管理响应式状态、当前 Model/Mode、历史 Thread、工具审批门禁（`_pendingApprovals`），并承载主执行入口 `sendMessage()`。 |
-| **`HarnessProxy`** (`MyAgentHarness`)   | [`src/harness/index.ts:1096`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/harness/index.ts#L1096)                         | **高级多态门面代理**。通过 ES6 `Proxy` 动态聚合 `adapter`、`activeSession` 和 `controller`，对外提供全功能、动态延迟绑定、零样板转发的统一接口。                                                             |
+| 核心实体                              | 源码位置                                                                       | 核心定位与职责                                                                                                                                                                                               |
+| :------------------------------------ | :----------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`Agent`**                           | `packages/core/src/core/agent/agent.ts`                                        | **原子智能体能力封装体**。管理 System Instructions、Model 解析、Tools 列表注入与 Memory 关联，提供基础流式生成 `stream()`。                                                                                  |
+| **`AgentController`**                 | `packages/core/src/core/controller/controller.ts:119`                          | **工作区级调度宿主与 Session 工厂**。持有全局存储（Storage）、持久化记忆（Memory）、模式（Modes）、子智能体注册表（Subagents），负责多 Session 生命周期管理。                                                |
+| **`Session`** (`ActiveSession`)       | `packages/core/src/core/controller/controller.ts:324`                          | **有状态的单项目/工作区分支执行实例**。每个项目或 Git Worktree 对应一个独立的 Session。管理响应式状态、当前 Model/Mode、历史 Thread、工具审批门禁（`_pendingApprovals`），并承载主执行入口 `sendMessage()`。 |
+| **`HarnessProxy`** (`MyAgentHarness`) | `packages/core/src/harness/index.ts:1278`（`createMyAgent` 位于同文件 `:472`） | **高级多态门面代理**。通过 ES6 `Proxy` 动态聚合 `adapter`、`activeSession` 和 `controller`，对外提供全功能、动态延迟绑定、零样板转发的统一接口。                                                             |
 
 ---
 
 ##### 2. 核心类与接口定义结构
 
-###### (1) `Agent` 类定义（[`src/core/agent/agent.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/agent/agent.ts)）
+###### (1) `Agent` 类定义（`packages/core/src/core/agent/agent.ts`）
 
 ```typescript
 export class Agent {
@@ -416,7 +445,7 @@ export class Agent {
 }
 ```
 
-###### (2) `Harness` / `AgentController` 类定义（[`src/core/controller/controller.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts)）
+###### (2) `AgentController` 类定义（`packages/core/src/core/controller/controller.ts`）
 
 ```typescript
 export class AgentController<TState = any> {
@@ -442,7 +471,7 @@ export class AgentController<TState = any> {
 }
 ```
 
-###### (3) `ActiveSession` (`Session<TState>`) 类定义（[`src/core/controller/controller.ts:296`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/core/controller/controller.ts#L296)）
+###### (3) `Session` (`ActiveSession`) 类定义（`packages/core/src/core/controller/controller.ts:324`）
 
 ```typescript
 export class Session<TState = any> {
@@ -500,7 +529,7 @@ export class Session<TState = any> {
 }
 ```
 
-###### (4) `HarnessProxy` 与 `adapter` 门面（[`src/harness/index.ts`](file:///Users/timlyu/gitcode/github/mastra-code-ui/src/harness/index.ts)）
+###### (4) `HarnessProxy` 与 `adapter` 门面（`packages/core/src/harness/index.ts`）
 
 ```typescript
 // 1. adapter: 在会话之上封装高阶业务逻辑与存储兜底
@@ -575,7 +604,7 @@ const harness: MyAgentHarness = new Proxy(adapter, {
 - 实例化核心智能体 `codeAgent`，在 `harness.sendMessage()` 中配置 `maxSteps: 1000`。
 - 模型依据指令思考并自主决策调用工具；工具在宿主运行后将标准输出或异常反馈回模型，模型持续迭代直至完成整体任务。
 
-#### 3.4.5 扩展工具生态与沙箱安全 (`src/tools/`, `src/lsp/`, `src/browser/`)
+#### 3.4.5 扩展工具生态与沙箱安全 (`packages/core/src/tools/`, `lsp/`, `browser/`)
 
 - **基础代码工具**：`view`（查看代码）、`grep`（内容正则搜索）、`glob`（文件匹配）、`execute_command`（受控命令执行）、`write_file`（写文件）。
 - **AST 智能编辑**：`string_replace_lsp` 基于 LSP 协议实现精确的语法树级别代码替换。
@@ -591,7 +620,7 @@ const harness: MyAgentHarness = new Proxy(adapter, {
 - `plan`：只读规划子智能体，负责功能设计与实施方案梳理。
 - `execute`：写权限执行子智能体，执行具体代码修改并调用任务看板工具。
 
-#### 3.4.7 执行模式与图调度 (`src/core/graph/`)
+#### 3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)
 
 同一个模型、同一套工具，可以按任务性质切换三种**执行模式（Execution Mode）**。模式不是提示词开关，而是**整张执行图的替换**：每种模式注册一份独立的 `AgentGraphDefinition`（含拓扑描述 `topology` 与 `buildGraph(ctx)` 工厂），由 `modeId` 在运行时选择。
 
@@ -603,13 +632,13 @@ const harness: MyAgentHarness = new Proxy(adapter, {
 
 实现要点：
 
-- **枚举与别名**：`src/core/graph/types.ts` 定义 `ExecutionMode`（`REACT` / `FAST` / `PLAN`）；`GraphRegistry` 把 `build` 注册为 `react` 的别名（注册表自身的兜底 `defaultModeId` 仍是 `"build"`，最终解析到的就是 ReAct 图），因此旧的会话记录与录制文件不会失效。
+- **枚举与别名**：`packages/core/src/core/graph/types.ts` 定义 `ExecutionMode`（`REACT` / `FAST` / `PLAN`）；`GraphRegistry` 把 `build` 注册为 `react` 的别名（注册表自身的兜底 `defaultModeId` 仍是 `"build"`，最终解析到的就是 ReAct 图），因此旧的会话记录与录制文件不会失效。
 - **调度入口**：`Harness.sendMessage()` 依据 `modeId` 选择图定义并构建该次运行的 StateGraph，因此 `maxSteps`、可用工具集、是否输出计划都由模式决定（例如 Plan 模式额外挂载任务看板工具）。
 - **按线程记忆**：渲染层把所选模式存在 `modesByThread[threadKey]`，并与线程元数据一起持久化；切换线程会自动恢复成该线程上次使用的模式，不会出现「A 线程在 Plan、B 线程被一起改掉」。
-- **Fast 的只读边界**：Fast 图用 `selectReadOnlyTools()`（`src/core/graph/readonly-tools.ts`）按权限分类过滤工具——只保留 `read` 类，因此 `write_file` / `string_replace_lsp` / `ast_smart_edit` / `execute_command` / MCP 工具都不会出现在模型面前；同时 `describeToolNames("fast")` 只登记 `view` / `search_content` / `find_files` / `request_sandbox_access`，提示词与真实工具集不会漂移。图内以 `stopWhen: stepCountIs(8)` 允许少量工具回合后强制成文。
+- **Fast 的只读边界**：Fast 图用 `selectReadOnlyTools()`（`packages/core/src/core/graph/readonly-tools.ts`）按权限分类过滤工具——只保留 `read` 类，因此 `write_file` / `string_replace_lsp` / `ast_smart_edit` / `execute_command` / MCP 工具都不会出现在模型面前；同时 `describeToolNames("fast")` 只登记 `view` / `search_content` / `find_files` / `request_sandbox_access`，提示词与真实工具集不会漂移。图内以 `stopWhen: stepCountIs(8)` 允许少量工具回合后强制成文。
 - **可观测**：Agent Dashboard 与 Context 面板都会读 `modeId`，顶部状态条也实时显示当前模式；录制回放会把模式写进 `RecordedRuntime`，见下节。
 
-#### 3.4.8 会话录制与离线回放 (`src/core/recorder/`)
+#### 3.4.8 会话录制与离线回放 (`packages/core/src/core/recorder/`)
 
 把一次真实运行**完整录制成文件**，之后不调模型、不碰文件系统，原样重放整轮对话——用于问题复现、回归对比与演示。
 
@@ -638,9 +667,9 @@ src/core/recorder/
 - 进入回放时按 `RecordedRuntime` 还原模式与权限，并把会话授权注入，避免卡在等待一个不会到人的审批弹窗。
 - 界面上通过 `SessionReplayModal` 选择或拖放录制文件即可开始，回放中的标签页会显示 Replay 状态，可随时停止回到正常会话。
 
-### 3.5 Memory 记忆模块 (`src/memory/`)
+### 3.5 Memory 记忆模块 (`packages/core/src/memory/`)
 
-`src/memory/` 是项目自研的 `Memory` 实现：它继承 `src/core` 的 `MyAgentMemory`，把线程/消息持久化、上下文召回与观察性记忆（OM）压缩统一收敛到一个可直接注入 `AgentController` 的实例中。
+`packages/core/src/memory/` 是项目自研的 `Memory` 实现：它继承 `packages/core/src/core` 的 `MyAgentMemory`，把线程/消息持久化、上下文召回与观察性记忆（OM）压缩统一收敛到一个可直接注入 `AgentController` 的实例中。
 
 ```
 src/memory/
@@ -672,7 +701,7 @@ src/memory/
 
 #### 3.5.3 Observational Memory 参数与触发阈值
 
-OM 的开关与全部阈值集中在 `options.observationalMemory`，类型定义在 `src/memory/types.ts`，实际装配在 `src/harness/index.ts` 的 `getDynamicMemory`：
+OM 的开关与全部阈值集中在 `options.observationalMemory`，类型定义在 `packages/core/src/memory/types.ts`，实际装配在 `packages/core/src/harness/index.ts` 的 `getDynamicMemory`：
 
 ```ts
 observationalMemory: {
@@ -694,7 +723,7 @@ observationalMemory: {
 }
 ```
 
-- **`scope` 决定记忆可见范围**：`thread`（默认）每条会话独立观察与压缩；`resource` 则在同一 `resourceId` 的所有会话间共享观察记录。解析优先级见 `getOmScope()`（`src/utils/project.ts`）：`MYAGENT_OM_SCOPE` 环境变量 → 项目级 `<project>/.myagent/database.json` 的 `omScope` → 全局 `~/.myagent/database.json` → 默认 `thread`。
+- **`scope` 决定记忆可见范围**：`thread`（默认）每条会话独立观察与压缩；`resource` 则在同一 `resourceId` 的所有会话间共享观察记录。解析优先级见 `getOmScope()`（`packages/core/src/utils/project.ts`）：`MYAGENT_OM_SCOPE` 环境变量 → 项目级 `<project>/.myagent/database.json` 的 `omScope` → 全局 `~/.myagent/database.json` → 默认 `thread`。
 - **`bufferTokens`**：以「占 `messageTokens` 的比例」表示后台异步缓冲观察的间隔，`1/5` 即每积累到阈值的 20% 就在后台跑一次 Observer，把结果先存进缓冲区，真正越线时可直接激活而不阻塞。
 - **`bufferActivation`**：越线时激活多少比例的缓冲观察，小于 1 的部分保留到下一轮，用于维持对话连贯性。
 - **`blockAfter`**：允许「同步阻塞观察」的 token 阈值（取 `1 < x < 100` 时按 `messageTokens` 的倍数解析，取 `≥ 100` 时按绝对 token 数解析）。在 `messageTokens` 与 `blockAfter` 之间只跑异步缓冲，未观察消息最多可增长到 `blockAfter`（此处 `2 ×` ≈ 60k tokens）才插入一次同步观察，避免每个 Agent 步骤都被 LLM 观察调用拖慢。
@@ -709,7 +738,7 @@ observationalMemory: {
 2. 以 `` `${obsThreshold}:${refThreshold}:${omScope}` `` 作为缓存键：只要阈值与作用域不变就复用已构建的实例，避免每轮回调都重建。
 3. `observation.model` / `reflection.model` 写成闭包而非固定模型：调用时才读 `state.observerModelId ?? DEFAULT_OM_MODEL_ID`（Reflector 同理）并经 `resolveModel(..., { remapForCodexOAuth: true })` 解析，因此**运行中切换阈值或模型会立即生效**，无需重启会话。
 
-模型变更的三条入口都位于 `src/electron/helpers.ts`（切换主模型、自动升级模型、切换失败后的回退）：它们会同时把 `observerModelId` / `reflectorModelId` 与 `currentModelId` 一起写入 state，保持三者对齐；渲染层设置面板再通过 `setObserverModel` / `setReflectorModel` 命令 + `harness.switchObserverModel()` / `switchReflectorModel()` 单独覆盖。
+模型变更的三条入口都位于 `apps/desktop/src/electron/helpers.ts`（切换主模型、自动升级模型、切换失败后的回退）：它们会同时把 `observerModelId` / `reflectorModelId` 与 `currentModelId` 一起写入 state，保持三者对齐；渲染层设置面板再通过 `setObserverModel` / `setReflectorModel` 命令 + `harness.switchObserverModel()` / `switchReflectorModel()` 单独覆盖。
 
 #### 3.5.5 分词估算与 Working Memory 空实现
 
@@ -719,9 +748,59 @@ observationalMemory: {
 
 #### 3.5.6 配置入口与测试覆盖
 
-- **UI 配置**：设置面板 `src/renderer/components/settings/MemorySection.tsx` 提供 Observer 模型、Reflector 模型、Observation threshold、Reflection threshold 四项；阈值变化会改变缓存键，进而触发 Memory 实例重建。
-- **默认值**：`src/harness/state.ts` 中 `DEFAULT_OBS_THRESHOLD = 30_000`、`DEFAULT_REF_THRESHOLD = 40_000`、`DEFAULT_OM_MODEL_ID = process.env.DEFAULT_OM_MODEL_ID ?? DEFAULT_FALLBACK_MODEL_ID`。
-- **测试**：`src/memory/__tests__/memory.test.ts` 使用内存态 SQLite（`file::memory:`）覆盖线程 CRUD 与分页、消息保存/召回顺序、系统提醒与信号过滤、召回分页、OM 配置与 `settled()`、`cloneThread`，以及与 `AgentController` 的线程生命周期集成。
+- **UI 配置**：设置面板 `apps/desktop/src/renderer/components/settings/MemorySection.tsx` 提供 Observer 模型、Reflector 模型、Observation threshold、Reflection threshold 四项；阈值变化会改变缓存键，进而触发 Memory 实例重建。
+- **默认值**：`packages/core/src/harness/state.ts` 中 `DEFAULT_OBS_THRESHOLD = 30_000`、`DEFAULT_REF_THRESHOLD = 40_000`、`DEFAULT_OM_MODEL_ID = process.env.DEFAULT_OM_MODEL_ID ?? DEFAULT_FALLBACK_MODEL_ID`。
+- **测试**：`packages/core/src/memory/__tests__/memory.test.ts` 使用内存态 SQLite（`file::memory:`）覆盖线程 CRUD 与分页、消息保存/召回顺序、系统提醒与信号过滤、召回分页、OM 配置与 `settled()`、`cloneThread`，以及与 `AgentController` 的线程生命周期集成。
+
+### 3.6 A2A 协议服务 (`packages/a2a/`)
+
+`@my-agent/a2a` 把 `packages/core` 的 Harness 暴露为一套标准的 Agent-to-Agent 接口，使外部调用方（CLI、其它 Agent、桌面端自身）能以同一协议驱动会话。
+
+| 层         | 文件                                     | 职责                                                                                                                                   |
+| ---------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP 入口  | `packages/a2a/src/server/http-server.ts` | `startA2AServer()` 启动监听，`createA2ARequestHandler()` 产出可复用的请求处理器，`A2AServer` 类封装生命周期；默认监听 `127.0.0.1:3888` |
+| 路由分发   | `packages/a2a/src/server/router.ts`      | JSON-RPC 2.0 方法表分发，负责参数校验与错误码映射                                                                                      |
+| 流式推送   | `packages/a2a/src/server/sse.ts`         | `handleSSEStream()` 订阅 `harness.subscribe(...)`，将引擎事件以 `event: <name>` / `data: <json>` 逐条推给客户端                        |
+| 跨域策略   | `packages/a2a/src/server/cors.ts`        | 仅放行本机回环来源（`getLoopbackOrigin`），不使用通配符                                                                                |
+| Agent 名片 | `packages/a2a/src/card.ts`               | `createAgentCard()` 生成 `/.well-known/agent-card.json` 描述，声明 JSON-RPC 1.0 绑定与 streaming 能力                                  |
+| 客户端     | `packages/a2a/src/client/client.ts`      | 对端 SDK，封装 JSON-RPC 调用与 SSE 消费                                                                                                |
+
+**HTTP 端点**
+
+- `GET /.well-known/agent-card.json`（或 `/agent-card.json`）：Agent 能力名片
+- `GET /health`：健康检查
+- `GET /a2a/stream`：SSE 事件流
+- `POST /a2a`：JSON-RPC 主入口
+
+**JSON-RPC 方法集**
+
+| 方法                                                                 | 说明                                                                                  |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `projects/list` / `projects/create` / `projects/open`                | 项目枚举、创建与切换（`projects/open` 会触发 `onSwitchProject` 回调，同步桌面端会话） |
+| `threads/list` / `threads/create` / `threads/get` / `threads/delete` | 线程全生命周期 CRUD                                                                   |
+| `message/send` / `tasks/create`                                      | 发送用户消息、派生任务                                                                |
+| `tasks/get` / `tasks/cancel` / `tasks/revert`                        | 任务查询、取消与基于快照的回滚                                                        |
+| `approvals/list` / `approvals/submit`                                | 拉取待审批工具调用、提交审批结论（对应人机协同闭环）                                  |
+
+`startA2AServer()` 接受 `getHarness`、`onSwitchProject`、`onProjectListChanged` 三个钩子，使得远程会话切换项目时，桌面端能同步刷新侧边栏并重建 Harness，而不需要重启服务。
+
+### 3.7 CLI 命令行与本地守护进程 (`packages/cli/`)
+
+`@my-agent/cli` 提供 `my-agent` 可执行文件，把同一套引擎带到终端场景。它由两部分组成：
+
+- **命令层** `packages/cli/src/cli.ts`：解析 argv 并分发到 `packages/cli/src/commands/` 下的六个子命令。
+- **守护进程层** `packages/cli/src/daemon.ts`：`startDaemon()` 在后台托管一个 A2A 服务实例，并把 `{ pid, port, host, baseUrl, cwd, startedAt }` 写入 `getAppDataDir()/daemon.json`；读取时会用 `process.kill(pid, 0)` 探测进程存活，进程已死则视为无效残留。
+
+| 子命令    | 作用                                                         |
+| --------- | ------------------------------------------------------------ |
+| `serve`   | 前台启动守护进程与 A2A 服务（`--port` / `--host` / `--cwd`） |
+| `run`     | 一次性执行任务并返回结果                                     |
+| `chat`    | 交互式多轮对话                                               |
+| `project` | 项目枚举与切换                                               |
+| `thread`  | 线程的列出、创建、切换与删除                                 |
+| `status`  | 查看守护进程状态                                             |
+
+`packages/cli/src/client-runner.ts` 负责把命令翻译成 JSON-RPC 请求发给守护进程，因此 CLI 不直接持有 Harness —— 所有状态都集中在守护进程内，多个终端可以共享同一个会话上下文。
 
 ---
 
@@ -832,138 +911,237 @@ flowchart LR
 - 当切换或打开多个工作区时，主进程维护由项目根路径为键的 `sessions: Map<string, WorktreeSession>`。
 - 所有前后台通信事件均携带 `worktreePath` 标识，前端 Hook 会依据当前激活的工作区自动比对，杜绝后台会话消息错位串扰。
 
+### 4.4 A2A 远程会话驱动桌面工作区
+
+当外部客户端（CLI 或其它 Agent）通过 A2A 操作项目时，桌面端必须实时跟随，不能停留在旧项目上。链路如下：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as 远程客户端 (CLI / Agent)
+    participant Server as A2A 服务 (packages/a2a)
+    participant Main as 主进程 (a2a-handlers)
+    participant Renderer as 渲染进程
+
+    Client->>Server: POST /a2a  projects/open { path }
+    Server->>Server: router 校验参数
+    Server->>Main: onSwitchProject(path)
+    Main->>Main: 按 path 查找/创建 WorktreeSession 并切换当前 Harness
+    Main-->>Server: { harness }
+    Server->>Server: 切换到目标项目的 Harness 实例
+    Server->>Main: onProjectListChanged()
+    Main->>Renderer: 推送项目/会话列表变更
+    Renderer->>Renderer: 切换到对应项目 Tab 并刷新侧边栏
+    Server-->>Client: JSON-RPC result
+```
+
+- `getHarness` 钩子让路由层始终取到"当前项目"的 Harness，而不是启动时捕获的旧实例。
+- 事件流同样按项目路由：客户端订阅 `/a2a/stream` 后，收到的是当前 Harness 的事件；项目切换后流会继续跟随新实例。
+- 审批闭环跨端一致：远程发起的工具调用若需审批，会出现在 `approvals/list` 中，桌面端 `ToolApprovalCard` 与远程 `approvals/submit` 均可提交结论。
+
 ---
 
-## 5. 源码目录结构映射
+## 5. 多包目录结构映射
+
+仓库采用 pnpm workspace 的 monorepo 布局（`pnpm-workspace.yaml` 声明 `packages/*` 与 `apps/*`），自研引擎与协议层全部收拢到 `packages/`，桌面端作为唯一 `apps/` 消费方。
 
 ```
-src/
-├── core/                      # 自研智能体核心层 (Agent Runtime Core)
-│   ├── agent/                 # Agent 核心类定义与 streamText 流式执行管道
-│   ├── controller/            # AgentController 调度容器与 Session 会话类定义
-│   ├── context/               # RequestContext 请求生命周期上下文
-│   ├── tools/                 # 工具适配、参数校验与 JSON Schema 转换 (toModelTool)
-│   ├── memory/                # 核心 Memory 抽象类定义
-│   ├── llm/                   # 统一语言模型解析与动态包装
-│   ├── graph/                 # 执行模式图定义 (ReAct / Plan & Solve / Fast) 与调度
-│   ├── recorder/              # 会话录制 (JSONL) 与离线回放 (ReplayLanguageModel)
-│   ├── workspace/             # 工作区解析与环境抽象
-│   └── index.ts               # 核心层对外统一出口
+my-agent/
+├── apps/
+│   └── desktop/                   # Electron 桌面端 (唯一 GUI 外壳)
+│       └── src/
+│           ├── index.ts           # 桌面端统一导出
+│           ├── types.ts           # 跨进程共享类型
+│           ├── electron/          # 主进程层 (Main Process)
+│           │   ├── main.ts        # 应用生命周期、窗口创建、Harness 初始化与事件转接
+│           │   ├── preload.ts     # contextBridge 安全桥接注入
+│           │   ├── electron-state.ts    # 工作区维度集成状态 (Linear/GitHub 绑定)
+│           │   ├── notifications.ts     # 原生系统通知与角标
+│           │   ├── external-links.ts    # 外链安全拦截与系统浏览器分发
+│           │   ├── logging.ts           # 主进程日志落盘
+│           │   ├── helpers.ts           # OAuth 校验、对话标题自动生成
+│           │   ├── project-threads.ts       # 项目会话索引与持久化
+│           │   ├── project-thread-write.ts  # 会话写入通道
+│           │   ├── task-changes-store.ts    # 任务变更文件与 diff 持久化
+│           │   ├── git-task-snapshot.ts     # Git 变更快照
+│           │   ├── updater/       # 应用自更新检查与下载安装
+│           │   ├── __tests__/     # 主进程单元测试
+│           │   └── ipc/           # 19 个 IPC 业务子模块的路由装配
+│           │       ├── index.ts                  # 路由总装与分发入口
+│           │       ├── harness-handlers.ts       # 消息收发、模式与模型调度
+│           │       ├── project-handlers.ts       # 项目探测、Worktree 切换与会话构建
+│           │       ├── repo-handlers.ts          # 仓库信息与远程地址解析
+│           │       ├── permission-handlers.ts    # 权限校验、工具审批、提问拦截
+│           │       ├── a2a-handlers.ts           # A2A 服务启停与远程会话接入
+│           │       ├── pty-handlers.ts           # node-pty 伪终端生命周期与 I/O
+│           │       ├── git-handlers.ts           # Git 状态提取与代码差异对比
+│           │       ├── file-handlers.ts          # 文件只读读取与编辑器服务
+│           │       ├── context-handlers.ts       # 上下文文件/目录的增删与统计
+│           │       ├── integration-handlers.ts   # Linear / GitHub 双向集成协议
+│           │       ├── mcp-handlers.ts           # MCP 服务连接生命周期管理
+│           │       ├── settings-handlers.ts      # 应用偏好与模型参数持久化
+│           │       ├── auth-handlers.ts          # OAuth 凭证轮转与回调
+│           │       ├── dashboard-handlers.ts     # Token 统计与运行耗时聚合
+│           │       ├── slash-command-handlers.ts # Slash 指令加载与动态注入
+│           │       ├── feedback-handlers.ts      # 消息反馈上报
+│           │       ├── logging-handlers.ts       # 渲染进程日志转发
+│           │       ├── update-handlers.ts        # 版本检查与更新状态
+│           │       └── types.ts                  # IPC 契约类型
+│           └── renderer/          # 渲染进程 UI 层 (React 19 + TypeScript + Vite)
+│               ├── index.html     # 页面承载入口
+│               ├── main.tsx       # React 挂载入口
+│               ├── App.tsx        # 顶层布局骨架、快捷键注册与状态装配
+│               ├── components/    # UI 面板与交互组件
+│               │   ├── ChatView.tsx           # 会话渲染管线：消息分组、一轮一个执行块
+│               │   ├── AssistantMessage.tsx   # 助手正文渲染 (Markdown / 代码高亮)
+│               │   ├── ExecutionBlock.tsx     # 执行块：Working for … / Worked for …
+│               │   ├── UserMessage.tsx        # 用户消息气泡：吸顶、折叠、图片预览
+│               │   ├── ToolExecution.tsx      # 工具执行状态卡片
+│               │   ├── ToolApprovalCard.tsx   # 工具审批卡片 (once/conversation/project/global 四级作用域)
+│               │   ├── SubagentExecution.tsx  # 子 Agent 执行嵌套可视化
+│               │   ├── FilesChangedBar.tsx    # 本轮变更文件卡片与行内 diff
+│               │   ├── AppModals.tsx          # 全局模态框集中挂载
+│               │   ├── TerminalPanel.tsx      # 基于 xterm.js 的嵌入式终端
+│               │   ├── FileEditor.tsx         # 语法高亮代码编辑器/查看器
+│               │   ├── DiffEditor.tsx         # 代码变更对比面板
+│               │   ├── TaskBoard.tsx          # 任务看板 (Linear / GitHub Issues)
+│               │   ├── ProjectList.tsx        # 项目与会话列表 (含 project-list/ 子目录)
+│               │   ├── Settings.tsx           # 设置面板 (含 settings/ 子目录)
+│               │   ├── ModelSelector.tsx      # 模型切换与鉴权状态
+│               │   ├── CommandPalette.tsx     # Cmd+K 全局指令面板
+│               │   ├── PlanApproval.tsx       # Plan & Solve 方案审批
+│               │   ├── AskQuestionDialog.tsx  # Agent 提问交互
+│               │   ├── SessionReplayModal.tsx # 会话录制回放
+│               │   └── graph/                 # 基于 @xyflow/react 的流程图可视化
+│               ├── hooks/         # 业务 React Hooks
+│               │   ├── useHarnessEvents.ts    # IPC 事件总线订阅与状态分发
+│               │   ├── useChatReducer.ts      # 对话与工具状态机
+│               │   ├── useProjectManager.ts   # 多工程与 Worktree 状态控制
+│               │   ├── useProjectThreads.ts   # 项目会话列表与切换
+│               │   ├── useThreadActions.ts    # 会话级操作 (重命名/删除/导出)
+│               │   ├── useThreadModelPermissions.ts # 会话级模型与权限策略
+│               │   ├── useGitOperations.ts    # Git 操作与差异拉取
+│               │   ├── useDialogManager.ts    # 模态框栈管理
+│               │   ├── useAuthManager.ts      # 登录态与凭证
+│               │   ├── useMessageQueue.ts     # 消息排队发送
+│               │   ├── useTabManager.ts       # 多标签页管理
+│               │   └── useKeyboardShortcuts.ts # 全局快捷键
+│               ├── utils/         # 渲染层工具函数
+│               ├── types/         # 渲染进程 TypeScript 类型定义
+│               ├── styles/        # 全局样式与主题变量
+│               ├── assets/        # 静态资源
+│               └── __tests__/     # 渲染层测试
 │
-├── harness/                   # 智能体装配与门面代理层 (Harness Facade)
-│   ├── index.ts               # createMyAgent 入口、adapter 装配与 HarnessProxy 动态代理
-│   ├── instructions.ts        # 动态系统提示词装配 (getDynamicInstructions)
-│   ├── model-resolver.ts      # 模型解析与鉴权凭证绑定 (createModelResolver)
-│   ├── subagents.ts           # 默认子智能体 (explore/plan/execute) 装配
-│   ├── tools.ts               # 动态工具组装与不同运行模式过滤
-│   ├── thinking.ts            # 思考链 (Thinking/Reasoning) 解析与标签过滤
-│   ├── settings.ts            # 工作区与用户设置持久化
-│   └── state.ts               # 会话状态机类型与 Schema 定义
+├── packages/
+│   ├── core/                      # @my-agent/core 无头智能体引擎
+│   │   └── src/
+│   │       ├── index.ts           # 引擎对外统一出口
+│   │       ├── client.ts          # 引擎客户端入口
+│   │       ├── core/              # 核心运行时
+│   │       │   ├── agent/         # Agent 类与 streamText 流式执行管道
+│   │       │   ├── controller/    # AgentController 调度容器与 Session 会话类
+│   │       │   ├── context/       # RequestContext 请求生命周期上下文
+│   │       │   ├── tools/         # 工具适配、参数校验与 JSON Schema 转换
+│   │       │   ├── memory/        # 核心 Memory 抽象类
+│   │       │   ├── llm/           # 统一语言模型解析与动态包装
+│   │       │   ├── graph/         # 执行模式图 (ReAct / Plan & Solve / Fast)
+│   │       │   ├── recorder/      # 会话录制 (JSONL) 与离线回放
+│   │       │   ├── workspace/     # 工作区解析与环境抽象
+│   │       │   ├── base/          # 运行时基类与共享契约
+│   │       │   └── logger/        # 结构化日志
+│   │       ├── harness/           # 智能体装配与门面代理层
+│   │       │   ├── index.ts       # createMyAgent / adapter 装配与 HarnessProxy
+│   │       │   ├── instructions.ts    # 动态系统提示词装配
+│   │       │   ├── model-resolver.ts  # 模型解析与凭证绑定
+│   │       │   ├── subagents.ts       # 默认子智能体装配
+│   │       │   ├── tools.ts           # 动态工具组装与模式过滤
+│   │       │   ├── thinking.ts        # 思考链解析与标签过滤
+│   │       │   ├── settings.ts        # 工作区与用户设置持久化
+│   │       │   ├── state.ts           # 会话状态机类型与 Schema
+│   │       │   ├── workspace.ts       # Harness 侧工作区上下文
+│   │       │   └── project-purge.ts   # 项目数据清理
+│   │       ├── agents/            # 分级子智能体 (explore / plan / execute)
+│   │       ├── prompts/           # 系统提示词 (base / build / plan / fast)
+│   │       ├── tools/             # 宿主扩展工具实现
+│   │       │   ├── shell.ts                   # execute_command
+│   │       │   ├── file-view.ts               # view
+│   │       │   ├── write.ts                   # write_file
+│   │       │   ├── file-editor.ts             # 精准文本编辑
+│   │       │   ├── grep.ts                    # search_content
+│   │       │   ├── glob.ts                    # find_files
+│   │       │   ├── string-replace-lsp.ts      # string_replace_lsp
+│   │       │   ├── ast-smart-edit.ts          # ast_smart_edit
+│   │       │   ├── subagent.ts                # subagent 派生工具
+│   │       │   ├── submit-plan.ts             # submit_plan 方案提交
+│   │       │   ├── request-sandbox-access.ts  # request_sandbox_access 动态提权
+│   │       │   ├── navigate-browser.ts        # 浏览器导航与内容抓取
+│   │       │   ├── computer-use.ts            # 无头浏览器视觉操作
+│   │       │   ├── web-search.ts              # 联网检索 (Tavily)
+│   │       │   ├── wrap-with-confirmation.ts  # 工具确认包装器
+│   │       │   └── utils.ts                   # 路径沙箱限制与并发写锁
+│   │       ├── store/             # 原生无服务 SQLite 存储 (LibSQL / node:sqlite)
+│   │       │   ├── store.ts       # SQLiteStore 主类 (WAL 模式)
+│   │       │   ├── memory-store.ts    # 线程/消息与观察性记忆持久化
+│   │       │   ├── migrations.ts      # 版本化迁移
+│   │       │   ├── schema.ts          # DDL 表结构与索引
+│   │       │   ├── types.ts           # 存储配置与领域接口
+│   │       │   └── index.ts
+│   │       ├── memory/            # 观察性记忆模块
+│   │       │   ├── memory.ts      # 消息 CRUD、会话恢复、OM 提示注入
+│   │       │   ├── token-counter.ts   # 启发式分词估算
+│   │       │   └── types.ts
+│   │       ├── mcp/               # MCP 客户端与管理 (Stdio / SSE)
+│   │       ├── lsp/               # LSP 客户端、进程管理与 TS/JS 适配
+│   │       ├── browser/           # Playwright BrowserManager
+│   │       ├── hooks/             # 项目扩展钩子 (HookManager / 阶段自动化)
+│   │       ├── acp/               # Agent Client Protocol 终端管理与事件总线
+│   │       ├── auth/              # 凭证存储与 OAuth PKCE 适配
+│   │       ├── snapshot/          # Git 任务快照与任务变更持久化
+│   │       ├── providers/         # 模型供应商适配
+│   │       ├── ipc/               # 引擎侧 IPC 契约与事件定义
+│   │       ├── constants/         # 全局常量
+│   │       ├── utils/             # 项目探测、路径安全、Token 估算、指令加载
+│   │       └── permissions.ts     # 工具权限分类策略 (read / edit / execute / mcp / YOLO)
+│   │
+│   ├── a2a/                       # @my-agent/a2a 协议服务与客户端
+│   │   ├── bin/a2a-server.js      # my-agent-a2a 可执行入口
+│   │   ├── src/server/http-server.ts  # createA2ARequestHandler / startA2AServer / A2AServer
+│   │   ├── src/server/router.ts       # JSON-RPC 分发 (projects / threads / tasks / approvals)
+│   │   ├── src/server/sse.ts          # SSE 流式事件推送
+│   │   ├── src/server/cors.ts         # 跨域策略
+│   │   ├── src/client/client.ts       # A2A 客户端
+│   │   └── tests/                     # 协议测试
+│   │
+│   └── cli/                       # @my-agent/cli 命令行与本地守护进程
+│       ├── bin/my-agent.js        # my-agent 可执行入口
+│       ├── src/cli.ts             # 参数解析与命令注册
+│       ├── src/daemon.ts          # 守护进程：daemon.json 写盘 + A2A 服务托管
+│       ├── src/client-runner.ts   # 客户端命令执行器
+│       ├── src/commands/          # serve / run / chat / project / thread / status
+│       └── tests/                 # CLI 与守护进程测试
 │
-├── agents/                    # 分级子智能体定义 (Subagents)
-│   ├── explore.ts             # 只读代码探索子智能体 (代码检索、结构分析)
-│   ├── plan.ts                # 只读架构规划子智能体 (设计实现方案)
-│   ├── execute.ts             # 具备写入与终端执行能力的实施子智能体
-│   └── index.ts               # 子智能体导出
-│
-├── prompts/                   # 系统提示词系统 (System Prompts)
-│   ├── base.ts                # 通用基础提示词 (编码准则、Git 安全、沙箱约束)
-│   ├── build.ts               # ReAct 模式提示词 (实现与验证循环，对应 modeId=react)
-│   ├── plan.ts                # Plan & Solve 模式提示词 (先规划后执行)
-│   ├── fast.ts                # Fast 模式提示词 (直连流式 + 只读工具边界)
-│   └── index.ts               # buildFullPrompt 提示词装配入口
-│
-├── tools/                     # Agent 宿主扩展工具实现 (Tool Implementations)
-│   ├── shell.ts               # execute_command (进程组管控、超时拦截、实时流式输出)
-│   ├── file-view.ts           # view (文件只读查看、目录树巡检)
-│   ├── write.ts               # write_file (写文件、覆盖、目录递归自动创建)
-│   ├── grep.ts                # search_content (基于 ripgrep/正则的代码内容搜索)
-│   ├── glob.ts                # find_files (文件名与路径通配符模式匹配)
-│   ├── string-replace-lsp.ts  # string_replace_lsp (基于 LSP 的文本精准替换与诊断)
-│   ├── ast-smart-edit.ts      # ast_smart_edit (基于 ast-grep 的语法结构重构)
-│   ├── subagent.ts            # subagent 派生工具 (流式消费子 Agent 事件与结果)
-│   ├── request-sandbox-access.ts # request_sandbox_access (动态沙箱提权提问交互)
-│   ├── navigate-browser.ts    # 基于 Playwright 的网页导航与内容抓取
-│   ├── computer-use.ts        # 基于无头浏览器的视觉操作工具
-│   └── utils.ts               # 路径沙箱限制 (assertPathAllowed) 与并发写文件锁
-│
-├── store/                     # 原生无服务 SQLite 存储引擎 (LibSQL / node:sqlite)
-│   ├── store.ts               # SQLiteStore 主类 (基于 WAL 模式的高性能本地数据库)
-│   ├── memory-store.ts        # SQLiteMemoryStore (线程/消息持久化与观察性记忆存储)
-│   ├── schema.ts              # SQLite DDL 表结构与性能索引定义
-│   ├── types.ts               # 存储配置与领域接口定义
-│   └── index.ts               # 存储层对外导出
-│
-├── memory/                    # 观察性记忆模块 (Observational Memory)
-│   ├── memory.ts              # 继承 MyAgentMemory (消息 CRUD、会话秒级恢复、OM 系统提示注入)
-│   ├── token-counter.ts       # 启发式分词估算器 (len / 4)
-│   ├── types.ts               # ObservationalMemoryConfig / MemoryOptions
-│   └── index.ts               # 记忆层对外导出
-│
-├── electron/                  # 主进程层 (Main Process)
-│   ├── main.ts                # 应用主生命周期、窗口创建、Harness 初始化与事件转接
-│   ├── preload.ts             # 安全预加载脚本，实现 contextBridge 注入
-│   ├── electron-state.ts      # 工作区维度的集成状态管理 (Linear/GitHub 绑定)
-│   ├── notifications.ts       # 原生系统通知与角标更新服务
-│   ├── task-changes-store.ts  # 任务变更文件与 diff 的本地持久化 (task-changes.json)
-│   ├── helpers.ts             # 会话辅助工具 (OAuth 校验、对话标题自动生成)
-│   └── ipc/                   # 模块化 IPC 命令处理器 (14 个业务子模块)
-│       ├── harness-handlers.ts       # 消息收发、模式与模型调度
-│       ├── project-handlers.ts       # 项目探测、Worktree 切换与会话构建
-│       ├── permission-handlers.ts    # 权限校验、工具审批、提问拦截
-│       ├── pty-handlers.ts           # node-pty 伪终端生命周期与 I/O
-│       ├── git-handlers.ts           # Git 状态提取与代码差异对比
-│       ├── file-handlers.ts          # 文件只读读取与编辑器服务
-│       ├── integration-handlers.ts   # Linear / GitHub 双向集成协议
-│       ├── mcp-handlers.ts           # MCP 服务连接生命周期管理
-│       ├── settings-handlers.ts      # 应用偏好与模型参数持久化
-│       ├── auth-handlers.ts          # OAuth 身份凭证轮转与回调
-│       ├── dashboard-handlers.ts     # Token 统计与 Agent 运行耗时聚合
-│       ├── slash-command-handlers.ts # Slash 指令加载与动态注入
-│       └── index.ts                  # IPC 路由总装与分发入口
-│
-├── renderer/                  # 渲染进程 UI 层 (React 19 + TypeScript + Vite)
-│   ├── index.html             # 页面承载 HTML 入口
-│   ├── main.tsx              # React 挂载入口
-│   ├── App.tsx                # 应用顶层布局骨架、快捷键注册与状态装配
-│   ├── components/            # 核心 UI 面板与交互组件
-│   │   ├── ChatView.tsx              # 会话渲染管线：消息分组、一轮一个执行块、吸顶用户消息
-│   │   ├── AssistantMessage.tsx      # 助手正文渲染 (Markdown / 代码高亮 / 复制)
-│   │   ├── ExecutionBlock.tsx        # 执行块：运行中 Working for …（逐字入场）/ 结束 Worked for …
-│   │   ├── UserMessage.tsx           # 用户消息气泡：吸顶、折叠、图片预览
-│   │   ├── FilesChangedBar.tsx       # 本轮变更文件卡片与行内 diff
-│   │   ├── TodoProgress.tsx          # 任务进度条
-│   │   ├── ToolExecution.tsx         # 工具执行状态卡片组件
-│   │   ├── SubagentExecution.tsx     # 子 Agent 执行嵌套可视化组件
-│   │   ├── TerminalPanel.tsx         # 基于 xterm.js 的嵌入式终端面板
-│   │   ├── FileEditor.tsx            # 语法高亮代码编辑器/查看器
-│   │   ├── DiffEditor.tsx            # 代码变更对比面板
-│   │   ├── TaskBoard.tsx             # 任务看板 (Linear / GitHub Issues)
-│   │   ├── ToolApprovalDialog.tsx    # 工具审批拦截交互模态框
-│   │   ├── ModelSelector.tsx         # 模型切换与鉴权状态下拉面板
-│   │   └── CommandPalette.tsx        # Cmd+K 全局指令面板
-│   ├── hooks/                 # 自定义业务 React Hooks
-│   │   ├── useHarnessEvents.ts       # IPC 核心事件总线订阅与状态分发
-│   │   ├── useChatReducer.ts         # 对话与工具状态机
-│   │   ├── useProjectManager.ts      # 多工程与 Worktree 状态控制
-│   │   └── useGitOperations.ts       # Git 操作与差异拉取
-│   ├── types/                 # 渲染进程 TypeScript 类型定义
-│   └── styles/                # 全局样式与主题变量
-│
-├── mcp/                       # Model Context Protocol (MCP) 客户端与管理
-│   ├── client.ts              # MCP 客户端协议实现 (Stdio / SSE 通信信道)
-│   ├── manager.ts             # MCP 服务器动态发现、生命周期与工具注入
-│   └── types.ts               # MCP 协议标准定义
-│
-├── lsp/                       # 语言服务器协议 (LSP) 与 AST 智能改写集成
-│   ├── client.ts              # LSP 客户端与诊断信息收集
-│   ├── manager.ts             # 语言服务器进程生命周期管理
-│   └── server.ts              # TypeScript/JavaScript 等语言服务适配
-│
-├── browser/                   # Playwright 浏览器自动化管理器 (BrowserManager)
-├── hooks/                     # 项目扩展钩子管理 (HookManager / 阶段自动化任务)
-├── acp/                       # Agent Client Protocol 终端管理与事件总线
-├── auth/                      # 凭证存储 (AuthStorage) 与 OAuth 鉴权适配
-├── permissions.ts             # 工具权限分类策略 (read / edit / execute / mcp / YOLO)
-└── utils/                     # 通用工具函数 (项目探测、路径安全、Token 估算)
+├── scripts/                       # 构建与发布脚本 (build-dispatch / build-local / update-readme-release)
+├── resources/                     # 应用图标等打包资源
+├── docs/                          # 补充文档
+├── electron.vite.config.ts        # Electron 三进程构建配置
+├── tsconfig.base.json             # 跨包共享 TS 配置
+└── vitest.config.ts               # 统一测试配置
 ```
+
+**包依赖方向**（单向向下，无环）：
+
+```mermaid
+flowchart LR
+    desktop["apps/desktop"] --> core["packages/core<br/>@my-agent/core"]
+    desktop --> a2a["packages/a2a<br/>@my-agent/a2a"]
+    cli["packages/cli<br/>@my-agent/cli"] --> core
+    cli --> a2a
+    a2a --> core
+```
+
+- `packages/core` 不依赖任何 Electron / DOM API，可在纯 Node 环境运行，这是 CLI 与 A2A 服务能复用同一引擎的前提。
+- `packages/a2a` 只依赖 `core`，不感知桌面端；桌面端与 CLI 通过它暴露同一套 JSON-RPC 会话能力。
+- `packages/cli` 依赖 `core` 与 `a2a`，既是命令行入口，也是守护进程宿主。
+- `apps/desktop` 同时依赖 `core` 与 `a2a`，是唯一的 GUI 消费方。
+
+<!-- 本文档由维护者持续更新，如与代码实现不一致，以代码为准。 -->
