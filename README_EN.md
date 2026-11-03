@@ -37,23 +37,23 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#downloads-for-all-platforms)
 [![ChangeLog](https://img.shields.io/badge/ChangeLog-notes-blueviolet)](https://kidyfirst.github.io/my-agent/changelog.html)
 
-**Latest stable version: `v0.1.3`**  
+**Latest stable version: `v0.1.4`**  
 🌐 **[Official download site (GitHub Pages)](https://kidyfirst.github.io/my-agent/)** ｜ 📋 **[Release notes (ChangeLog)](https://kidyfirst.github.io/my-agent/changelog.html)** ｜ 📦 **[GitHub Releases](https://github.com/kidyfirst/my-agent/releases)**
 
 </div>
 
 ### Downloads for all platforms
 
-| Platform       | Architecture / device                 | Package                    | Direct download (v0.1.3)                                                                                                                    | Notes                       |
+| Platform       | Architecture / device                 | Package                    | Direct download (v0.1.4)                                                                                                                    | Notes                       |
 | :------------- | :------------------------------------ | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------- |
-| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer           | [my-agent-0.1.3-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-arm64.dmg)                 | Recommended for most Macs   |
-| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build      | [my-agent-0.1.3-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-arm64.zip)                 | Unzip and run               |
-| 🍏 **macOS**   | **Intel x86_64**                      | `.dmg` installer           | [my-agent-0.1.3-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-x64.dmg)                     | For Intel-based Macs        |
-| 🍏 **macOS**   | **Intel x86_64**                      | `.zip` portable build      | [my-agent-0.1.3-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-x64.zip)                     | Unzip and run               |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.exe` installer           | [my-agent-0.1.3-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-win-x64.exe)                     | NSIS guided setup           |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.zip` portable build      | [my-agent-0.1.3-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-win-x64.zip)                     | Unzip and run               |
-| 🐧 **Linux**   | **Linux x86_64** (generic)            | `.AppImage` portable image | [my-agent-0.1.3-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-linux-x86_64.AppImage) | `chmod +x`, then run it     |
-| 🐧 **Linux**   | **Debian / Ubuntu / Deepin**          | `.deb` package             | [my-agent-0.1.3-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-linux-amd64.deb)             | Install with `sudo dpkg -i` |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer           | [my-agent-0.1.4-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-arm64.dmg)                 | Recommended for most Macs   |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build      | [my-agent-0.1.4-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-arm64.zip)                 | Unzip and run               |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.dmg` installer           | [my-agent-0.1.4-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-x64.dmg)                     | For Intel-based Macs        |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.zip` portable build      | [my-agent-0.1.4-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-x64.zip)                     | Unzip and run               |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.exe` installer           | [my-agent-0.1.4-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-win-x64.exe)                     | NSIS guided setup           |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.zip` portable build      | [my-agent-0.1.4-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-win-x64.zip)                     | Unzip and run               |
+| 🐧 **Linux**   | **Linux x86_64** (generic)            | `.AppImage` portable image | [my-agent-0.1.4-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-linux-x86_64.AppImage) | `chmod +x`, then run it     |
+| 🐧 **Linux**   | **Debian / Ubuntu / Deepin**          | `.deb` package             | [my-agent-0.1.4-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-linux-amd64.deb)             | Install with `sudo dpkg -i` |
 
 > [!IMPORTANT]
 > **macOS says the app “is damaged” or “cannot be opened”:**  

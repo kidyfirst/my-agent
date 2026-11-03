@@ -1,179 +1,189 @@
-import { useState, memo } from "react"
+import { useState, useEffect, useRef, memo } from "react"
+import { Chevron } from "./ExecutionBlock"
+import { ToolExecution } from "./ToolExecution"
+
+interface SubagentTool {
+	name: string
+	args?: unknown
+	result?: unknown
+	isError?: boolean
+	status: string
+}
 
 interface SubagentExecutionProps {
 	subagent: {
 		toolCallId: string
 		agentType: string
 		task: string
-		tools: Array<{
-			name: string
-			args: unknown
-			result?: unknown
-			isError?: boolean
-			status: string
-		}>
+		tools: SubagentTool[]
 		result?: string
 		isError?: boolean
 		durationMs?: number
 		status: string
+		/** 1-based position among parallel agents of the same turn. */
+		index?: number
 	}
 }
 
+/** Seconds render like the Working/Thinking labels: "114s", "2m 39s". */
+function formatSecs(sec: number) {
+	if (sec >= 60) {
+		const m = Math.floor(sec / 60)
+		const s = Math.round(sec - m * 60)
+		return `${m}m ${s}s`
+	}
+	return `${Math.round(sec)}s`
+}
+
+/**
+ * The Agent row under an assistant reply, styled to match
+ * "Working for 2m 39s › (3 steps)": a muted inline label whose duration
+ * ticks while the subagent runs, a chevron, and a step-count hint. The
+ * sub-tool log reuses the exact ToolExecution rows from the Working block —
+ * collapsed it shows a ~82px auto-scrolling window, expanded it shows
+ * everything. Only a genuinely live run ticks; "interrupted" rows (app
+ * closed before the result landed) render frozen.
+ */
 export const SubagentExecution = memo(function SubagentExecution({
 	subagent,
 }: SubagentExecutionProps) {
 	const [expanded, setExpanded] = useState(false)
-	const isDone = subagent.status === "complete"
+	const [hover, setHover] = useState(false)
+	const isRunning = subagent.status === "running"
+	const [liveSec, setLiveSec] = useState<number>(1)
+	const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+	useEffect(() => {
+		if (!isRunning) return
+		const start = Date.now()
+		const timer = setInterval(() => {
+			setLiveSec(Math.max(1, Math.round((Date.now() - start) / 1000)))
+		}, 1000)
+		return () => clearInterval(timer)
+	}, [isRunning])
+
+	// Auto-scroll the collapsed window so the newest sub-tool stays visible.
+	useEffect(() => {
+		if (!expanded && scrollContainerRef.current) {
+			scrollContainerRef.current.scrollTop =
+				scrollContainerRef.current.scrollHeight
+		}
+	}, [subagent.tools.length, expanded])
+
+	const staticSec =
+		subagent.durationMs != null ? subagent.durationMs / 1000 : null
+	const durationText = isRunning
+		? formatSecs(liveSec)
+		: staticSec != null
+			? formatSecs(staticSec)
+			: null
+	const failed = Boolean(subagent.isError) && !isRunning
+	// Parallel agents of one turn are numbered "Agent 1", "Agent 2", …
+	const name = subagent.index ? `Agent ${subagent.index}` : "Agent"
+	const label = failed
+		? durationText
+			? `${name} failed after ${durationText}`
+			: `${name} failed`
+		: durationText
+			? `${name} for ${durationText}`
+			: name
 
 	return (
 		<div style={{ margin: "2px 0" }}>
-			{/* Compact header line */}
-			<button
+			<div
 				onClick={() => setExpanded(!expanded)}
+				onMouseEnter={() => setHover(true)}
+				onMouseLeave={() => setHover(false)}
 				style={{
-					display: "flex",
+					display: "inline-flex",
 					alignItems: "center",
-					gap: 8,
-					width: "100%",
-					padding: "3px 0",
-					textAlign: "left",
+					gap: 6,
 					cursor: "pointer",
+					userSelect: "none",
 					fontSize: 13,
-					background: "none",
-					border: "none",
-					color: "inherit",
+					lineHeight: 1,
+					color: failed
+						? "var(--error)"
+						: hover
+							? "var(--text)"
+							: "var(--muted)",
 				}}
+				title={expanded ? "Click to collapse" : "Click to expand all"}
 			>
-				{/* Icon */}
-				<span
-					style={{
-						fontSize: 14,
-						flexShrink: 0,
-						width: 20,
-						textAlign: "center",
-					}}
-				>
-					&#x1F3D7;&#xFE0F;
-				</span>
-
-				{/* Label */}
-				<span style={{ color: "var(--muted)", fontWeight: 500 }}>Agent</span>
-
-				{/* Task description */}
-				<span
-					style={{
-						color: "var(--muted)",
-						flex: 1,
-						overflow: "hidden",
-						textOverflow: "ellipsis",
-						whiteSpace: "nowrap",
-						minWidth: 0,
-					}}
-				>
-					{subagent.task}
-				</span>
-
-				{/* Duration */}
-				{isDone && subagent.durationMs != null && (
-					<span style={{ color: "var(--dim)", fontSize: 12, flexShrink: 0 }}>
-						{(subagent.durationMs / 1000).toFixed(1)}s
+				<span>{label}</span>
+				<Chevron open={expanded} />
+				{subagent.tools.length > 0 && !expanded && (
+					<span style={{ fontSize: 11, color: "var(--dim)" }}>
+						({subagent.tools.length} step
+						{subagent.tools.length > 1 ? "s" : ""})
 					</span>
 				)}
+			</div>
 
-				{/* Status */}
-				<span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
-					{isDone && !subagent.isError && (
-						<span style={{ color: "var(--success)", fontSize: 11 }}>
-							&#10003;
-						</span>
-					)}
-					{isDone && subagent.isError && (
-						<span style={{ color: "var(--error)", fontSize: 11 }}>
-							&#10007;
-						</span>
-					)}
-					{!isDone && (
-						<span
-							style={{
-								width: 5,
-								height: 5,
-								borderRadius: "50%",
-								background: "var(--accent)",
-								animation: "pulse 1.5s ease-in-out infinite",
-							}}
-						/>
-					)}
-				</span>
-			</button>
-
-			{/* Expanded details */}
-			{expanded && (
-				<div style={{ paddingLeft: 28, paddingBottom: 8, fontSize: 12 }}>
-					{/* Sub-tool list */}
-					{subagent.tools.map((t, i) => (
-						<div
-							key={i}
-							style={{
-								padding: "3px 0",
-								display: "flex",
-								gap: 6,
-								alignItems: "center",
-								borderBottom:
-									i < subagent.tools.length - 1
-										? "1px solid var(--border-muted)"
-										: "none",
-							}}
-						>
-							{t.status === "complete" && !t.isError && (
-								<span style={{ color: "var(--success)", fontSize: 10 }}>
-									&#10003;
-								</span>
-							)}
-							{t.status === "complete" && t.isError && (
-								<span style={{ color: "var(--error)", fontSize: 10 }}>
-									&#10007;
-								</span>
-							)}
-							{t.status === "running" && (
-								<span
-									style={{
-										width: 5,
-										height: 5,
-										borderRadius: "50%",
-										background: "var(--accent)",
-										animation: "pulse 1.5s ease-in-out infinite",
-									}}
-								/>
-							)}
-							<span style={{ color: "var(--muted)" }}>
-								{t.name.replace(/_/g, " ")}
-							</span>
-						</div>
-					))}
-
-					{/* Final result */}
-					{subagent.result && (
-						<div style={{ marginTop: 6 }}>
-							<pre
-								style={{
-									background: "var(--bg)",
-									padding: 8,
-									borderRadius: 4,
-									color: subagent.isError
-										? "var(--error)"
-										: "var(--tool-output)",
-									fontSize: 11,
-									overflow: "auto",
-									maxHeight: 200,
-									margin: 0,
-									border: "1px solid var(--border-muted)",
-									whiteSpace: "pre-wrap",
+			{/* Sub-tool log: collapsed shows a 2~3 row auto-scrolling window
+			    (identical to the Working block); expanded shows all rows. */}
+			{subagent.tools.length > 0 && (
+				<div
+					ref={scrollContainerRef}
+					onClick={!expanded ? () => setExpanded(true) : undefined}
+					className="scrollbar-none"
+					style={{
+						marginTop: 9,
+						paddingLeft: 14,
+						maxHeight: expanded ? "none" : 82,
+						overflowY: "auto",
+						scrollbarWidth: "none",
+						cursor: !expanded ? "pointer" : "default",
+						transition: "max-height 0.2s ease",
+					}}
+					title={
+						!expanded && subagent.tools.length > 3
+							? "Click to view all steps"
+							: undefined
+					}
+				>
+					<div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+						{subagent.tools.map((t, i) => (
+							<ToolExecution
+								key={`${t.name}-${i}`}
+								tool={{
+									id: `${subagent.toolCallId}-${i}`,
+									name: t.name,
+									args: t.args,
+									result: t.result,
+									isError: t.isError,
+									status:
+										t.status === "running"
+											? "running"
+											: t.isError
+												? "error"
+												: "complete",
 								}}
-							>
-								{subagent.result}
-							</pre>
-						</div>
-					)}
+							/>
+						))}
+					</div>
+				</div>
+			)}
+
+			{/* Final result */}
+			{expanded && subagent.result && (
+				<div style={{ marginTop: 6, paddingLeft: 14 }}>
+					<pre
+						style={{
+							background: "var(--bg)",
+							padding: 8,
+							borderRadius: 4,
+							color: subagent.isError ? "var(--error)" : "var(--tool-output)",
+							fontSize: 11,
+							overflow: "auto",
+							maxHeight: 200,
+							margin: 0,
+							border: "1px solid var(--border-muted)",
+							whiteSpace: "pre-wrap",
+						}}
+					>
+						{subagent.result}
+					</pre>
 				</div>
 			)}
 		</div>

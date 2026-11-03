@@ -11,14 +11,19 @@ import {
 	normalizeMessageContent,
 	extractThinkingFromText,
 } from "../utils/messageParser"
-import { isUserMessage, getMessageText } from "../types/chat"
+import { parseSubagentMeta } from "../utils/subagentMeta"
+import {
+	isUserMessage,
+	getMessageText,
+	type SubagentState,
+} from "../types/chat"
 import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
 import { shouldPinToBottom } from "../utils/chatScroll"
 export interface ChatViewProps {
-    threadId?: string | null
-    /** Transcript for `threadId` is still being fetched; show a wait state. */
-    isLoadingThread?: boolean
-    messages: Message[]
+	threadId?: string | null
+	/** Transcript for `threadId` is still being fetched; show a wait state. */
+	isLoadingThread?: boolean
+	messages: Message[]
 	tools: Map<
 		string,
 		{
@@ -31,26 +36,7 @@ export interface ChatViewProps {
 			shellOutput?: string
 		}
 	>
-	subagents: Map<
-		string,
-		{
-			toolCallId: string
-			agentType: string
-			task: string
-			modelId?: string
-			tools: Array<{
-				name: string
-				args: unknown
-				result?: unknown
-				isError?: boolean
-				status: "running" | "complete"
-			}>
-			result?: string
-			isError?: boolean
-			durationMs?: number
-			status: "running" | "complete"
-		}
-	>
+	subagents: Map<string, SubagentState>
 	isAgentActive: boolean
 	agentStartedAt: number | null
 	streamingMessageId: string | null
@@ -102,7 +88,7 @@ export type RenderItem =
 				task: string
 				tools: Array<{
 					name: string
-					args: unknown
+					args?: unknown
 					result?: unknown
 					isError?: boolean
 					status: string
@@ -111,6 +97,8 @@ export type RenderItem =
 				isError?: boolean
 				durationMs?: number
 				status: string
+				/** 1-based position among parallel agents of the same turn. */
+				index?: number
 			}
 	  }
 	| {
@@ -265,9 +253,9 @@ export function decideDuplicateUser(
 	return nextIsReplay ? "keep" : "skip"
 }
 export function ChatView({
-    threadId,
-    isLoadingThread = false,
-    messages,
+	threadId,
+	isLoadingThread = false,
+	messages,
 	tools,
 	subagents,
 	isAgentActive,
@@ -294,21 +282,21 @@ export function ChatView({
 
 	useEffect(() => {
 		if (prevThreadIdRef.current !== threadId) {
-            prevThreadIdRef.current = threadId
-            isAutoScroll.current = true
-            setIsScrolledUp(false)
-            setIsScrolledDown(false)
-        }
-    }, [threadId])
+			prevThreadIdRef.current = threadId
+			isAutoScroll.current = true
+			setIsScrolledUp(false)
+			setIsScrolledDown(false)
+		}
+	}, [threadId])
 
 	// Auto-scroll on new messages or tool updates. A message the user just sent
 	// always belongs in view: reading history first must not push the fresh
 	// bubble below the fold, or the send looks ignored until the answer streams.
-    useEffect(() => {
-        // The wait state is a fixed placeholder; there is nothing to pin.
-        if (isLoadingThread) return
-        const pin = isAutoScroll.current || shouldPinToBottom(messages)
-        if (pin && scrollRef.current) {
+	useEffect(() => {
+		// The wait state is a fixed placeholder; there is nothing to pin.
+		if (isLoadingThread) return
+		const pin = isAutoScroll.current || shouldPinToBottom(messages)
+		if (pin && scrollRef.current) {
 			if (scrollRafRef.current != null) {
 				cancelAnimationFrame(scrollRafRef.current)
 			}
@@ -329,44 +317,44 @@ export function ChatView({
 				scrollRafRef.current = null
 			}
 		}
-    }, [
-        messages.length,
-        messages,
-        tools,
-        subagents,
-        isAgentActive,
-        interrupted,
-        isLoadingThread,
-    ])
+	}, [
+		messages.length,
+		messages,
+		tools,
+		subagents,
+		isAgentActive,
+		interrupted,
+		isLoadingThread,
+	])
 
 	const handleScroll = () => {
 		if (!scrollRef.current) return
 		const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
 		const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-        const scrolledUp = distanceFromBottom > 80
-        isAutoScroll.current = !scrolledUp
-        setIsScrolledUp(scrolledUp)
-        setIsScrolledDown(scrollTop > 8)
-        setHasOverflow(scrollHeight - clientHeight > 1)
-    }
-    // `scroll` only fires on user or programmatic scrolling; streaming output
-    // grows the content without one, so the fades need a separate signal. The
-    // observer watches both boxes: the viewport can shrink (window resize) and
-    // the content can grow, and either flips overflow.
-    useEffect(() => {
-        const el = scrollRef.current
-        if (!el) return
-        const sync = () => setHasOverflow(el.scrollHeight - el.clientHeight > 1)
-        sync()
-        if (typeof ResizeObserver === "undefined") return
-        const observer = new ResizeObserver(sync)
-        observer.observe(el)
-        if (contentRef.current) observer.observe(contentRef.current)
-        return () => observer.disconnect()
-    }, [isLoadingThread])
+		const scrolledUp = distanceFromBottom > 80
+		isAutoScroll.current = !scrolledUp
+		setIsScrolledUp(scrolledUp)
+		setIsScrolledDown(scrollTop > 8)
+		setHasOverflow(scrollHeight - clientHeight > 1)
+	}
+	// `scroll` only fires on user or programmatic scrolling; streaming output
+	// grows the content without one, so the fades need a separate signal. The
+	// observer watches both boxes: the viewport can shrink (window resize) and
+	// the content can grow, and either flips overflow.
+	useEffect(() => {
+		const el = scrollRef.current
+		if (!el) return
+		const sync = () => setHasOverflow(el.scrollHeight - el.clientHeight > 1)
+		sync()
+		if (typeof ResizeObserver === "undefined") return
+		const observer = new ResizeObserver(sync)
+		observer.observe(el)
+		if (contentRef.current) observer.observe(contentRef.current)
+		return () => observer.disconnect()
+	}, [isLoadingThread])
 
-    const scrollToLatest = () => {
-        if (scrollRef.current) {
+	const scrollToLatest = () => {
+		if (scrollRef.current) {
 			if (typeof scrollRef.current.scrollTo === "function") {
 				scrollRef.current.scrollTo({
 					top: scrollRef.current.scrollHeight,
@@ -462,7 +450,9 @@ export function ChatView({
 				items.push({ type: "system", key: `msg-${msg.id}`, data: msg })
 			} else if (msg.role === "assistant") {
 				const isCurrentTurnStreaming = Boolean(
-					isAgentActive && isLastAssistantInCurrentTurn && i === lastAssistantMsgIdx,
+					isAgentActive &&
+					isLastAssistantInCurrentTurn &&
+					i === lastAssistantMsgIdx,
 				)
 				const isStreaming =
 					isAgentActive &&
@@ -550,7 +540,7 @@ export function ChatView({
 								durationMs: withDuration ? msgDurationMs : undefined,
 								startedAt: isStreaming
 									? agentStartedAt ||
-									  (msgDurationMs ? Date.now() - msgDurationMs : null)
+										(msgDurationMs ? Date.now() - msgDurationMs : null)
 									: null,
 								changedFiles: showChangedFiles ? msg.changedFiles : undefined,
 							},
@@ -669,7 +659,7 @@ export function ChatView({
 								isStreaming: isStreaming && isAgentActive,
 								startedAt: isStreaming
 									? agentStartedAt ||
-									  (msgDurationMs ? Date.now() - msgDurationMs : null)
+										(msgDurationMs ? Date.now() - msgDurationMs : null)
 									: null,
 							})
 						}
@@ -721,6 +711,13 @@ export function ChatView({
 								})
 							} else {
 								const saArgs = (toolArgs as Record<string, unknown>) || {}
+								// History path (after restart): rebuild the Agent card from
+								// the <subagent-meta> tag embedded in the persisted result.
+								const rawResult =
+									typeof toolResult === "string"
+										? toolResult
+										: (toolResult as any)?.content
+								const meta = parseSubagentMeta(rawResult)
 								items.push({
 									type: "subagent",
 									key: `subagent-${toolId}`,
@@ -731,13 +728,18 @@ export function ChatView({
 											(saArgs.task as string) ||
 											(saArgs.description as string) ||
 											"",
-										tools: [],
-										result:
-											typeof toolResult === "string"
-												? toolResult
-												: (toolResult as any)?.content,
+										tools: meta.tools,
+										result: meta.cleanResult || undefined,
 										isError,
-										status: isDone ? "complete" : "running",
+										durationMs: meta.durationMs ?? undefined,
+										// "running" only while the turn is genuinely live; a resultless
+										// subagent in a finished/restarted session is "interrupted" —
+										// nothing will ever complete it, so it must not tick forever.
+										status: isDone
+											? "complete"
+											: isAgentActive
+												? "running"
+												: "interrupted",
 									},
 								})
 							}
@@ -907,7 +909,7 @@ export function ChatView({
 				baseItems.push(item)
 			}
 		}
-		return organizeTurnItems(baseItems)
+		return organizeTurnItems(baseItems, { isAgentActive, agentStartedAt })
 	}, [
 		messages,
 		tools,
@@ -1074,220 +1076,226 @@ export function ChatView({
 					scrollbarGutter: "stable",
 				}}
 			>
-            <div
-                ref={contentRef}
-                style={{
-                    maxWidth: 800,
-                    width: "100%",
-                    margin: "0 auto",
-                    padding: "16px 24px 0",
-                    display: "flex",
-                    flexDirection: "column",
-                    flex: "1 0 auto",
-                    minHeight: "100%",
-                }}
-            >
-				{showReplayBanner && (
-					<div
-						style={{
-							marginBottom: 16,
-							padding: "10px 16px",
-							borderRadius: 10,
-							background: isActivelyReplaying
-								? "color-mix(in srgb, var(--replay) 12%, transparent)"
-								: "color-mix(in srgb, var(--replay) 8%, transparent)",
-							border:
-								"1px solid color-mix(in srgb, var(--replay) 30%, transparent)",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "space-between",
-							gap: 12,
-						}}
-					>
-						<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-							<div
-								style={{
-									width: 24,
-									height: 24,
-									borderRadius: "50%",
-									background:
-										"color-mix(in srgb, var(--replay) 20%, transparent)",
-									color: "var(--replay)",
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "center",
-									fontSize: 10,
-									fontWeight: 700,
-									flexShrink: 0,
-								}}
-							>
-								▶
-							</div>
-							<div>
-								<div
-									style={{
-										fontSize: 13,
-										fontWeight: 600,
-										color: "var(--text)",
-									}}
-								>
-									{isActivelyReplaying ? "Replay Running" : "Session Replay"}
-									<span
-										style={{
-											fontSize: 9,
-											fontWeight: 700,
-											color: "var(--replay)",
-											background:
-												"color-mix(in srgb, var(--replay) 15%, transparent)",
-											padding: "1px 5px",
-											borderRadius: 3,
-											marginLeft: 8,
-											letterSpacing: "0.5px",
-										}}
-									>
-										OFFLINE
-									</span>
-								</div>
-								<div
-									style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}
-								>
-									{isActivelyReplaying
-										? "Currently streaming execution from recorded data. No tokens are consumed."
-										: "This conversation was reproduced from recorded session events."}
-								</div>
-							</div>
-						</div>
-						{replaySource && (
-							<span
-								title={replaySource}
-								style={{
-									fontSize: 10,
-									fontFamily: "monospace",
-									background: "var(--bg)",
-									border:
-										"1px solid color-mix(in srgb, var(--replay) 25%, transparent)",
-									color: "var(--replay)",
-									padding: "3px 8px",
-									borderRadius: 4,
-									maxWidth: 200,
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-									whiteSpace: "nowrap",
-								}}
-							>
-								{replaySource}
-							</span>
-						)}
-					</div>
-				)}
-                {isLoadingThread ? (
-                    <ThreadLoadingState />
-                ) : (
-                    <>
-                        {cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
-
-                        {renderedTurns.map((turn) => {
-					const replayTurn = isReplayTurn(turn)
-					const playbackKey = replayTurn ? replayTurnPlaybackKey(turn) : null
-					const playbackPass = playbackKey
-						? replayPassByKey.get(playbackKey)
-						: undefined
-					return (
+				<div
+					ref={contentRef}
+					style={{
+						maxWidth: 800,
+						width: "100%",
+						margin: "0 auto",
+						padding: "16px 24px 0",
+						display: "flex",
+						flexDirection: "column",
+						flex: "1 0 auto",
+						minHeight: "100%",
+					}}
+				>
+					{showReplayBanner && (
 						<div
-							key={turn.key}
 							style={{
+								marginBottom: 16,
+								padding: "10px 16px",
+								borderRadius: 10,
+								background: isActivelyReplaying
+									? "color-mix(in srgb, var(--replay) 12%, transparent)"
+									: "color-mix(in srgb, var(--replay) 8%, transparent)",
+								border:
+									"1px solid color-mix(in srgb, var(--replay) 30%, transparent)",
 								display: "flex",
-								flexDirection: "column",
-								...(replayTurn
-									? {
-											position: "relative",
-											// The outline is a sibling overlay rather than a
-											// border on the box: a child's opaque background
-											// would otherwise paint over the border line.
-											margin: "14px 0",
-											padding: "12px 14px 6px",
-											borderRadius: 12,
-											// Every playback writes fresh message ids, so replaying
-											// the same file remounts this block and replays the
-											// fade — otherwise a second replay looks like nothing
-											// happened because the transcript is identical.
-											animation: "replay-turn-in 260ms ease-out both",
-										}
-									: null),
+								alignItems: "center",
+								justifyContent: "space-between",
+								gap: 12,
 							}}
 						>
-							{replayTurn && (
-								<span
-									aria-hidden="true"
+							<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+								<div
 									style={{
-										position: "absolute",
-										inset: 0,
-										borderRadius: 12,
-										border:
-											"1px solid color-mix(in srgb, var(--replay) 45%, transparent)",
-										pointerEvents: "none",
-										zIndex: 30,
-									}}
-								/>
-							)}
-							{replayTurn && (
-								<span
-									title="Reproduced from a recorded session — no API calls"
-									style={{
-										position: "absolute",
-										top: -8,
-										right: 12,
-										fontSize: 9,
-										fontWeight: 700,
-										letterSpacing: "0.5px",
+										width: 24,
+										height: 24,
+										borderRadius: "50%",
+										background:
+											"color-mix(in srgb, var(--replay) 20%, transparent)",
 										color: "var(--replay)",
-										background: "var(--bg)",
-										border:
-											"1px solid color-mix(in srgb, var(--replay) 40%, transparent)",
-										borderRadius: 999,
-										padding: "1px 7px",
-										lineHeight: 1.4,
-										pointerEvents: "none",
-										zIndex: 31,
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+										fontSize: 10,
+										fontWeight: 700,
+										flexShrink: 0,
 									}}
 								>
-									{`▶ REPLAY${
-										playbackPass && playbackPass > 1 ? ` #${playbackPass}` : ""
-									}`}
+									▶
+								</div>
+								<div>
+									<div
+										style={{
+											fontSize: 13,
+											fontWeight: 600,
+											color: "var(--text)",
+										}}
+									>
+										{isActivelyReplaying ? "Replay Running" : "Session Replay"}
+										<span
+											style={{
+												fontSize: 9,
+												fontWeight: 700,
+												color: "var(--replay)",
+												background:
+													"color-mix(in srgb, var(--replay) 15%, transparent)",
+												padding: "1px 5px",
+												borderRadius: 3,
+												marginLeft: 8,
+												letterSpacing: "0.5px",
+											}}
+										>
+											OFFLINE
+										</span>
+									</div>
+									<div
+										style={{
+											fontSize: 11,
+											color: "var(--muted)",
+											marginTop: 2,
+										}}
+									>
+										{isActivelyReplaying
+											? "Currently streaming execution from recorded data. No tokens are consumed."
+											: "This conversation was reproduced from recorded session events."}
+									</div>
+								</div>
+							</div>
+							{replaySource && (
+								<span
+									title={replaySource}
+									style={{
+										fontSize: 10,
+										fontFamily: "monospace",
+										background: "var(--bg)",
+										border:
+											"1px solid color-mix(in srgb, var(--replay) 25%, transparent)",
+										color: "var(--replay)",
+										padding: "3px 8px",
+										borderRadius: 4,
+										maxWidth: 200,
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+									}}
+								>
+									{replaySource}
 								</span>
 							)}
-							{turn.userItem && renderItem(turn.userItem, replayTurn)}
-							{turn.items.map((item, i) =>
-								renderItem(
-									item,
-									replayTurn,
-									turn.items[i - 1]?.type === "execution",
-								),
-							)}
 						</div>
-					)
-				})}
+					)}
+					{isLoadingThread ? (
+						<ThreadLoadingState />
+					) : (
+						<>
+							{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
 
-				{/* Todo progress */}
-				{todos.length > 0 && <TodoProgress todos={todos} />}
+							{renderedTurns.map((turn) => {
+								const replayTurn = isReplayTurn(turn)
+								const playbackKey = replayTurn
+									? replayTurnPlaybackKey(turn)
+									: null
+								const playbackPass = playbackKey
+									? replayPassByKey.get(playbackKey)
+									: undefined
+								return (
+									<div
+										key={turn.key}
+										style={{
+											display: "flex",
+											flexDirection: "column",
+											...(replayTurn
+												? {
+														position: "relative",
+														// The outline is a sibling overlay rather than a
+														// border on the box: a child's opaque background
+														// would otherwise paint over the border line.
+														margin: "14px 0",
+														padding: "12px 14px 6px",
+														borderRadius: 12,
+														// Every playback writes fresh message ids, so replaying
+														// the same file remounts this block and replays the
+														// fade — otherwise a second replay looks like nothing
+														// happened because the transcript is identical.
+														animation: "replay-turn-in 260ms ease-out both",
+													}
+												: null),
+										}}
+									>
+										{replayTurn && (
+											<span
+												aria-hidden="true"
+												style={{
+													position: "absolute",
+													inset: 0,
+													borderRadius: 12,
+													border:
+														"1px solid color-mix(in srgb, var(--replay) 45%, transparent)",
+													pointerEvents: "none",
+													zIndex: 30,
+												}}
+											/>
+										)}
+										{replayTurn && (
+											<span
+												title="Reproduced from a recorded session — no API calls"
+												style={{
+													position: "absolute",
+													top: -8,
+													right: 12,
+													fontSize: 9,
+													fontWeight: 700,
+													letterSpacing: "0.5px",
+													color: "var(--replay)",
+													background: "var(--bg)",
+													border:
+														"1px solid color-mix(in srgb, var(--replay) 40%, transparent)",
+													borderRadius: 999,
+													padding: "1px 7px",
+													lineHeight: 1.4,
+													pointerEvents: "none",
+													zIndex: 31,
+												}}
+											>
+												{`▶ REPLAY${
+													playbackPass && playbackPass > 1
+														? ` #${playbackPass}`
+														: ""
+												}`}
+											</span>
+										)}
+										{turn.userItem && renderItem(turn.userItem, replayTurn)}
+										{turn.items.map((item, i) =>
+											renderItem(
+												item,
+												replayTurn,
+												turn.items[i - 1]?.type === "execution",
+											),
+										)}
+									</div>
+								)
+							})}
 
-				{/* The run ended because the user stopped it; closing the turn here
+							{/* Todo progress */}
+							{todos.length > 0 && <TodoProgress todos={todos} />}
+
+							{/* The run ended because the user stopped it; closing the turn here
 				    keeps the truncated answer from reading like a crash. Shown the
 				    moment Stop is pressed — waiting for the harness to confirm the
 				    abort would put the note a round trip behind the click. */}
-                        {interrupted && (
-                            <InterruptedNotice
-                                onRevert={onRevert}
-                                reverting={reverting}
-                                reverted={reverted}
-                            />
-                        )}
-                    </>
-                )}
+							{interrupted && (
+								<InterruptedNotice
+									onRevert={onRevert}
+									reverting={reverting}
+									reverted={reverted}
+								/>
+							)}
+						</>
+					)}
 
-
-
-				<style>{`
+					<style>{`
 				@keyframes pulse {
 					0%, 100% { opacity: 0.3; }
 					50% { opacity: 1; }
@@ -1306,110 +1314,110 @@ export function ChatView({
 				}
 			`}</style>
 
-				{/* Bottom padding */}
-				<div style={{ height: 28 }} />
+					{/* Bottom padding */}
+					<div style={{ height: 28 }} />
+				</div>
 			</div>
-		</div>
 
-		{/* Gradient fade at top, so content dissolves into the edge instead of
+			{/* Gradient fade at top, so content dissolves into the edge instead of
 		    being cut by a hard line. Hidden at scrollTop 0 to keep the first
 		    message fully legible. */}
-		<div
-			data-testid="chat-top-fade"
-			aria-hidden="true"
-			style={{
-				position: "absolute",
-				top: 0,
-				left: 0,
-				right: 0,
-                height: 56,
-                background: "linear-gradient(to top, transparent, var(--bg))",
-                pointerEvents: "none",
-                zIndex: 10,
-                opacity: isScrolledDown ? 1 : 0,
-                transition: "opacity 0.2s ease",
-            }}
-        />
+			<div
+				data-testid="chat-top-fade"
+				aria-hidden="true"
+				style={{
+					position: "absolute",
+					top: 0,
+					left: 0,
+					right: 0,
+					height: 56,
+					background: "linear-gradient(to top, transparent, var(--bg))",
+					pointerEvents: "none",
+					zIndex: 10,
+					opacity: isScrolledDown ? 1 : 0,
+					transition: "opacity 0.2s ease",
+				}}
+			/>
 
-		{/* Gradient fade at bottom, shown whenever content continues past the
+			{/* Gradient fade at bottom, shown whenever content continues past the
 		    edge — not only after scrolling up, or the cut is a hard line until
 		    the user moves. */}
-		<div
-			data-testid="chat-bottom-fade"
-			aria-hidden="true"
-			style={{
-				position: "absolute",
-				bottom: 0,
-				left: 0,
-				right: 0,
-				height: 56,
-				background: "linear-gradient(to bottom, transparent, var(--bg))",
-				pointerEvents: "none",
-				zIndex: 10,
-                opacity: hasOverflow ? 1 : 0,
-                transition: "opacity 0.2s ease",
-            }}
-        />
+			<div
+				data-testid="chat-bottom-fade"
+				aria-hidden="true"
+				style={{
+					position: "absolute",
+					bottom: 0,
+					left: 0,
+					right: 0,
+					height: 56,
+					background: "linear-gradient(to bottom, transparent, var(--bg))",
+					pointerEvents: "none",
+					zIndex: 10,
+					opacity: hasOverflow ? 1 : 0,
+					transition: "opacity 0.2s ease",
+				}}
+			/>
 
-		{/* Floating button to jump to latest message */}
-		<button
-			type="button"
-			data-testid="scroll-to-latest-button"
-			onClick={scrollToLatest}
-			title="Scroll to latest"
-			aria-label="Scroll to latest"
-			style={{
-				position: "absolute",
-				bottom: 16,
-				left: "50%",
-				transform: isScrolledUp
-					? "translateX(-50%)"
-					: "translateX(-50%) translateY(8px)",
-				width: 34,
-				height: 34,
-				borderRadius: "50%",
-				background: "var(--bg)",
-				border: "1px solid var(--border)",
-				boxShadow: "var(--shadow-sm)",
-				display: "flex",
-				alignItems: "center",
-				justifyContent: "center",
-				color: "var(--text)",
-				cursor: isScrolledUp ? "pointer" : "default",
-				zIndex: 20,
-				opacity: isScrolledUp ? 1 : 0,
-				pointerEvents: isScrolledUp ? "auto" : "none",
-				transition:
-					"opacity 0.2s ease, transform 0.2s ease, background-color 0.15s ease, box-shadow 0.15s ease",
-			}}
-			onMouseEnter={(e) => {
-				if (isScrolledUp) {
-					e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-					e.currentTarget.style.boxShadow = "var(--shadow-popover)"
-				}
-			}}
-			onMouseLeave={(e) => {
-				if (isScrolledUp) {
-					e.currentTarget.style.backgroundColor = "var(--bg)"
-					e.currentTarget.style.boxShadow = "var(--shadow-sm)"
-				}
-			}}
-		>
-			<svg
-				width="15"
-				height="15"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2.2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
+			{/* Floating button to jump to latest message */}
+			<button
+				type="button"
+				data-testid="scroll-to-latest-button"
+				onClick={scrollToLatest}
+				title="Scroll to latest"
+				aria-label="Scroll to latest"
+				style={{
+					position: "absolute",
+					bottom: 16,
+					left: "50%",
+					transform: isScrolledUp
+						? "translateX(-50%)"
+						: "translateX(-50%) translateY(8px)",
+					width: 34,
+					height: 34,
+					borderRadius: "50%",
+					background: "var(--bg)",
+					border: "1px solid var(--border)",
+					boxShadow: "var(--shadow-sm)",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
+					color: "var(--text)",
+					cursor: isScrolledUp ? "pointer" : "default",
+					zIndex: 20,
+					opacity: isScrolledUp ? 1 : 0,
+					pointerEvents: isScrolledUp ? "auto" : "none",
+					transition:
+						"opacity 0.2s ease, transform 0.2s ease, background-color 0.15s ease, box-shadow 0.15s ease",
+				}}
+				onMouseEnter={(e) => {
+					if (isScrolledUp) {
+						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+						e.currentTarget.style.boxShadow = "var(--shadow-popover)"
+					}
+				}}
+				onMouseLeave={(e) => {
+					if (isScrolledUp) {
+						e.currentTarget.style.backgroundColor = "var(--bg)"
+						e.currentTarget.style.boxShadow = "var(--shadow-sm)"
+					}
+				}}
 			>
-				<line x1="12" y1="5" x2="12" y2="19" />
-				<polyline points="19 12 12 19 5 12" />
-			</svg>
-		</button>
-	</div>
+				<svg
+					width="15"
+					height="15"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="2.2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				>
+					<line x1="12" y1="5" x2="12" y2="19" />
+					<polyline points="19 12 12 19 5 12" />
+				</svg>
+			</button>
+		</div>
 	)
 }
 
@@ -1419,32 +1427,32 @@ export function ChatView({
  * must fill the viewport area — otherwise the switch reads as a blank screen.
  */
 function ThreadLoadingState() {
-    return (
-        <div
-            data-testid="thread-loading"
-            style={{
-                display: "flex",
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: 160,
-            }}
-        >
-            <div
-                aria-label="Loading conversation"
-                role="status"
-                style={{
-                    width: 18,
-                    height: 18,
-                    border: "2px solid var(--border)",
-                    borderTopColor: "var(--muted)",
-                    borderRadius: "50%",
-                    animation: "thread-load-spin 0.8s linear infinite",
-                }}
-            />
-            <style>{`@keyframes thread-load-spin { to { transform: rotate(360deg) } }`}</style>
-        </div>
-    )
+	return (
+		<div
+			data-testid="thread-loading"
+			style={{
+				display: "flex",
+				flex: 1,
+				alignItems: "center",
+				justifyContent: "center",
+				minHeight: 160,
+			}}
+		>
+			<div
+				aria-label="Loading conversation"
+				role="status"
+				style={{
+					width: 18,
+					height: 18,
+					border: "2px solid var(--border)",
+					borderTopColor: "var(--muted)",
+					borderRadius: "50%",
+					animation: "thread-load-spin 0.8s linear infinite",
+				}}
+			/>
+			<style>{`@keyframes thread-load-spin { to { transform: rotate(360deg) } }`}</style>
+		</div>
+	)
 }
 
 /**
@@ -1452,7 +1460,13 @@ function ThreadLoadingState() {
  * same turn into a single execution block, and ensure it ALWAYS appears
  * BEFORE the assistant's response (Worked for ... -> Assistant Message).
  */
-export function organizeTurnItems(cleanedItems: RenderItem[]): RenderItem[] {
+export function organizeTurnItems(
+	cleanedItems: RenderItem[],
+	options?: {
+		isAgentActive?: boolean
+		agentStartedAt?: number | null
+	},
+): RenderItem[] {
 	const turnItems: RenderItem[] = []
 
 	let currentTurnUser: Extract<RenderItem, { type: "user" }> | null = null
@@ -1466,27 +1480,70 @@ export function organizeTurnItems(cleanedItems: RenderItem[]): RenderItem[] {
 			currentTurnUser = null
 		}
 
-		// If no execution block was created by tool/thinking steps, but assistant has durationMs,
-		// synthesize an execution block for this turn so "Worked for Xs" is displayed.
-		if (!currentTurnExec && currentTurnAssistants.length > 0) {
-			let foundDuration: number | undefined
-			for (let i = currentTurnAssistants.length - 1; i >= 0; i--) {
-				const d = currentTurnAssistants[i].data.durationMs
-				if (d != null) {
-					foundDuration = d
-					break
-				}
-			}
-			if (foundDuration != null && foundDuration > 0) {
+		// If no execution block was created by tool/thinking steps, synthesize one:
+		// 1) If the turn is actively running (agent active, assistant streaming, or subagent running),
+		//    synthesize an active execution block so "Working for Xs" is displayed.
+		// 2) If the turn has finished and has a duration, synthesize "Worked for Xs".
+		if (
+			!currentTurnExec &&
+			(currentTurnAssistants.length > 0 || currentTurnSubagents.length > 0)
+		) {
+			const isTurnActive =
+				Boolean(options?.isAgentActive) ||
+				currentTurnAssistants.some((a) => (a.data as any)?.isStreaming) ||
+				currentTurnSubagents.some(
+					(sa) => (sa.data as any)?.status === "running",
+				)
+
+			if (isTurnActive) {
+				const activeAssistant = currentTurnAssistants.find(
+					(a) => (a.data as any)?.isStreaming,
+				)
+				const activeSubagent = currentTurnSubagents.find(
+					(sa) => (sa.data as any)?.status === "running",
+				)
+				const key = activeAssistant
+					? `turn-exec-active-${activeAssistant.data.id}`
+					: `turn-exec-active-${(activeSubagent?.data as any)?.toolCallId || "subagent"}`
 				currentTurnExec = {
 					type: "execution",
-					key: `turn-exec-${currentTurnAssistants[0].data.id}`,
+					key,
 					data: {
-						isActive: false,
+						isActive: true,
 						steps: [],
-						durationMs: foundDuration,
-						startedAt: null,
+						durationMs: undefined,
+						startedAt: options?.agentStartedAt || Date.now(),
 					},
+				}
+			} else {
+				let foundDuration: number | undefined
+				for (let i = currentTurnAssistants.length - 1; i >= 0; i--) {
+					const d = currentTurnAssistants[i].data.durationMs
+					if (d != null) {
+						foundDuration = d
+						break
+					}
+				}
+				if (foundDuration == null) {
+					for (let i = currentTurnSubagents.length - 1; i >= 0; i--) {
+						const d = (currentTurnSubagents[i].data as any)?.durationMs
+						if (d != null) {
+							foundDuration = d
+							break
+						}
+					}
+				}
+				if (foundDuration != null && foundDuration > 0) {
+					currentTurnExec = {
+						type: "execution",
+						key: `turn-exec-${currentTurnAssistants[0]?.data.id || (currentTurnSubagents[0]?.data as any)?.toolCallId}`,
+						data: {
+							isActive: false,
+							steps: [],
+							durationMs: foundDuration,
+							startedAt: null,
+						},
+					}
 				}
 			}
 		}
@@ -1497,12 +1554,34 @@ export function organizeTurnItems(cleanedItems: RenderItem[]): RenderItem[] {
 				currentTurnExec.data.isActive ||
 				currentTurnExec.data.durationMs != null)
 		) {
+			// If subagent or agent is running in this turn, ensure execution block stays active
+			if (
+				Boolean(options?.isAgentActive) ||
+				currentTurnSubagents.some(
+					(sa) => (sa.data as any)?.status === "running",
+				)
+			) {
+				currentTurnExec.data.isActive = true
+				if (!currentTurnExec.data.startedAt) {
+					currentTurnExec.data.startedAt = options?.agentStartedAt || Date.now()
+				}
+			}
+
 			if (currentTurnExec.data.durationMs == null) {
 				for (let i = currentTurnAssistants.length - 1; i >= 0; i--) {
 					const d = currentTurnAssistants[i].data.durationMs
 					if (d != null) {
 						currentTurnExec.data.durationMs = d
 						break
+					}
+				}
+				if (currentTurnExec.data.durationMs == null) {
+					for (let i = currentTurnSubagents.length - 1; i >= 0; i--) {
+						const d = (currentTurnSubagents[i].data as any)?.durationMs
+						if (d != null) {
+							currentTurnExec.data.durationMs = d
+							break
+						}
 					}
 				}
 			}
@@ -1518,6 +1597,15 @@ export function organizeTurnItems(cleanedItems: RenderItem[]): RenderItem[] {
 			turnItems.push(currentTurnExec)
 		}
 		currentTurnExec = null
+
+		// Number parallel agents in the same turn ("Agent 1", "Agent 2", …)
+		// starting from 1 — with the task text gone from the header, identical
+		// "Agent for 6s" rows otherwise read as a rendering duplicate.
+		if (currentTurnSubagents.length > 1) {
+			currentTurnSubagents.forEach((sa, i) => {
+				;(sa.data as any).index = i + 1
+			})
+		}
 
 		for (const sa of currentTurnSubagents) {
 			turnItems.push(sa)

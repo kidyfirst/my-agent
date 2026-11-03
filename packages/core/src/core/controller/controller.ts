@@ -909,6 +909,11 @@ export class Session<TState = any> {
 			""
 		if (!steerText.trim()) return
 
+		logger.info("steering", "steer prompt received", {
+			threadId: targetThreadId,
+			text: steerText,
+		})
+
 		const threadRun = targetThreadId
 			? this._threadRuns.get(targetThreadId)
 			: undefined
@@ -1001,6 +1006,7 @@ export class Session<TState = any> {
 	}
 
 	async followUp(options: any): Promise<void> {
+		logger.info("steering", "followUp prompt received", { options })
 		return this.steer(options)
 	}
 
@@ -1457,6 +1463,13 @@ export class Session<TState = any> {
 							})
 							this._pendingApprovals.set(toolCallId, resolve)
 						})
+						logger.info("approval", `tool requires approval: ${toolName}`, {
+							threadId,
+							toolCallId,
+							toolName,
+							category,
+							args,
+						})
 						this.emit({
 							type: "tool_approval_required",
 							threadId,
@@ -1470,6 +1483,15 @@ export class Session<TState = any> {
 						})
 
 						const decision = await decisionPromise
+						logger.info("approval", `tool approval resolved: ${toolName}`, {
+							threadId,
+							toolCallId,
+							toolName,
+							decision:
+								typeof decision === "object" ? decision.decision : decision,
+							feedback:
+								typeof decision === "object" ? decision.feedback : undefined,
+						})
 
 						if (
 							decision === "decline" ||
@@ -1493,6 +1515,13 @@ export class Session<TState = any> {
 						toolCallId,
 						args,
 					})
+					const toolStartTime = Date.now()
+					logger.info("tool", `tool start: ${toolName}`, {
+						threadId,
+						toolName,
+						toolCallId,
+						args,
+					})
 
 					try {
 						const toolContext = { requestContext, toolCallId }
@@ -1507,6 +1536,14 @@ export class Session<TState = any> {
 						} else {
 							result = { success: true }
 						}
+
+						const toolDurationMs = Date.now() - toolStartTime
+						logger.info("tool", `tool end: ${toolName} (${toolDurationMs}ms)`, {
+							threadId,
+							toolName,
+							toolCallId,
+							durationMs: toolDurationMs,
+						})
 
 						const current = executedTools.find((t) => t.id === toolCallId)
 						if (current) {
@@ -1524,6 +1561,18 @@ export class Session<TState = any> {
 						})
 						return result
 					} catch (toolErr: any) {
+						const toolDurationMs = Date.now() - toolStartTime
+						logger.error(
+							"tool",
+							`tool error: ${toolName} (${toolDurationMs}ms)`,
+							{
+								threadId,
+								toolName,
+								toolCallId,
+								durationMs: toolDurationMs,
+								error: toolErr?.message || String(toolErr),
+							},
+						)
 						const current = executedTools.find((t) => t.id === toolCallId)
 						if (current) {
 							current.result = toolErr?.message || String(toolErr)
@@ -1911,6 +1960,15 @@ export class Session<TState = any> {
 					threadId,
 					durationMs: Date.now() - startTime,
 					error: err,
+				})
+				// Surface the failure in the UI: the renderer listens for this
+				// event, shows the error message and ends the run. Without it a
+				// failed run only emits agent_end and the session looks like it
+				// is still working.
+				this.emit({
+					type: "error",
+					threadId,
+					error: { message: err?.message || String(err) },
 				})
 				if (recorder) {
 					recorder.recordRunEnd({

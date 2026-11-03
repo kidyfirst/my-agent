@@ -122,21 +122,20 @@ interface MessageFeedbackProps {
  *
  * Which clicks actually reach the counter is decided by `applyVote`: at most
  * one hit per rendered reply, and switching thumbs stays silent.
+ *
+ * Vote totals are intentionally never displayed — a per-reply global count is
+ * noise next to a single user's answer; the README badges are the public face.
  */
 export function MessageFeedback({ text }: MessageFeedbackProps) {
 	const [copied, setCopied] = useState(false)
 	const [voted, setVoted] = useState<FeedbackKind | null>(null)
-	const [count, setCount] = useState<number | null>(null)
 
 	const copyTimer = useRef<number | null>(null)
 	/** The authoritative vote bookkeeping; `voted` above only drives rendering. */
 	const voteState = useRef<VoteState>(INITIAL_VOTE)
-	const mounted = useRef(true)
 
 	useEffect(() => {
-		mounted.current = true
 		return () => {
-			mounted.current = false
 			if (copyTimer.current) window.clearTimeout(copyTimer.current)
 		}
 	}, [])
@@ -162,14 +161,10 @@ export function MessageFeedback({ text }: MessageFeedbackProps) {
 		setVoted(next.voted)
 		if (!send) return
 
+		// Fire-and-forget: the pill never shows totals, so the response is
+		// irrelevant; the counter service holds the only durable state.
 		window.api
 			.invoke({ type: "feedbackCounter", kind: send, action: "hit" })
-			.then((result) => {
-				const value = (result as { value?: unknown } | null)?.value
-				// The total lands a beat after the click; showing it late beats
-				// showing a guessed number that the server then contradicts.
-				if (mounted.current && typeof value === "number") setCount(value)
-			})
 			.catch(() => {})
 	}, [])
 
@@ -214,7 +209,6 @@ export function MessageFeedback({ text }: MessageFeedbackProps) {
 						onClick={() => vote(kind)}
 					>
 						{kind === "like" ? <ThumbUpIcon /> : <ThumbDownIcon />}
-						{selected && count !== null && <span>{count}</span>}
 					</PillButton>
 				)
 			})}

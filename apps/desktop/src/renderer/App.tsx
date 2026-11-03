@@ -190,44 +190,54 @@ export function App() {
 				: "var(--muted)"
 	const toastGlyph =
 		toast?.type === "error" ? "⚠" : toast?.type === "success" ? "✓" : "•"
-    // Two independent paths load the same thread: the caller that initiated the
-    // switch, and the `thread_changed` broadcast the main process emits after
-    // it. Without this guard the transcript loads twice, so the user watches
-    // loading -> content -> loading -> content. In-flight calls for one thread
-    // share the first promise; a repeat for an already-loaded thread is ignored
-    // unless the caller explicitly asked for a refresh.
-    const loadMessages = useCallback(
-        async (threadIdOverride?: string, force = false) => {
-            const tid =
-                threadIdOverride || currentThreadId || currentThreadIdRef.current
-            if (!tid) {
-                dispatch({ type: "SET_MESSAGES", messages: [] })
-                return
-            }
-            if (inFlightThreadRef.current === tid) return
-            if (!force && lastLoadedThreadRef.current === tid) return
-            inFlightThreadRef.current = tid
-            // Clear the outgoing transcript and show a wait state before the
-            // round-trip, so the switch never looks like a frozen old thread.
-            dispatch({ type: "BEGIN_THREAD_LOAD", threadId: tid })
-            try {
-                const msgs = (await window.api.invoke({
-                    type: "getMessages",
-                    threadId: tid,
-                })) as Message[]
-                if (Array.isArray(msgs)) {
-                    dispatch({ type: "SET_MESSAGES", messages: msgs, threadId: tid })
-                }
-                lastLoadedThreadRef.current = tid
-            } catch {
-                // Thread may not exist yet
-            } finally {
-                inFlightThreadRef.current = null
-                dispatch({ type: "END_THREAD_LOAD", threadId: tid })
-            }
-        },
-        [currentThreadId, dispatch],
-    )
+	// Two independent paths load the same thread: the caller that initiated the
+	// switch, and the `thread_changed` broadcast the main process emits after
+	// it. Without this guard the transcript loads twice, so the user watches
+	// loading -> content -> loading -> content. In-flight calls for one thread
+	// share the first promise; a repeat for an already-loaded thread is ignored
+	// unless the caller explicitly asked for a refresh.
+	const loadMessages = useCallback(
+		async (threadIdOverride?: string, force = false) => {
+			const tid =
+				threadIdOverride || currentThreadId || currentThreadIdRef.current
+			if (!tid) {
+				dispatch({ type: "SET_MESSAGES", messages: [] })
+				return
+			}
+			if (inFlightThreadRef.current === tid) return
+			if (!force && lastLoadedThreadRef.current === tid) return
+			inFlightThreadRef.current = tid
+			// Only a real thread *switch* drops the live transcript state.
+			// A forced same-thread reload (e.g. after agent_end) must keep the
+			// subagents/tools maps — wiping them here blanked every Agent card
+			// the moment a run finished, because the persisted parts carry no
+			// live tool state.
+			const isSwitch = tid !== currentThreadIdRef.current
+			if (isSwitch) {
+				// Clear the outgoing transcript and show a wait state before the
+				// round-trip, so the switch never looks like a frozen old thread.
+				dispatch({ type: "BEGIN_THREAD_LOAD", threadId: tid })
+			}
+			try {
+				const msgs = (await window.api.invoke({
+					type: "getMessages",
+					threadId: tid,
+				})) as Message[]
+				if (Array.isArray(msgs)) {
+					dispatch({ type: "SET_MESSAGES", messages: msgs, threadId: tid })
+				}
+				lastLoadedThreadRef.current = tid
+			} catch {
+				// Thread may not exist yet
+			} finally {
+				inFlightThreadRef.current = null
+				if (isSwitch) {
+					dispatch({ type: "END_THREAD_LOAD", threadId: tid })
+				}
+			}
+		},
+		[currentThreadId, dispatch],
+	)
 
 	useEffect(() => {
 		window.api

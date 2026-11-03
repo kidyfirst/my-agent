@@ -1,6 +1,6 @@
 {
 	"name": "@my-agent/cli",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "Command line interface and local daemon for My Agent",
 	"type": "module",
 	"main": "./src/index.ts",

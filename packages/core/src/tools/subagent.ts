@@ -9,6 +9,7 @@
  * real-time subagent activity (tool calls, text deltas, etc.).
  */
 import { createTool, Agent } from "../core/index.js"
+import { logger } from "../core/logger/index.js"
 import { z } from "zod/v3"
 import { getSubagentDefinition, getSubagentIds } from "../agents/index.js"
 import type { HarnessEvent, HarnessRequestContext } from "../harness/index.js"
@@ -160,6 +161,14 @@ Use this tool when:
 
 			const startTime = Date.now()
 
+			logger.info("subagent", `subagent started: [${agentType}]`, {
+				toolCallId,
+				agentType,
+				task,
+				model: resolvedModelId,
+				availableTools: Object.keys(subagentTools),
+			})
+
 			// Notify TUI that subagent is starting
 			emitEvent?.({
 				type: "subagent_start",
@@ -200,6 +209,16 @@ Use this tool when:
 
 						case "tool-call":
 							toolCallLog.push({ name: chunk.payload.toolName })
+							logger.info(
+								"subagent",
+								`subagent tool call: [${agentType}] -> ${chunk.payload.toolName}`,
+								{
+									toolCallId,
+									agentType,
+									subToolName: chunk.payload.toolName,
+									args: chunk.payload.args,
+								},
+							)
 							emitEvent?.({
 								type: "subagent_tool_start",
 								toolCallId,
@@ -221,6 +240,28 @@ Use this tool when:
 									break
 								}
 							}
+							if (isErr) {
+								logger.warn(
+									"subagent",
+									`subagent tool error: [${agentType}] -> ${chunk.payload.toolName}`,
+									{
+										toolCallId,
+										agentType,
+										subToolName: chunk.payload.toolName,
+										result: chunk.payload.result,
+									},
+								)
+							} else {
+								logger.info(
+									"subagent",
+									`subagent tool end: [${agentType}] -> ${chunk.payload.toolName}`,
+									{
+										toolCallId,
+										agentType,
+										subToolName: chunk.payload.toolName,
+									},
+								)
+							}
 							emitEvent?.({
 								type: "subagent_tool_end",
 								toolCallId,
@@ -237,6 +278,11 @@ Use this tool when:
 				// Check if we were aborted
 				if (abortSignal?.aborted) {
 					const durationMs = Date.now() - startTime
+					logger.warn("subagent", `subagent aborted by user: [${agentType}]`, {
+						toolCallId,
+						agentType,
+						durationMs,
+					})
 					const abortResult = partialText
 						? `[Aborted by user]\n\nPartial output:\n${partialText}`
 						: "[Aborted by user]"
@@ -261,6 +307,16 @@ Use this tool when:
 				const resultText = fullOutput.text || partialText
 
 				const durationMs = Date.now() - startTime
+				logger.info(
+					"subagent",
+					`subagent completed: [${agentType}] in ${durationMs}ms`,
+					{
+						toolCallId,
+						agentType,
+						durationMs,
+						toolCallsCount: toolCallLog.length,
+					},
+				)
 				emitEvent?.({
 					type: "subagent_end",
 					toolCallId,
@@ -282,6 +338,12 @@ Use this tool when:
 						err.message?.includes("abort") ||
 						err.message?.includes("cancel"))
 				const durationMs = Date.now() - startTime
+				logger.error("subagent", `subagent error: [${agentType}]`, {
+					toolCallId,
+					agentType,
+					durationMs,
+					error: err instanceof Error ? err.message : String(err),
+				})
 
 				if (isAbort) {
 					// Return partial output on abort

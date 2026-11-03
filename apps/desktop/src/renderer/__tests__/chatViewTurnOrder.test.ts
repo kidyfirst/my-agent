@@ -244,6 +244,158 @@ describe("organizeTurnItems - Turn Order and Placement", () => {
 		}
 	})
 
+	it("synthesizes an active execution block when subagent is running in the turn", () => {
+		const user = createUserItem("u1", "Dispatch an execute subagent")
+		const asst = createAssistantItem(
+			"a1",
+			"I'll dispatch an execute subagent for that.",
+		)
+		const subagentItem: RenderItem = {
+			type: "subagent",
+			key: "sa-1",
+			data: {
+				toolCallId: "call-1",
+				agentType: "execute",
+				task: "Create file",
+				tools: [],
+				status: "running",
+			} as any,
+		}
+
+		const result = organizeTurnItems([user, asst, subagentItem], {
+			isAgentActive: true,
+			agentStartedAt: 1000,
+		})
+
+		expect(result).toHaveLength(4)
+		expect(result[0].type).toBe("user")
+		expect(result[1].type).toBe("execution")
+		expect(result[2].type).toBe("subagent")
+		expect(result[3].type).toBe("assistant")
+		if (result[1].type === "execution") {
+			expect(result[1].data.isActive).toBe(true)
+			expect(result[1].data.startedAt).toBe(1000)
+		}
+	})
+
+	it("numbers parallel agents of the same turn starting from 1", () => {
+		const user = createUserItem("u1", "Dispatch subagents for both files")
+		const asst = createAssistantItem("a1", "Dispatching two subagents.")
+		const mkSubagent = (id: string): RenderItem => ({
+			type: "subagent",
+			key: `sa-${id}`,
+			data: {
+				toolCallId: id,
+				agentType: "execute",
+				task: "Create file",
+				tools: [],
+				status: "complete",
+				durationMs: 4200,
+			} as any,
+		})
+
+		const result = organizeTurnItems([
+			user,
+			asst,
+			mkSubagent("call-a"),
+			mkSubagent("call-b"),
+		])
+
+		const subagents = result.filter((r) => r.type === "subagent")
+		expect(subagents).toHaveLength(2)
+		expect((subagents[0].data as any).index).toBe(1)
+		expect((subagents[1].data as any).index).toBe(2)
+	})
+
+	it("leaves a lone agent unnumbered", () => {
+		const user = createUserItem("u1", "Dispatch one subagent")
+		const asst = createAssistantItem("a1", "Dispatching.")
+		const subagentItem: RenderItem = {
+			type: "subagent",
+			key: "sa-1",
+			data: {
+				toolCallId: "call-1",
+				agentType: "execute",
+				task: "Create file",
+				tools: [],
+				status: "complete",
+				durationMs: 4200,
+			} as any,
+		}
+
+		const result = organizeTurnItems([user, asst, subagentItem])
+		const subagents = result.filter((r) => r.type === "subagent")
+		expect(subagents).toHaveLength(1)
+		expect((subagents[0].data as any).index).toBeUndefined()
+	})
+
+	it("synthesizes a completed execution block with durationMs when subagent finishes", () => {
+		const user = createUserItem("u1", "Dispatch an execute subagent")
+		const asst = createAssistantItem(
+			"a1",
+			"I'll dispatch an execute subagent for that.",
+		)
+		const subagentItem: RenderItem = {
+			type: "subagent",
+			key: "sa-1",
+			data: {
+				toolCallId: "call-1",
+				agentType: "execute",
+				task: "Create file",
+				tools: [],
+				status: "complete",
+				durationMs: 4500,
+			} as any,
+		}
+
+		const result = organizeTurnItems([user, asst, subagentItem])
+
+		expect(result).toHaveLength(4)
+		expect(result[0].type).toBe("user")
+		expect(result[1].type).toBe("execution")
+		expect(result[2].type).toBe("subagent")
+		expect(result[3].type).toBe("assistant")
+		if (result[1].type === "execution") {
+			expect(result[1].data.isActive).toBe(false)
+			expect(result[1].data.durationMs).toBe(4500)
+		}
+	})
+
+	it("does not keep the turn active for an interrupted subagent after restart", () => {
+		// History path: the app was closed before the subagent result landed.
+		// Its row is rebuilt as "interrupted", and the turn header must render
+		// "Worked for" instead of ticking "Working for" forever.
+		const user = createUserItem("u1", "Dispatch an execute subagent")
+		const asst = createAssistantItem(
+			"a1",
+			"I'll dispatch an execute subagent for that.",
+		)
+		const subagentItem: RenderItem = {
+			type: "subagent",
+			key: "sa-1",
+			data: {
+				toolCallId: "call-1",
+				agentType: "execute",
+				task: "Create file",
+				tools: [],
+				status: "interrupted",
+				durationMs: 12600,
+			} as any,
+		}
+
+		const result = organizeTurnItems([user, asst, subagentItem], {
+			isAgentActive: false,
+		})
+
+		expect(result).toHaveLength(4)
+		expect(result[1].type).toBe("execution")
+		if (result[1].type === "execution") {
+			expect(result[1].data.isActive).toBe(false)
+			expect(result[1].data.durationMs).toBe(12600)
+			expect(result[1].data.startedAt).toBeNull()
+		}
+	})
+
 	it("correctly preserves system notices", () => {
 		const sys: RenderItem = {
 			type: "system",

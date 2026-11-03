@@ -161,7 +161,7 @@ export type SubagentState = {
 	modelId?: string
 	tools: Array<{
 		name: string
-		args: unknown
+		args?: unknown
 		result?: unknown
 		isError?: boolean
 		status: "running" | "complete"

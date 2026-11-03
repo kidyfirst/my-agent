@@ -35,7 +35,7 @@ export interface ExecutionBlockProps {
 	startedAt?: number | null
 }
 
-function Chevron({ open }: { open: boolean }) {
+export function Chevron({ open }: { open: boolean }) {
 	return (
 		<span
 			style={{
@@ -179,15 +179,15 @@ const WORKING_CHAR_STAGGER_MS = 28
  * animation: it can change freely without restarting anything.
  */
 function staggeredChars(text: string) {
-    return Array.from(text).map((char, i) => (
-        <span
-            key={i}
-            className="working-char"
-            style={{ animationDelay: `${i * WORKING_CHAR_STAGGER_MS}ms` }}
-        >
-            {char === " " ? "\u00a0" : char}
-        </span>
-    ))
+	return Array.from(text).map((char, i) => (
+		<span
+			key={i}
+			className="working-char"
+			style={{ animationDelay: `${i * WORKING_CHAR_STAGGER_MS}ms` }}
+		>
+			{char === " " ? "\u00a0" : char}
+		</span>
+	))
 }
 
 /**
@@ -197,20 +197,17 @@ function staggeredChars(text: string) {
  * full label — a screen reader should read "Working for 4.2s", not the pieces.
  */
 function AnimatedWorkingLabel({ duration }: { duration: string | null }) {
-    const label = duration ? `Working for ${duration}` : "Working"
-    return (
-        <span aria-label={label} role="status">
-            {staggeredChars("Working for")}
-            {duration && (
-                <span
-                    style={{ fontVariantNumeric: "tabular-nums" }}
-                    aria-hidden="true"
-                >
-                    {` ${duration}`}
-                </span>
-            )}
-        </span>
-    )
+	const label = duration ? `Working for ${duration}` : "Working"
+	return (
+		<span aria-label={label} role="status">
+			{staggeredChars("Working for")}
+			{duration && (
+				<span style={{ fontVariantNumeric: "tabular-nums" }} aria-hidden="true">
+					{` ${duration}`}
+				</span>
+			)}
+		</span>
+	)
 }
 
 export const ExecutionBlock = memo(function ExecutionBlock({
@@ -322,7 +319,7 @@ export const ExecutionBlock = memo(function ExecutionBlock({
 						: undefined
 				}
 			>
-                <style>{`
+				<style>{`
                     @keyframes working-char-in {
                         from { opacity: 0; }
                         to { opacity: 1; }
@@ -337,11 +334,11 @@ export const ExecutionBlock = memo(function ExecutionBlock({
                         .working-char { animation: none; }
                     }
                 `}</style>
-                {isActive ? (
-                    <AnimatedWorkingLabel duration={formattedDuration} />
-                ) : (
-                    <span>{headerLabel}</span>
-                )}
+				{isActive ? (
+					<AnimatedWorkingLabel duration={formattedDuration} />
+				) : (
+					<span>{headerLabel}</span>
+				)}
 				{steps.length > 0 && <Chevron open={expanded} />}
 				{steps.length > 0 && !expanded && (
 					<span style={{ fontSize: 11, color: "var(--dim)" }}>

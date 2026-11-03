@@ -1,5 +1,6 @@
 import { streamText, wrapLanguageModel, type LanguageModel } from "ai"
 import type { ExecutedToolItem } from "./types.js"
+import { logger } from "../logger/index.js"
 
 export interface StreamLLMOptions {
 	model: LanguageModel
@@ -205,6 +206,63 @@ export function buildMessageParts(
 }
 
 /**
+ * A healthy generation streams deltas continuously. If the provider sends
+ * nothing at all for this long *outside of tool execution*, the stream is
+ * considered dead: without this watchdog a stalled request (e.g. "service is
+ * too busy" servers that accept the connection but never respond) hangs the
+ * whole run forever — no agent_end, no error, a spinning UI.
+ */
+const STREAM_STALL_TIMEOUT_MS = 120_000
+
+/**
+ * Wraps an AI SDK fullStream so the run fails visibly instead of hanging:
+ * every next() is raced against the stall timer. The timer is disarmed while
+ * a tool call is executing (tool-call received, tool-result not yet seen) —
+ * tools like subagents legitimately run for minutes without emitting chunks.
+ */
+export async function* stallWatchdog(
+	stream: AsyncIterable<any>,
+	timeoutMs: number = STREAM_STALL_TIMEOUT_MS,
+): AsyncGenerator<any> {
+	const iterator = stream[Symbol.asyncIterator]()
+	let awaitingToolResult = false
+	while (true) {
+		let timer: ReturnType<typeof setTimeout> | undefined
+		const stalled = new Promise<never>((_, reject) => {
+			if (!awaitingToolResult) {
+				timer = setTimeout(
+					() =>
+						reject(
+							new Error(
+								`LLM stream stalled: no data for ${Math.round(timeoutMs / 1000)}s — treating the task as failed`,
+							),
+						),
+					timeoutMs,
+				)
+			}
+		})
+		let next: IteratorResult<any>
+		try {
+			next = await Promise.race([iterator.next(), stalled])
+		} catch (err) {
+			// Best-effort: close the underlying stream so the hung request does
+			// not keep the socket open until GC.
+			try {
+				await iterator.return?.(undefined)
+			} catch {}
+			throw err
+		} finally {
+			if (timer) clearTimeout(timer)
+		}
+		if (next.done) return
+		const chunk = next.value
+		if (chunk?.type === "tool-call") awaitingToolResult = true
+		if (chunk?.type === "tool-result") awaitingToolResult = false
+		yield chunk
+	}
+}
+
+/**
  * Core helper that executes an AI streamText call, emits UI deltas, and aggregates results.
  */
 export async function executeStreamLLM(
@@ -243,6 +301,12 @@ export async function executeStreamLLM(
 	let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
 	let finishReason: string | null = null
 
+	logger.info("llm", `streamText started (${modelIdStr})`, {
+		threadId,
+		messageCount: messages.length,
+		toolsCount: tools ? Object.keys(tools).length : 0,
+	})
+
 	const streamRes = (streamText as any)({
 		model: effectiveModel,
 		system: instructions,
@@ -255,10 +319,17 @@ export async function executeStreamLLM(
 	const buildCurrentContent = () =>
 		buildMessageParts(assistantText, reasoningText, executedTools)
 
-	for await (const chunk of streamRes.fullStream) {
+	for await (const chunk of stallWatchdog(streamRes.fullStream)) {
 		if (abortSignal.aborted) break
 
 		if (chunk.type === "error") {
+			logger.error("llm", `streamText error (${modelIdStr})`, {
+				threadId,
+				error:
+					chunk.error instanceof Error
+						? chunk.error.message
+						: String(chunk.error),
+			})
 			throw chunk.error instanceof Error
 				? chunk.error
 				: new Error(String(chunk.error))
@@ -274,6 +345,11 @@ export async function executeStreamLLM(
 					totalTokens: usage.totalTokens ?? 0,
 				}
 			}
+			logger.info("llm", `streamText finished (${modelIdStr})`, {
+				threadId,
+				finishReason,
+				tokenUsage,
+			})
 			if (finishReason === "tool-calls") {
 				emit({
 					type: "agent_step_limit",
@@ -314,12 +390,16 @@ export async function executeStreamLLM(
 			}
 		} else if (chunk.type === "tool-call") {
 			const toolCallId = (chunk as any).toolCallId
+			// AI SDK v5 renamed the payload fields: `input` (was `args`). Reading
+			// only the legacy name silently persisted every tool part without its
+			// arguments, which blanked the UI after any transcript reload.
+			const args = (chunk as any).input ?? (chunk as any).args
 			const existing = executedTools.find((t) => t.id === toolCallId)
 			if (!existing) {
 				executedTools.push({
 					id: toolCallId,
 					name: (chunk as any).toolName,
-					args: (chunk as any).args,
+					args,
 				})
 			}
 			const { parts } = buildCurrentContent()
@@ -334,17 +414,22 @@ export async function executeStreamLLM(
 			})
 		} else if (chunk.type === "tool-result") {
 			const toolCallId = (chunk as any).toolCallId
+			// v5 renamed `result` → `output`; the legacy name is kept for safety.
+			const output = (chunk as any).output ?? (chunk as any).result
+			const isError = Boolean(
+				(chunk as any).isError ?? (output as any)?.isError,
+			)
 			const existing = executedTools.find((t) => t.id === toolCallId)
 			if (existing) {
-				existing.result = (chunk as any).result
-				existing.isError = (chunk as any).isError
+				existing.result = output
+				existing.isError = isError
 			} else {
 				executedTools.push({
 					id: toolCallId,
 					name: (chunk as any).toolName,
-					args: (chunk as any).args,
-					result: (chunk as any).result,
-					isError: (chunk as any).isError,
+					args: (chunk as any).input ?? (chunk as any).args,
+					result: output,
+					isError,
 				})
 			}
 			if (
@@ -358,11 +443,40 @@ export async function executeStreamLLM(
 						step,
 						toolCallId: toolCallId || "",
 						toolName: (chunk as any).toolName || "",
-						input: (chunk as any).args,
-						output: (chunk as any).result,
-						isError: Boolean((chunk as any).isError),
+						input: (chunk as any).input ?? (chunk as any).args,
+						output: output,
+						isError,
 					})
 				} catch {}
+			}
+			const { parts } = buildCurrentContent()
+			emit({
+				type: "message_update",
+				id: assistantMessageId,
+				message: {
+					id: assistantMessageId,
+					role: "assistant",
+					content: parts,
+				},
+			})
+		} else if (chunk.type === "tool-error") {
+			// v5 signals a thrown tool as its own chunk type; without this the
+			// tool stays marked "running" forever and the failure is invisible.
+			const toolCallId = (chunk as any).toolCallId
+			const errorOutput =
+				(chunk as any).error ?? (chunk as any).output ?? "Tool execution failed"
+			const existing = executedTools.find((t) => t.id === toolCallId)
+			if (existing) {
+				existing.result = errorOutput
+				existing.isError = true
+			} else {
+				executedTools.push({
+					id: toolCallId,
+					name: (chunk as any).toolName,
+					args: (chunk as any).input ?? (chunk as any).args,
+					result: errorOutput,
+					isError: true,
+				})
 			}
 			const { parts } = buildCurrentContent()
 			emit({
