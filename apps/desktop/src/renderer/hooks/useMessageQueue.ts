@@ -120,13 +120,30 @@ export function useMessageQueue(
 				id: item.id,
 			})
 			persist(queueFor(targetThreadId).filter((m) => m.id !== item.id))
+			dispatch({
+				type: "MESSAGE_START",
+				message: {
+					id: `user-${Date.now()}`,
+					role: "user",
+					content: item.content,
+					createdAt: new Date().toISOString(),
+					attachments:
+						item.files && item.files.length > 0
+							? (item.files as any)
+							: undefined,
+				},
+			})
 			try {
-				await window.api.invoke({ type: "steer", content: item.content })
+				await window.api.invoke({
+					type: "steer",
+					content: item.content,
+					threadId: currentThreadId || undefined,
+				})
 			} catch (err) {
 				console.error("Failed to steer queued message:", err)
 			}
 		},
-		[currentThreadId, chat.queuesByThread, persist],
+		[currentThreadId, chat.queuesByThread, persist, dispatch],
 	)
 
 	const handleDeleteQueued = useCallback(

@@ -345,7 +345,7 @@ export class Session<TState = any> {
 	private _activeAbortController: AbortController | null = null
 	private _pendingApprovals: Map<
 		string,
-		(decision: "approve" | "decline") => void
+		(decision: "approve" | "decline" | any) => void
 	> = new Map()
 	private _pendingSuspensions: Map<string, (data: any) => void> = new Map()
 	private _threadRuns: Map<
@@ -362,7 +362,7 @@ export class Session<TState = any> {
 					args: any
 					category?: string
 					categoryLabel?: string
-					resolve: (decision: "approve" | "decline") => void
+					resolve: (decision: "approve" | "decline" | any) => void
 				}
 			>
 			currentAssistantMessage?: any
@@ -894,9 +894,115 @@ export class Session<TState = any> {
 		return this._activeAbortController?.signal
 	}
 
-	async steer(_options: any): Promise<void> {}
+	async steer(options: any): Promise<void> {
+		const steerText =
+			typeof options === "string"
+				? options
+				: typeof options?.content === "string"
+					? options.content
+					: options?.content?.text ||
+						(options?.content ? JSON.stringify(options.content) : "")
+		const targetThreadId =
+			options?.threadId ||
+			this._currentThreadId ||
+			(this._threadRuns.size > 0 ? this._threadRuns.keys().next().value : "") ||
+			""
+		if (!steerText.trim()) return
 
-	async followUp(_options: any): Promise<void> {}
+		const threadRun = targetThreadId
+			? this._threadRuns.get(targetThreadId)
+			: undefined
+
+		if (threadRun && threadRun.pendingApprovals.size > 0) {
+			const store = await this.getMemoryStore()
+			const userMessageId = randomUUID()
+			const userDbMessage = {
+				id: userMessageId,
+				role: "user" as const,
+				content: {
+					format: 2,
+					parts: [{ type: "text", text: steerText }],
+					content: steerText,
+				},
+				threadId: targetThreadId,
+				resourceId: this.resourceId,
+				createdAt: new Date(),
+			}
+
+			if (store?.saveMessages) {
+				try {
+					await store.saveMessages({ messages: [userDbMessage] })
+				} catch (err) {
+					console.error("[steer] Failed to persist steer message:", err)
+				}
+			}
+
+			this.emit({
+				type: "message_start",
+				threadId: targetThreadId,
+				id: userMessageId,
+				message: userDbMessage,
+			})
+			this.emit({
+				type: "message_end",
+				threadId: targetThreadId,
+				id: userMessageId,
+				message: userDbMessage,
+			})
+
+			for (const [toolCallId, item] of threadRun.pendingApprovals.entries()) {
+				try {
+					item.resolve({ decision: "decline", feedback: steerText } as any)
+				} catch {}
+				this._pendingApprovals.delete(toolCallId)
+				this.emit({
+					type: "tool_approval_resolved" as any,
+					threadId: targetThreadId,
+					toolCallId,
+					decision: "decline",
+				})
+			}
+			threadRun.pendingApprovals.clear()
+			return
+		}
+
+		if (
+			this._pendingApprovals.size > 0 &&
+			(!threadRun || threadRun.pendingApprovals.size === 0)
+		) {
+			for (const [toolCallId, resolve] of this._pendingApprovals.entries()) {
+				try {
+					resolve({ decision: "decline", feedback: steerText } as any)
+				} catch {}
+				this._pendingApprovals.delete(toolCallId)
+				this.emit({
+					type: "tool_approval_resolved" as any,
+					threadId: targetThreadId,
+					toolCallId,
+					decision: "decline",
+				})
+			}
+			return
+		}
+
+		if (threadRun) {
+			threadRun.abortController.abort()
+			const startWait = Date.now()
+			while (
+				this._threadRuns.has(targetThreadId) &&
+				Date.now() - startWait < 3000
+			) {
+				await new Promise((r) => setTimeout(r, 50))
+			}
+			return this.sendMessage({ content: steerText, threadId: targetThreadId })
+		}
+
+		return this.sendMessage({ content: steerText, threadId: targetThreadId })
+	}
+
+	async followUp(options: any): Promise<void> {
+		return this.steer(options)
+	}
 
 	respondToToolApproval(opts: {
 		decision?: "approve" | "decline" | "always_allow_category" | string
@@ -909,7 +1015,7 @@ export class Session<TState = any> {
 		requestContext?: any
 		declineContext?: any
 	}): void {
-		let resolver: ((decision: "approve" | "decline") => void) | undefined
+		let resolver: ((decision: "approve" | "decline" | any) => void) | undefined
 		let resolvedThreadId = opts.threadId
 		let matchedItem: any = null
 
@@ -977,7 +1083,15 @@ export class Session<TState = any> {
 				}
 			}
 
-			resolver(dec)
+			const feedback =
+				typeof opts.declineContext === "string"
+					? opts.declineContext
+					: opts.declineContext?.reason || (opts as any).reason
+			if (dec === "decline" && feedback) {
+				resolver({ decision: "decline", feedback } as any)
+			} else {
+				resolver(dec)
+			}
 
 			// Record approval decision to database store
 			const targetThreadId = resolvedThreadId || this._currentThreadId
@@ -1108,7 +1222,7 @@ export class Session<TState = any> {
 					args: any
 					category?: string
 					categoryLabel?: string
-					resolve: (decision: "approve" | "decline") => void
+					resolve: (decision: "approve" | "decline" | any) => void
 				}
 			>(),
 			currentAssistantMessage: null as any,
@@ -1326,21 +1440,23 @@ export class Session<TState = any> {
 						// Register the resolver before emitting: a subscriber may
 						// answer synchronously, and the answer would otherwise be
 						// dropped and the run would hang.
-						const decisionPromise = new Promise<"approve" | "decline">(
-							(resolve) => {
-								threadRunState.pendingApprovals.set(toolCallId, {
-									toolCallId,
-									toolName,
-									args,
-									category,
-									categoryLabel: category
-										? category.charAt(0).toUpperCase() + category.slice(1)
-										: undefined,
-									resolve,
-								})
-								this._pendingApprovals.set(toolCallId, resolve)
-							},
-						)
+						const decisionPromise = new Promise<
+							| "approve"
+							| "decline"
+							| { decision: "approve" | "decline"; feedback?: string }
+						>((resolve) => {
+							threadRunState.pendingApprovals.set(toolCallId, {
+								toolCallId,
+								toolName,
+								args,
+								category,
+								categoryLabel: category
+									? category.charAt(0).toUpperCase() + category.slice(1)
+									: undefined,
+								resolve,
+							})
+							this._pendingApprovals.set(toolCallId, resolve)
+						})
 						this.emit({
 							type: "tool_approval_required",
 							threadId,
@@ -1355,7 +1471,17 @@ export class Session<TState = any> {
 
 						const decision = await decisionPromise
 
-						if (decision === "decline") {
+						if (
+							decision === "decline" ||
+							(typeof decision === "object" && decision?.decision === "decline")
+						) {
+							const feedback =
+								typeof decision === "object" && decision?.feedback
+									? decision.feedback
+									: undefined
+							if (feedback) {
+								return `Tool execution was declined by user with steering guidance: "${feedback}". Please adjust your plan and follow this guidance immediately.`
+							}
 							return "Tool execution was declined by user."
 						}
 					}

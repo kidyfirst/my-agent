@@ -177,7 +177,7 @@ describe("createSubagentTool", () => {
 			rc.set("harness", mockHarness)
 			const context = {
 				requestContext: rc,
-				agent: { toolCallId: "call-123" },
+				toolCallId: "call-123",
 			}
 
 			const res = await (tool as any).execute(

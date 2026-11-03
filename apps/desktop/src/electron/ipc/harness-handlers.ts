@@ -547,12 +547,40 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			return { files, canRevert: files.length > 0 }
 		},
 		steer: async (command, ctx) => {
-			await ctx.getActiveSession().harness.steer({ content: command.content })
+			const targetThreadId = command.threadId as string | undefined
+			if (targetThreadId) {
+				for (const session of ctx.sessions.values()) {
+					if ((session?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+						await session.harness.steer({
+							content: command.content,
+							threadId: targetThreadId,
+						})
+						return
+					}
+				}
+			}
+			await ctx.getActiveSession().harness.steer({
+				content: command.content,
+				threadId: targetThreadId,
+			})
 		},
 		followUp: async (command, ctx) => {
-			await ctx
-				.getActiveSession()
-				.harness.followUp({ content: command.content })
+			const targetThreadId = command.threadId as string | undefined
+			if (targetThreadId) {
+				for (const session of ctx.sessions.values()) {
+					if ((session?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+						await session.harness.followUp({
+							content: command.content,
+							threadId: targetThreadId,
+						})
+						return
+					}
+				}
+			}
+			await ctx.getActiveSession().harness.followUp({
+				content: command.content,
+				threadId: targetThreadId,
+			})
 		},
 		switchMode: async (command, ctx) => {
 			const s = ctx.getActiveSession()

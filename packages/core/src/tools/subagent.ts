@@ -106,8 +106,10 @@ Use this tool when:
 				| undefined
 			const emitEvent = harnessCtx?.emitEvent
 			const abortSignal = harnessCtx?.abortSignal
-			// toolCallId from the parent agent's tool invocation
-			const toolCallId = context?.agent?.toolCallId ?? "unknown"
+			// toolCallId from the parent agent's tool invocation. The controller
+			// passes the execution context as `{ requestContext, toolCallId }`,
+			// so it lives at the top level, not under `agent`.
+			const toolCallId = context?.toolCallId ?? "unknown"
 
 			// Build the constrained tool set
 			const subagentTools: Record<string, any> = {}

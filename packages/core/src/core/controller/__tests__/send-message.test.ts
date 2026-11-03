@@ -492,4 +492,174 @@ describe("Session.sendMessage", () => {
 		)
 		expect(imgPart).toBeDefined()
 	})
+
+	it("Session.steer redirects execution during tool approval and delivers guidance to next LLM turn", async () => {
+		let calls = 0
+		let step2Prompt: any = null
+		const model = new MockLanguageModelV3({
+			doStream: async (options) => {
+				calls++
+				if (calls === 1) {
+					return {
+						stream: convertArrayToReadableStream([
+							{ type: "stream-start", warnings: [] },
+							{
+								type: "tool-call",
+								toolCallId: "c1",
+								toolName: "shell",
+								input: JSON.stringify({
+									command: "grep -rn 'ToolApprovalCard'",
+								}),
+							},
+							{ type: "finish", finishReason: "tool-calls", usage },
+						]),
+					}
+				}
+				step2Prompt = options.prompt
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "t2" },
+						{
+							type: "text-delta",
+							id: "t2",
+							delta: "收到转向指示，改为派生子智能体",
+						},
+						{ type: "text-end", id: "t2" },
+						{ type: "finish", finishReason: "stop", usage },
+					]),
+				}
+			},
+		})
+
+		let executed = 0
+		const controller = makeController(model, {
+			shell: {
+				description: "run shell command",
+				parameters: {
+					type: "object",
+					properties: { command: { type: "string" } },
+				},
+				execute: async () => {
+					executed++
+					return { output: "should not run" }
+				},
+			},
+		})
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "test-steer" })
+
+		const events: Array<{ type: string; [key: string]: any }> = []
+		session.subscribe((e: any) => {
+			events.push(e)
+			if (e.type === "tool_approval_required") {
+				// User steers the agent instead of approving
+				session.steer({
+					content: "请派生一个子智能体实现该功能",
+					threadId: session.thread.getId(),
+				})
+			}
+		})
+
+		await session.sendMessage({ content: "开始查找文件" } as any)
+
+		// 1. Tool should NOT have been executed
+		expect(executed).toBe(0)
+		expect(calls).toBe(2)
+
+		// 2. tool_approval_resolved was emitted
+		const resolvedEvent = events.find(
+			(e) => e.type === "tool_approval_resolved",
+		)
+		expect(resolvedEvent).toBeDefined()
+		expect(resolvedEvent?.decision).toBe("decline")
+
+		// 3. Next LLM turn received the steering feedback in tool-result
+		expect(step2Prompt).toBeDefined()
+		const promptStr = JSON.stringify(step2Prompt)
+		expect(promptStr).toContain(
+			'Tool execution was declined by user with steering guidance: \\"请派生一个子智能体实现该功能\\"',
+		)
+
+		// 4. User steering message was persisted to memory store
+		const threadId = session.thread.getId()
+		const store = await (controller.storage as SQLiteStore).getStore("memory")
+		const { messages } = await store.listMessages({ threadId })
+		const steerMsg = messages.find(
+			(m: any) =>
+				m.role === "user" &&
+				(m.content?.content === "请派生一个子智能体实现该功能" ||
+					m.content?.parts?.[0]?.text === "请派生一个子智能体实现该功能"),
+		)
+		expect(steerMsg).toBeDefined()
+	})
+
+	it("respondToToolApproval with declineContext supplies feedback to LLM", async () => {
+		let calls = 0
+		let step2Prompt: any = null
+		const model = new MockLanguageModelV3({
+			doStream: async (options) => {
+				calls++
+				if (calls === 1) {
+					return {
+						stream: convertArrayToReadableStream([
+							{ type: "stream-start", warnings: [] },
+							{
+								type: "tool-call",
+								toolCallId: "c_decline",
+								toolName: "shell",
+								input: JSON.stringify({ command: "rm -rf /tmp/test" }),
+							},
+							{ type: "finish", finishReason: "tool-calls", usage },
+						]),
+					}
+				}
+				step2Prompt = options.prompt
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "t3" },
+						{ type: "text-delta", id: "t3", delta: "已采纳替代方案" },
+						{ type: "text-end", id: "t3" },
+						{ type: "finish", finishReason: "stop", usage },
+					]),
+				}
+			},
+		})
+
+		const controller = makeController(model, {
+			shell: {
+				description: "run shell command",
+				parameters: {
+					type: "object",
+					properties: { command: { type: "string" } },
+				},
+				execute: async () => ({ output: "declined" }),
+			},
+		})
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "test-decline-context",
+		})
+
+		session.subscribe((e: any) => {
+			if (e.type === "tool_approval_required") {
+				session.respondToToolApproval({
+					decision: "decline",
+					toolCallId: e.toolCallId,
+					threadId: session.thread.getId(),
+					declineContext: { reason: "请换用安全的重命名操作" },
+				})
+			}
+		})
+
+		await session.sendMessage({ content: "清理临时文件" } as any)
+
+		expect(calls).toBe(2)
+		expect(step2Prompt).toBeDefined()
+		const promptStr = JSON.stringify(step2Prompt)
+		expect(promptStr).toContain(
+			'Tool execution was declined by user with steering guidance: \\"请换用安全的重命名操作\\"',
+		)
+	})
 })

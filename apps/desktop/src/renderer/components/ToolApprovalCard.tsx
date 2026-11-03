@@ -380,7 +380,6 @@ export function ToolApprovalCard({
 				zIndex: 10,
 				display: "flex",
 				flexDirection: "column",
-				maxHeight: "60vh",
 				minHeight: 0,
 			}}
 		>
@@ -463,10 +462,7 @@ export function ToolApprovalCard({
 
 			<div
 				style={{
-					flex: "1 1 auto",
 					minHeight: 0,
-					overflowY: "auto",
-					overscrollBehavior: "contain",
 				}}
 			>
 				{/* Code block preview */}
@@ -482,8 +478,9 @@ export function ToolApprovalCard({
 						fontSize: 12,
 						lineHeight: 1.5,
 						color: "var(--tool-output, var(--text))",
-						maxHeight: 120,
+						maxHeight: 160,
 						overflowY: "auto",
+						overscrollBehavior: "contain",
 						wordBreak: "break-all",
 						whiteSpace: "pre-wrap",
 					}}

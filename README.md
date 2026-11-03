@@ -122,6 +122,12 @@
       - [3.4.4 Agent ReAct 循环机制与工具流](#344-agent-react-循环机制与工具流)
       - [3.4.5 扩展工具生态与沙箱安全 (`packages/core/src/tools/`, `lsp/`, `browser/`)](#345-扩展工具生态与沙箱安全-packagescoresrctools-lsp-browser)
       - [3.4.6 分级子智能体与多 Agent 体系 (Subagents & Multi-Agent)](#346-分级子智能体与多-agent-体系-subagents--multi-agent-architecture)
+        - [1. 内置子智能体职责与权限梯队](#1-内置子智能体职责与权限梯队)
+        - [2. 实现细节：调用链路与运行机制](#2-实现细节调用链路与运行机制)
+        - [3. 使用场景与调用建议](#3-使用场景与调用建议)
+        - [4. 自定义与扩展](#4-自定义与扩展)
+        - [5. 事件流转与 UI 呈现](#5-事件流转与-ui-呈现)
+        - [6. 为什么需要多权限 Subagent？（设计优势）](#6-为什么需要多权限-subagent设计优势)
       - [3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)](#347-执行模式与图调度-packagescoresrccoregraph)
       - [3.4.8 会话录制与离线回放 (`packages/core/src/core/recorder/`)](#348-会话录制与离线回放-packagescoresrccorerecorder)
     - [3.5 Memory 记忆模块 (`packages/core/src/memory/`)](#35-memory-记忆模块-packagescoresrcmemory)
@@ -355,7 +361,7 @@ contextBridge.exposeInMainWorld("api", {
 
 - **变更文件卡片 (`FilesChangedBar.tsx`)**：`message.changedFiles` 非空时挂在 assistant 消息尾部。头部一行是 `N files changed +X -Y`，点击整行展开；展开后每个文件显示 `basename` + 目录 + 增删行数，`Review` 按钮阻止冒泡并直接打开差异编辑器。行内 diff 懒加载（`getTaskFileDiff`，按 `messageId` 取），`isLive` 表示任务仍在执行。
 - **持久化 (`packages/core/src/snapshot/task-changes-store.ts`)**：任务结束时的文件列表与 diff 写入 `<appData>/task-changes.json`（thread → message → files/diff，上限 40 个线程 × 80 个任务、单条 diff 200KB），重启后 `getMessages` 会重新挂回 `changedFiles`，删除线程时同步清理。
-- **子智能体卡片 (`SubagentExecution.tsx`)**：整行可点，`🏗️` + `Agent` + 任务描述 + 完成耗时 + ✓/✗/运行中脉冲点；展开后展示子智能体内部的工具调用与最终结果。
+- **子智能体卡片 (`SubagentExecution.tsx`)**：整行可点，`🏗️` + `Agent` + 任务描述 + 完成耗时 + ✓/✗/运行中脉冲点；展开后逐条列出子智能体内部工具调用（含失败标记），并以只读文本块展示最终结果（失败时用错误色）。数据来源与事件映射见 [3.4.6 第 5 节](#5-事件流转与-ui-呈现)。
 
 #### 3.3.5 滚动、空态与层叠
 
@@ -637,9 +643,9 @@ flowchart TD
     subgraph SubagentSandbox ["4. 分级子智能体沙箱 (Subagents Engine)"]
         ParentAgent -->|"subagent 元工具动态派生<br/>(无状态、独立沙箱、任务自包含)"| SubagentRouter{"Subagent 分发与工具裁剪"}
 
-        SubagentRouter -->|"explore (只读探索)"| ExploreAgent["Explore Agent<br/>• 仅限: view, grep, glob<br/>• 路由: 极速小模型 (Gemini Flash)<br/>• 检索代码库，输出 < 300 字脱水摘要"]
+        SubagentRouter -->|"explore (只读探索)"| ExploreAgent["Explore Agent<br/>• 仅限: view, search_content, find_files<br/>• 模型: 显式指定 > 按类型配置 > 会话模型 > Gemini Flash<br/>• 检索代码库，输出 < 300 字脱水摘要"]
         SubagentRouter -->|"plan (架构规划)"| PlanAgent["Plan Agent<br/>• 仅限只读工具<br/>• 梳理依赖，输出结构化实施计划"]
-        SubagentRouter -->|"execute (写码执行)"| ExecuteAgent["Execute Agent<br/>• 挂载: LSP edit, write_file, shell<br/>• 闭环: 修改代码 → 跑测试验证<br/>• 受 HITL 权限审批监控"]
+        SubagentRouter -->|"execute (写码执行)"| ExecuteAgent["Execute Agent<br/>• 挂载: LSP edit, write_file, shell, task_write/check<br/>• 闭环: 修改代码 → 跑测试验证<br/>• 步数上限 50 步，随父会话 abortSignal 中断"]
     end
 
     subgraph Feedback ["5. 上下文脱水与事件流式渲染"]
@@ -653,28 +659,125 @@ flowchart TD
 
 ##### 1. 内置子智能体职责与权限梯队
 
-主 Agent 通过 `createSubagentTool` 动态按需唤起轻量级 Subagent，不同类型的 Subagent 实行严格的物理级工具白名单隔离与模型路由：
+主 Agent 通过 `subagent` 元工具（`createSubagentTool`，`packages/core/src/tools/subagent.ts:47`）在需要时派生轻量级 Subagent。三个内置类型在 `packages/core/src/agents/` 中以纯数据定义（`SubagentDefinition`：`id` / `name` / `instructions` / `allowedTools`），由 `agents/index.ts` 的注册表统一检索：
 
-| Subagent 类型 | 角色定位       | 允许工具 (`allowedTools`)                                                                                                 | 默认模型策略                                         | 核心应用场景                                                                 |
-| :------------ | :------------- | :------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------- | :--------------------------------------------------------------------------- |
-| **`explore`** | 只读代码探索   | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(极速/低单价/秒级响应) | 全仓跨文件大范围检索、查调用点、分析模块结构，避免海量原始代码撑爆主上下文。 |
-| **`plan`**    | 架构与方案规划 | `view`, `search_content`, `find_files`                                                                                    | 继承默认/高推理模型                                  | 大型重构或新功能实施前的方案拆解、依赖关系梳理、产出带步骤的实施蓝图。       |
-| **`execute`** | 专注读写执行   | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | 继承高代码能力模型                                   | 聚焦执行单一文件的代码重构、改写，并在封闭循环内自运行测试验证直至通过。     |
+| Subagent 类型 | 角色定位       | 允许工具 (`allowedTools`)                                                                                                 | 默认模型（`subagent.ts:43-45`）                                     | 核心应用场景                                                                 |
+| :------------ | :------------- | :------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------ | :--------------------------------------------------------------------------- |
+| **`explore`** | 只读代码探索   | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(极速 / 低单价 / 秒级响应)            | 全仓跨文件大范围检索、查调用点、分析模块结构，避免海量原始代码撑爆主上下文。 |
+| **`plan`**    | 架构与方案规划 | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(当前与 explore 共用默认值，可被覆盖) | 大型重构或新功能实施前的方案拆解、依赖关系梳理、产出带步骤的实施蓝图。       |
+| **`execute`** | 专注读写执行   | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | `google/gemini-2.0-flash`<br/>(同上，建议显式配置为高代码能力模型)  | 聚焦执行单一文件的代码重构、改写，并在封闭循环内自运行测试验证直至通过。     |
 
-##### 2. 为什么需要多权限 Subagent？（设计优势）
+##### 2. 实现细节：调用链路与运行机制
+
+**调用链路**
+
+```
+Agent (ReAct 循环)
+  └─ tools.subagent({ agentType, task, modelId? })      packages/core/src/tools/subagent.ts:93
+       ├─ getSubagentDefinition(agentType)              packages/core/src/agents/index.ts:21
+       ├─ 从父级工具注册表按 allowedTools 白名单裁剪      subagent.ts:113-118
+       ├─ 解析模型（见下方优先级）                        subagent.ts:120-148
+       ├─ new Agent({ instructions, model, tools })      subagent.ts:151-157   全新实例，无父会话历史
+       ├─ agent.stream(task, { maxSteps: 50, abortSignal }) subagent.ts:176-179
+       │    └─ 逐帧消费 fullStream → emitEvent(subagent_*)  subagent.ts:182-233
+       └─ getFullOutput() → 结果文本 + <subagent-meta />  subagent.ts:258-275
+```
+
+要点：
+
+- **权限清单单一来源（当前实现）**：`createSubagentTool` 通过 `getSubagentIds()` / `getSubagentDefinition()` 直接读取 `packages/core/src/agents/` 注册表，工具白名单在 `subagent.ts:113-118` 从父级工具注册表按 `allowedTools` 逐个取用、缺失即跳过。
+- **`config.subagents` 尚未接入工具**：`createMyAgent()` 会把 `config.subagents ?? createDefaultSubagents(projectRoot)` 挂到 `controller.subagents`（`harness/index.ts:595,609`），但当前没有任何代码消费该列表 —— 既不会改变可派生的类型，也不会改变子智能体拿到的工具。自定义类型需要同步修改 `agents/` 注册表。
+- **每次调用都是一次性全新 Agent**：Subagent 不复用父 Agent 的 Memory，也不注入父会话的历史消息；父 Agent 只能看到最终返回的文本（`Stateless Ephemeral Worker`）。
+- **父级工具代理（`harness/tools.ts:125-137`）**：`task_write` / `task_check` 通过 `Proxy` 恒定可解析，因此 `execute` 子智能体的任务看板工具不会因模式裁剪而缺失。
+- **步数上限 50 步、可中断**：`maxSteps: 50` 限制子智能体自身的 ReAct 轮次；父会话的 `abortSignal` 透传进来，用户中断时返回 `[Aborted by user]` + 已产出的部分文本，而非报错。
+- **结果附带元数据标签**：结束时在文本尾部追加 `<subagent-meta modelId="…" durationMs="…" tools="view:ok,search_content:err" />`（`subagent.ts:336-345`），用于从历史记录恢复卡片时展示模型、耗时与工具调用流水。
+- **错误降级**：模型解析失败返回 `Failed to resolve model "…"`；未知类型在 Zod 枚举处即被拒绝，运行时再兜底返回 `Unknown agent type`；其他异常统一包装为 `Subagent "<name>" failed: …` 并置 `isError: true`。
+
+**模型路由优先级（`subagent.ts:120-139`）**
+
+1. 工具调用参数中显式指定的 `modelId`；
+2. 持久化配置的按类型子智能体模型：`harness.getSubagentModelId({ agentType })` → `AuthStorage.getSubagentModelId(agentType)`，即 `<dataDir>` 中的 `_subagentModelId_<agentType>`（`packages/core/src/auth/storage.ts:278-297`，写入走 `setSubagentModelId`）；
+3. `createSubagentTool({ defaultModelId })` —— 由 `harness/tools.ts:160-164` 传入当前会话模型 ID；
+4. 内置兜底：`google/gemini-2.0-flash`。
+
+> 注意：优先级 3 会让未配置第 2 项时子智能体跟随主会话模型，因此"explore 默认便宜小模型"只在父会话未传 `defaultModelId` 时成立；需要固定分级路由时请显式调用 `setSubagentModelId(modelId, agentType)`。
+
+##### 3. 使用场景与调用建议
+
+| 场景                                            | 推荐类型      | 理由                                                      |
+| :---------------------------------------------- | :------------ | :-------------------------------------------------------- |
+| "X 在哪定义 / 谁调用了 Y / Z 模块怎么跑起来"    | `explore`     | 大量 grep 与文件读取留在子上下文，只回传结论与行号        |
+| 跨模块、多子系统的并行排查（前端 + 后端各一路） | `explore` × N | 多路并发，互不污染主上下文                                |
+| 大型重构 / 新特性落地前先出方案                 | `plan`        | 只读遍历现有约定，产出「改动文件 + 实施顺序 + 风险」蓝图  |
+| 边界清晰、可独立验证的单点改动                  | `execute`     | 具备读写与跑测试的闭环能力，但仍需父 Agent 复核整体一致性 |
+| 机械批量改造（如统一重命名、补测试）            | `execute`     | 自带回环验证，父 Agent 只消费最终报告                     |
+
+不适合委派的场景：需要沿主会话上下文追问的对话式任务、需要频繁与用户确认审批的破坏性操作、以及只有一两步就能完成的琐碎查找（直接调 `search_content` 更省时）。
+
+##### 4. 自定义与扩展
+
+当前可用的扩展点只有一个 —— **新增子智能体类型 = 在注册表里加一条定义**：
+
+```ts
+// packages/core/src/agents/review.ts
+import type { SubagentDefinition } from "./types.js"
+
+export const reviewSubagent: SubagentDefinition = {
+	id: "review",
+	name: "Review",
+	instructions: `你是一名严格的代码评审者……`,
+	allowedTools: ["view", "search_content", "find_files", "execute_command"],
+}
+
+// packages/core/src/agents/index.ts
+const subagentRegistry: Record<string, SubagentDefinition> = {
+	explore: exploreSubagent,
+	plan: planSubagent,
+	execute: executeSubagent,
+	review: reviewSubagent, // ← 新增后自动出现在 subagent 工具的枚举与描述中
+}
+```
+
+注册即刻生效：`getSubagentIds()` 决定 Zod 枚举与工具描述中可用类型的清单，`subagent.ts:53-57` 的 `typeDescriptions` 为其补充说明文案（未覆盖的类型仅显示 `- **id**`）。
+
+尚未接通的配置项（扩展时需留意）：
+
+| 配置项                                        | 位置                                                          | 现状                                                                      |
+| :-------------------------------------------- | :------------------------------------------------------------ | :------------------------------------------------------------------------ |
+| `MyAgentConfig.subagents` / `HarnessSubagent` | `harness/index.ts:595`、`core/controller/controller.ts:63-71` | 已挂到 `controller.subagents`，但无消费者；改它不会改变可派生类型与工具集 |
+| `createSubagentTool({ allowedAgentTypes })`   | `tools/subagent.ts:39,49-51`                                  | 工具侧已支持类型裁剪，但 `harness/tools.ts` 未传入，属于预留能力          |
+| `HarnessSubagent.tools` / `model`             | `core/controller/controller.ts:68-69`                         | 未参与注入，子智能体工具始终由 `agents/*.ts` 的 `allowedTools` 决定       |
+
+##### 5. 事件流转与 UI 呈现
+
+`subagent` 工具通过 requestContext 上的 `harness.emitEvent` 实时广播以下事件（`packages/core/src/tools/subagent.ts`），全部携带父级 `toolCallId` 以便归并：
+
+| 事件                  | 触发时机               | 载荷                                      |
+| :-------------------- | :--------------------- | :---------------------------------------- |
+| `subagent_start`      | 子 Agent 创建后        | `agentType`, `task`, `modelId`            |
+| `subagent_tool_start` | 子 Agent 发起工具调用  | `subToolName`, `subToolArgs`              |
+| `subagent_tool_end`   | 子 Agent 工具返回      | `subToolName`, `subToolResult`, `isError` |
+| `subagent_text_delta` | 子 Agent 流式输出      | `textDelta`（同时累积到 `partialText`）   |
+| `subagent_end`        | 正常结束 / 中断 / 失败 | `result`, `isError`, `durationMs`         |
+
+渲染侧链路：`useHarnessEvents.ts:512-554` 将事件转为 `SUBAGENT_START` / `SUBAGENT_TOOL_START` / `SUBAGENT_TOOL_END` / `SUBAGENT_END`（对应 `apps/desktop/src/renderer/types/chat.ts:605-666`），`ChatView` 据此产出独立的 `subagent` 渲染项，由 `SubagentExecution.tsx` 呈现为 `🏗️ Agent + 任务描述 + 耗时 + ✓/✗` 的折叠卡片。若历史记录中缺少实时事件，`ChatView.tsx:713-741` 会依据工具调用参数与结果回退构造卡片。
+
+> `subagent_model_changed` 目前只在渲染进程的事件类型联合（`types/ipc.ts:54`）中声明；`AuthStorage.setSubagentModelId` 尚无对应的 IPC 通道与 UI 入口，修改按类型的子智能体模型需直接写入凭证存储。
+
+##### 6. 为什么需要多权限 Subagent？（设计优势）
 
 1. **最小特权原则与物理防注入（Least Privilege & Security）**：
-   - `explore` 和 `plan` 实例在构建时，危险的 `write_file` 和 `execute_command` 工具被直接过滤掉（见 `packages/core/src/tools/subagent.ts:112-118`）。
-   - 即使探索第三方开源项目时代码注释中包含恶意 Prompt Injection（如“删除本地文件”），因缺乏工具暴露，模型在物理层面无法发起任何破坏性调用。
+   - `explore` / `plan` 实例在构建时，危险的 `write_file` 与 `execute_command` 根本不在工具表里（`packages/core/src/tools/subagent.ts:113-118`）。
+   - 即使探索第三方开源项目时代码注释中包含恶意 Prompt Injection（如"删除本地文件"），因缺乏工具暴露，模型在物理层面无法发起任何破坏性调用。
 2. **保护主会话上下文与信噪比（Context Isolation & Noise Filtering）**：
-   - Subagent 拥有完全独立的沙箱上下文，不加载父会话的历史记忆（`Stateless Ephemeral Worker`）。
-   - 探索过程中产生的成千上万行 grep 输出和原始文件全被隔离在子沙箱内部，角色提示词强制要求（`packages/core/src/agents/explore.ts:38`）输出不超过 300 字的精炼结论（回答、核心文件、行号），避免主会话遭遇上下文爆炸和注意力稀释。
+   - Subagent 拥有完全独立的上下文，不加载父会话的历史记忆。
+   - 探索过程中产生的成千上万行 grep 输出和原始文件全被隔离在子上下文内部，角色提示词强制要求（`packages/core/src/agents/explore.ts:38`）输出不超过 300 字的精炼结论（回答、核心文件、行号），避免主会话遭遇上下文爆炸和注意力稀释。
 3. **模型分级路由（Cost & Latency Optimization）**：
-   - 主会话往往使用顶级推理模型（如 Claude 3.7 Sonnet / GPT-4o），而机械的代码翻找交由毫秒级响应的小模型（Gemini 2.0 Flash / Cerebras）并发跑，开销节省 90% 以上。
+   - 主会话往往使用顶级推理模型（如 Claude 3.7 Sonnet / GPT-4o），可通过 `setSubagentModelId` 把机械的代码翻找固定到 Gemini 2.0 Flash 等小模型，显著降低开销与首字延迟。
 4. **决策聚焦与工具误触消除（Tool Confusion Reduction）**：
-   - 将工具决策空间由全量的数十个裁剪至 3 个，大模型的 Tool Calling 准确率大幅提升，彻底消除工具误用。
-5. **多路异步并发（Parallel Multitasking）**：
-   - 主 Agent 可同时并发调起多个探索任务（例如前端组件排查与后端路由排查同时进行），并在桌面端以独立的 `🏗️ Agent` 卡片（`SubagentExecution.tsx`）流式呈现。
+   - 将工具决策空间由全量的数十个裁剪至 3 个，大模型的 Tool Calling 准确率大幅提升，降低工具误用。
+5. **多路异步并发与统一呈现（Parallel Multitasking）**：
+   - 主 Agent 可同时发起多个探索任务（例如前端组件排查与后端路由排查并行），桌面端以彼此独立的 `🏗️ Agent` 卡片流式呈现，互不干扰。
 
 #### 3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)
 

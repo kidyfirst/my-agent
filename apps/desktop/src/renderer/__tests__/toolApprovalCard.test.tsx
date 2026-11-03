@@ -101,7 +101,7 @@ describe("ToolApprovalCard Component", () => {
 		expect(html).toContain("in this conversation")
 	})
 
-	it("caps card height and scrolls the body while pinning header and footer", () => {
+	it("keeps the command preview as the only scroll container", () => {
 		const html = renderToStaticMarkup(
 			<ToolApprovalCard
 				approval={sampleApproval}
@@ -109,12 +109,17 @@ describe("ToolApprovalCard Component", () => {
 			/>,
 		)
 
-		// The card is a bounded flex column so it cannot grow past the viewport.
-		expect(html).toContain("max-height:60vh")
+		// The card is a flex column but must not clamp its own height: a capped
+		// body would wrap the options in a second scrollbar beside the preview.
 		expect(html).toContain("flex-direction:column")
+		expect(html).not.toContain("max-height:60vh")
 
-		// Only the middle region scrolls; header and footer must stay put.
-		expect(html).toContain("overflow-y:auto")
+		// Exactly one scrollable region: the command preview.
+		const scrollRegions = html.match(/overflow-y:auto/g) ?? []
+		expect(scrollRegions).toHaveLength(1)
+		expect(html).toContain("overscroll-behavior:contain")
+
+		// Header and footer stay outside the scrolling region.
 		expect(html).toContain("flex-shrink:0")
 	})
 

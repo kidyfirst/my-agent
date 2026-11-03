@@ -288,7 +288,7 @@ Usage notes:
 				toolContext?.requestContext?.get("harness")) as any
 			const abortSignal = harnessCtx?.abortSignal
 			const emitEvent = harnessCtx?.emitEvent
-			const toolCallId = toolContext?.agent?.toolCallId
+			const toolCallId = toolContext?.toolCallId
 
 			// Define abort handler outside try block so it's accessible in catch
 			const abortHandler = () => {

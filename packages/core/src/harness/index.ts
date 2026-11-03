@@ -181,12 +181,14 @@ export interface SendMessageOptions {
 
 export interface SteerOptions {
 	content: string
+	threadId?: string
 	files?: SendMessageFile[]
 	requestContext?: RequestContext
 }
 
 export interface FollowUpOptions {
 	content: string
+	threadId?: string
 	files?: SendMessageFile[]
 	requestContext?: RequestContext
 }

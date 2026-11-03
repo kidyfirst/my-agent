@@ -124,6 +124,12 @@ If this project has been useful to you, treat the cat 🐱
       - [3.4.4 Agent ReAct loop and tool stream](#344-agent-react-loop-and-tool-stream)
       - [3.4.5 Extended tool ecosystem and sandbox safety (`src/tools/`, `src/lsp/`, `src/browser/`)](#345-extended-tool-ecosystem-and-sandbox-safety-srctools-srclsp-srcbrowser)
       - [3.4.6 Tiered Subagents & Multi-Agent Architecture](#346-tiered-subagents--multi-agent-architecture)
+        - [1. Built-in Subagent Roles & Permission Tiers](#1-built-in-subagent-roles--permission-tiers)
+        - [2. Implementation Details: Invocation Flow & Execution Mechanics](#2-implementation-details-invocation-flow--execution-mechanics)
+        - [3. Usage Scenarios & Recommendations](#3-usage-scenarios--recommendations)
+        - [4. Customization & Extensions](#4-customization--extensions)
+        - [5. Event Flow & UI Presentation](#5-event-flow--ui-presentation)
+        - [6. Why Multi-Tiered Subagents? (Design Advantages)](#6-why-multi-tiered-subagents-design-advantages)
       - [3.4.7 Execution modes and graph scheduling (`src/core/graph/`)](#347-execution-modes-and-graph-scheduling-srccoregraph)
       - [3.4.8 Session recording and offline replay (`src/core/recorder/`)](#348-session-recording-and-offline-replay-srccorerecorder)
     - [3.5 Memory module (`src/memory/`)](#35-memory-module-srcmemory)
@@ -610,9 +616,9 @@ flowchart TD
     subgraph SubagentSandbox ["4. Tiered Subagent Sandbox (Subagents Engine)"]
         ParentAgent -->|"subagent meta-tool dynamic delegation<br/>(Stateless, isolated sandbox, self-contained prompt)"| SubagentRouter{"Subagent Router & Tool Scoping"}
 
-        SubagentRouter -->|"explore (read-only)"| ExploreAgent["Explore Agent<br/>• Scoped to: view, grep, glob<br/>• Routed to: ultra-fast model (Gemini Flash)<br/>• Codebase search, returns <300 word distilled summary"]
+        SubagentRouter -->|"explore (read-only)"| ExploreAgent["Explore Agent<br/>• Scoped to: view, search_content, find_files<br/>• Model: Explicit > Type config > Session model > Gemini Flash<br/>• Codebase search, returns <300 word distilled summary"]
         SubagentRouter -->|"plan (planning)"| PlanAgent["Plan Agent<br/>• Scoped to read-only tools<br/>• Analyzes dependencies, outputs structured plan"]
-        SubagentRouter -->|"execute (write execution)"| ExecuteAgent["Execute Agent<br/>• Mounts: LSP edit, write_file, shell<br/>• Closed loop: edit code → run tests to verify<br/>• Monitored by HITL tool approval system"]
+        SubagentRouter -->|"execute (write execution)"| ExecuteAgent["Execute Agent<br/>• Mounts: LSP edit, write_file, shell, task_write/check<br/>• Closed loop: edit code → run tests to verify<br/>• 50 step limit, aborts on parent session abortSignal"]
     end
 
     subgraph Feedback ["5. Context Distillation & Event Streaming"]
@@ -626,26 +632,107 @@ flowchart TD
 
 ##### 1. Built-in Subagent Roles & Permission Tiers
 
-The parent agent dynamically spawns lightweight Subagents on demand via `createSubagentTool`, with strict physical tool whitelisting and model routing per type:
+The parent agent dynamically spawns lightweight Subagents on demand via the `subagent` meta-tool (`createSubagentTool`, `packages/core/src/tools/subagent.ts:47`). The three built-in types are defined in `packages/core/src/agents/` as pure data (`SubagentDefinition`: `id` / `name` / `instructions` / `allowedTools`), indexed by the registry in `agents/index.ts`:
 
-| Subagent Type | Role & Focus                           | Allowed Tools (`allowedTools`)                                                                                            | Default Model Policy                                               | Primary Scenarios                                                                                                                  |
-| :------------ | :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
-| **`explore`** | Read-only codebase exploration         | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(Fast / low-cost / instant response) | Large-scale codebase search, finding call sites, inspecting structure; prevents raw file contents from exploding the main context. |
-| **`plan`**    | Architecture & implementation planning | `view`, `search_content`, `find_files`                                                                                    | Inherited / high-reasoning model                                   | Pre-implementation architecture breakdown, dependency analysis, producing actionable ordered steps.                                |
-| **`execute`** | Focused read-write execution           | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | Inherited high-capability coding model                             | Targeted implementation and refactoring within a scoped module, running tests locally until passing before reporting back.         |
+| Subagent Type | Role & Focus                           | Allowed Tools (`allowedTools`)                                                                                            | Default Model Policy (`subagent.ts:43-45`)                                     | Primary Scenarios                                                                                                                  |
+| :------------ | :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **`explore`** | Read-only codebase exploration         | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(Fast / low-cost / instant response)             | Large-scale codebase search, finding call sites, inspecting structure; prevents raw file contents from exploding the main context. |
+| **`plan`**    | Architecture & implementation planning | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(Shares default with explore, can be overridden) | Pre-implementation architecture breakdown, dependency analysis, producing actionable ordered steps.                                |
+| **`execute`** | Focused read-write execution           | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | `google/gemini-2.0-flash`<br/>(Can be overridden, coding models recommended)   | Targeted implementation and refactoring within a scoped module, running tests locally until passing before reporting back.         |
 
-##### 2. Key Architectural Advantages
+##### 2. Implementation Details: Invocation Flow & Execution Mechanics
+
+**Invocation Flow**
+
+```
+Agent (ReAct loop)
+  └─ tools.subagent({ agentType, task, modelId? })      packages/core/src/tools/subagent.ts:93
+       ├─ getSubagentDefinition(agentType)              packages/core/src/agents/index.ts:21
+       ├─ Prune parent tool registry by allowedTools    subagent.ts:113-118
+       ├─ Resolve model (see priority below)            subagent.ts:120-148
+       ├─ new Agent({ instructions, model, tools })      subagent.ts:151-157   Clean instance, no parent history
+       ├─ agent.stream(task, { maxSteps: 50, abortSignal }) subagent.ts:176-179
+       │    └─ Consume fullStream → emitEvent(subagent_*)  subagent.ts:182-233
+       └─ getFullOutput() → result text + <subagent-meta />  subagent.ts:258-275
+```
+
+Key points:
+
+- **Single source of truth for permissions (current implementation)**: `createSubagentTool` directly accesses the registry in `packages/core/src/agents/` via `getSubagentIds()` / `getSubagentDefinition()`. Tool whitelisting extracts allowed tools from the parent tool registry, safely skipping missing ones (`subagent.ts:113-118`).
+- **`config.subagents` pending tool wiring**: `createMyAgent()` attaches `config.subagents ?? createDefaultSubagents(projectRoot)` to `controller.subagents` (`harness/index.ts:595,609`), but currently no code consumes this list — neither altering spawnable types nor altering toolsets. Custom subagent types require registering into `agents/`.
+- **Each invocation is a fresh, stateless agent**: Subagents do not reuse parent memory or inject historical messages. The parent agent only receives the distilled output text (`Stateless Ephemeral Worker`).
+- **Parent tool proxies (`harness/tools.ts:125-137`)**: `task_write` and `task_check` are resolved dynamically via `Proxy`, guaranteeing task board tools are not pruned away in `execute` subagents.
+- **50-step limit with cooperative cancellation**: `maxSteps: 50` constrains the subagent's internal ReAct loop. The parent session's `abortSignal` is forwarded, returning `[Aborted by user]` along with partial output rather than throwing an unhandled exception.
+- **Metadata tags on output**: Upon completion, `<subagent-meta modelId="..." durationMs="..." tools="view:ok,search_content:err" />` is appended (`subagent.ts:336-345`) to enable faithful UI reconstruction from chat logs.
+- **Graceful degradation**: Model resolution failure returns `Failed to resolve model "..."`; unknown types fail Zod schema validation; other errors are wrapped cleanly as `Subagent "<name>" failed: ...` with `isError: true`.
+
+**Model Routing Priority (`subagent.ts:120-139`)**
+
+1. Explicit `modelId` argument passed in tool call;
+2. Configured persistent model per agent type: `harness.getSubagentModelId({ agentType })` → `AuthStorage.getSubagentModelId(agentType)` (stored as `_subagentModelId_<agentType>` in `<dataDir>`);
+3. `createSubagentTool({ defaultModelId })` — current session model ID passed by `harness/tools.ts:160-164`;
+4. Built-in fallback: `google/gemini-2.0-flash`.
+
+##### 3. Usage Scenarios & Recommendations
+
+| Scenario                                            | Recommended Type | Rationale                                                   |
+| :-------------------------------------------------- | :--------------- | :---------------------------------------------------------- |
+| "Where is X defined / Who calls Y / How does Z run" | `explore`        | Massive greps and file reads remain isolated in subagent    |
+| Multi-subsystem investigation (frontend + backend)  | `explore` × N    | Concurrent exploration without polluting main context       |
+| Architecture / plan formulation before big PR       | `plan`           | Read-only traversal, returns actionable implementation plan |
+| Self-contained refactoring or unit edits            | `execute`        | Read-write capability with local test verification loop     |
+| Mechanical repetitive refactoring                   | `execute`        | Self-contained validation, returns final summary to parent  |
+
+##### 4. Customization & Extensions
+
+Currently, adding a new subagent type simply requires registering a definition:
+
+```ts
+// packages/core/src/agents/review.ts
+import type { SubagentDefinition } from "./types.js"
+
+export const reviewSubagent: SubagentDefinition = {
+	id: "review",
+	name: "Review",
+	instructions: `You are a strict code reviewer...`,
+	allowedTools: ["view", "search_content", "find_files", "execute_command"],
+}
+
+// packages/core/src/agents/index.ts
+const subagentRegistry: Record<string, SubagentDefinition> = {
+	explore: exploreSubagent,
+	plan: planSubagent,
+	execute: executeSubagent,
+	review: reviewSubagent, // ← Appears automatically in tool schema & description
+}
+```
+
+##### 5. Event Flow & UI Presentation
+
+The `subagent` tool emits real-time events via `harness.emitEvent` on `requestContext` (`packages/core/src/tools/subagent.ts`), tagged with the parent's `toolCallId`:
+
+| Event                 | Timing               | Payload                                      |
+| :-------------------- | :------------------- | :------------------------------------------- |
+| `subagent_start`      | Subagent initialized | `agentType`, `task`, `modelId`               |
+| `subagent_tool_start` | Tool call initiated  | `subToolName`, `subToolArgs`                 |
+| `subagent_tool_end`   | Tool call completed  | `subToolName`, `subToolResult`, `isError`    |
+| `subagent_text_delta` | Streaming text chunk | `textDelta` (accumulates into `partialText`) |
+| `subagent_end`        | Finished / aborted   | `result`, `isError`, `durationMs`            |
+
+Renderer pipeline: `useHarnessEvents.ts:512-554` maps events to `SUBAGENT_START` / `SUBAGENT_TOOL_START` / `SUBAGENT_TOOL_END` / `SUBAGENT_END`, rendered as interactive `🏗️ Agent` cards via `SubagentExecution.tsx`.
+
+##### 6. Why Multi-Tiered Subagents? (Design Advantages)
 
 1. **Least Privilege & Physical Injection Defense**:
-   - During `explore` and `plan` instantiation, write and shell tools are physically pruned from the tool registry (`packages/core/src/tools/subagent.ts:112-118`). Even if untrusted third-party code contains prompt injections, malicious commands cannot be dispatched.
+   - `explore` and `plan` instances physically exclude `write_file` and `execute_command` (`packages/core/src/tools/subagent.ts:113-118`). Even if untrusted third-party code contains prompt injection, destructive tool calls are physically impossible.
 2. **Context Isolation & Noise Filtering**:
-   - Subagents are stateless workers with an isolated sandbox. Massive raw grep outputs and code snippets are consumed inside the subagent, and system prompts enforce structured summaries under 300 words (`packages/core/src/agents/explore.ts:38`), protecting the parent conversation from attention dilution.
+   - Subagents run in isolated scratchpads without inheriting parent chat history. Thousands of lines of raw search results are distilled down into a structured summary under 300 words (`packages/core/src/agents/explore.ts:38`).
 3. **Tiered Model Routing**:
-   - Heavy planning/coding uses frontier models while exploratory searching delegates to fast, low-cost flash models, cutting latency and API costs significantly.
+   - High-cost frontier models are reserved for top-level reasoning while routine codebase exploration delegates to fast, low-cost flash models.
 4. **Tool Confusion Elimination**:
-   - Trimming tool options down to 3 focused primitives increases tool calling accuracy to near 100%.
-5. **Parallel Multitasking**:
-   - Multiple subagents can run concurrently across independent threads and stream their progress to desktop `SubagentExecution.tsx` cards in real time.
+   - Narrowing tool options down to 3 focused primitives increases model tool-calling accuracy to near 100%.
+5. **Parallel Multitasking & Unified UI**:
+   - The main agent can launch multiple subagents concurrently, streaming distinct cards in the UI without cross-contamination.
 
 #### 3.4.7 Execution modes and graph scheduling (`src/core/graph/`)
 
