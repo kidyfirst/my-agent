@@ -351,6 +351,9 @@ export interface MyAgentHarness<TState = HarnessState> {
 		threadId: string
 		queue: QueuedMessage[]
 	}): Promise<void>
+	abortSignal?: AbortSignal
+	getSubagentModelId?(options?: { agentType?: string }): string | undefined
+	resolveModel?(modelId: string, options?: any): any
 }
 
 export interface MyAgentConfig<TState = HarnessState> {
@@ -532,6 +535,7 @@ export async function createMyAgent(
 		tools: createDynamicTools(
 			mcpManager,
 			config?.extraTools as Record<string, unknown>,
+			resolveModel,
 		),
 	})
 
@@ -794,6 +798,18 @@ export async function createMyAgent(
 		async followUp(options: FollowUpOptions) {
 			const session = activeSession ?? (await sessionReady)
 			return session.followUp?.(options)
+		},
+		get abortSignal(): AbortSignal | undefined {
+			return (
+				(controller as any).abortSignal ??
+				(controller as any)._activeAbortController?.signal
+			)
+		},
+		getSubagentModelId(options?: { agentType?: string }) {
+			return authStorage.getSubagentModelId(options?.agentType)
+		},
+		resolveModel(modelId: string, options?: any) {
+			return resolveModel(modelId, options)
 		},
 		getState(): HarnessState & Record<string, unknown> {
 			const sessionState = (activeSession?.state?.get?.() ??

@@ -60,7 +60,11 @@ Questions are parked in a `pendingQuestions` map keyed by `questionId` and resum
 `respondToQuestion`. Plan approval falls through to `respondToToolSuspension` with
 `resumeData` when the session exposes no dedicated resume hook.
 
-### 5. `getSubagentModelId` — **open** (see Open #2)
+### 5. `getSubagentModelId` — closed
+
+**Where:** `packages/core/src/harness/index.ts` (`getSubagentModelId`), `packages/core/src/auth/storage.ts`
+
+`getSubagentModelId` is exposed on the harness request context and delegates to `authStorage.getSubagentModelId(agentType)`.
 
 ### 6. `getState()` / `setState()` — closed
 
@@ -252,9 +256,7 @@ Fixed on two levels:
   from the live list, plus an explicit note that earlier turns claiming the tools
   are unavailable are stale. `main-agent-tools.test.ts` asserts both.
 
-Still open: actually implementing `task_write` / `task_check` / `ask_user` and
-registering `subagent` (`src/tools/subagent.ts`), so the prompt can describe them
-again.
+Closed: `subagent` (`src/tools/subagent.ts`) is registered in `WRITE_TOOL_NAMES` and dynamically mounted in `createDynamicTools`. Still open: `ask_user`.
 
 ### History replay deformed the message array — **fixed**
 

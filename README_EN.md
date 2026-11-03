@@ -779,6 +779,56 @@ All three entry points for model changes live in `src/electron/helpers.ts` (swit
 - **Defaults**: in `src/harness/state.ts`, `DEFAULT_OBS_THRESHOLD = 30_000`, `DEFAULT_REF_THRESHOLD = 40_000`, `DEFAULT_OM_MODEL_ID = process.env.DEFAULT_OM_MODEL_ID ?? DEFAULT_FALLBACK_MODEL_ID`.
 - **Tests**: `src/memory/__tests__/memory.test.ts` uses in-memory SQLite (`file::memory:`) to cover thread CRUD and pagination, message save / recall ordering, system reminder and signal filtering, recall pagination, OM configuration and `settled()`, `cloneThread`, plus integration with the `AgentController` thread lifecycle.
 
+### 3.6 A2A Protocol Service (`packages/a2a/`)
+
+`@my-agent/a2a` exposes the `packages/core` Harness as a standardized Agent-to-Agent interface, enabling external clients (CLI, other agents, or the desktop application itself) to drive sessions using the same protocol.
+
+| Layer      | File                                     | Responsibility                                                                                                                                                                      |
+| ---------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP Entry | `packages/a2a/src/server/http-server.ts` | `startA2AServer()` starts listening, `createA2ARequestHandler()` yields reusable request handlers, `A2AServer` class encapsulates lifecycle; listens on `127.0.0.1:3888` by default |
+| Router     | `packages/a2a/src/server/router.ts`      | JSON-RPC 2.0 method table dispatch, parameter validation, and error code mapping                                                                                                    |
+| SSE Stream | `packages/a2a/src/server/sse.ts`         | `handleSSEStream()` subscribes to `harness.subscribe(...)`, pushing engine events line by line as `event: <name>` / `data: <json>`                                                  |
+| CORS       | `packages/a2a/src/server/cors.ts`        | Restricts origins strictly to local loopback (`getLoopbackOrigin`), never wildcard                                                                                                  |
+| Agent Card | `packages/a2a/src/card.ts`               | `createAgentCard()` generates the `/.well-known/agent-card.json` profile, declaring JSON-RPC 1.0 bindings and streaming support                                                     |
+| Client     | `packages/a2a/src/client/client.ts`      | Peer SDK encapsulating JSON-RPC invocation and SSE event consumption                                                                                                                |
+
+**HTTP Endpoints**
+
+- `GET /.well-known/agent-card.json` (or `/agent-card.json`): Agent capability card
+- `GET /health`: Health check
+- `GET /a2a/stream`: SSE event stream
+- `POST /a2a`: JSON-RPC main entry point
+
+**JSON-RPC Method Registry**
+
+| Method                                                               | Description                                                                                                                |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `projects/list` / `projects/create` / `projects/open`                | Project enumeration, creation, and switching (`projects/open` invokes `onSwitchProject` callback to sync desktop sessions) |
+| `threads/list` / `threads/create` / `threads/get` / `threads/delete` | Thread lifecycle CRUD                                                                                                      |
+| `message/send` / `tasks/create`                                      | Send user message, spawn asynchronous task                                                                                 |
+| `tasks/get` / `tasks/cancel` / `tasks/revert`                        | Task status query, cancellation, and snapshot-based reversion                                                              |
+| `approvals/list` / `approvals/submit`                                | Fetch pending tool approvals, submit approval decision (human-in-the-loop closure)                                         |
+
+`startA2AServer()` accepts `getHarness`, `onSwitchProject`, and `onProjectListChanged` hooks, allowing remote sessions to switch projects while the desktop sidebar dynamically refreshes and rebuilds the Harness without restarting the service.
+
+### 3.7 CLI Command Line and Local Daemon (`packages/cli/`)
+
+`@my-agent/cli` provides the `my-agent` executable, bringing the engine to terminal workflows. It consists of two components:
+
+- **Command Layer** `packages/cli/src/cli.ts`: Parses argv and routes to six subcommands under `packages/cli/src/commands/`.
+- **Daemon Layer** `packages/cli/src/daemon.ts`: `startDaemon()` hosts an A2A service instance in the background, writing `{ pid, port, host, baseUrl, cwd, startedAt }` to `getAppDataDir()/daemon.json`; on retrieval it probes process vitality with `process.kill(pid, 0)` and discards stale records if deceased.
+
+| Subcommand | Purpose                                                                     |
+| ---------- | --------------------------------------------------------------------------- |
+| `serve`    | Foreground launch of daemon and A2A service (`--port` / `--host` / `--cwd`) |
+| `run`      | One-off task execution and result retrieval                                 |
+| `chat`     | Interactive multi-turn terminal chat                                        |
+| `project`  | Project enumeration and switching                                           |
+| `thread`   | Thread listing, creation, switching, and deletion                           |
+| `status`   | Inspect daemon process status                                               |
+
+`packages/cli/src/client-runner.ts` translates commands into JSON-RPC requests directed to the daemon. The CLI does not retain its own Harness instance — all state is concentrated in the daemon, allowing multiple terminal sessions to share the same workspace context.
+
 ---
 
 ## 4. Core business and data-flow sequences
@@ -888,134 +938,237 @@ flowchart LR
 - When switching between or opening multiple workspaces, the main process maintains `sessions: Map<string, WorktreeSession>` keyed by project root path.
 - All foreground/background communication events carry the `worktreePath` identifier, and frontend Hooks automatically compare it against the currently active workspace, ruling out cross-talk and misplacement of background session messages.
 
+### 4.4 A2A Remote Session Drives Desktop Workspace
+
+When external clients (CLI or other agents) operate on projects via A2A, the desktop UI must track changes in real time rather than staying on the old workspace. The pipeline is as follows:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Remote Client (CLI / Agent)
+    participant Server as A2A Service (packages/a2a)
+    participant Main as Main Process (a2a-handlers)
+    participant Renderer as Renderer Process
+
+    Client->>Server: POST /a2a  projects/open { path }
+    Server->>Server: router validates parameters
+    Server->>Main: onSwitchProject(path)
+    Main->>Main: Find / create WorktreeSession by path and switch active Harness
+    Main-->>Server: { harness }
+    Server->>Server: Switch to target project's Harness instance
+    Server->>Main: onProjectListChanged()
+    Main->>Renderer: Push project / session list changes
+    Renderer->>Renderer: Switch to corresponding project tab and refresh sidebar
+    Server-->>Client: JSON-RPC result
+```
+
+- The `getHarness` hook ensures the router always accesses the "current project's" Harness instead of a stale instance captured at startup.
+- The event stream is similarly routed per-project: when a client subscribes to `/a2a/stream`, it receives events from the active Harness; after switching projects, the stream follows the new instance.
+- Cross-platform approval loop consistency: if a remotely triggered tool call requires confirmation, it appears in `approvals/list`. Both the desktop `ToolApprovalCard` and remote `approvals/submit` can resolve it.
+
 ---
 
-## 5. Source directory map
+## 5. Multi-Package Directory Structure Mapping
+
+The repository employs a pnpm workspace monorepo layout (`pnpm-workspace.yaml` declares `packages/*` and `apps/*`), consolidating the home-grown agent engine and protocol layers into `packages/`, with the desktop application as the sole `apps/` consumer.
 
 ```
-src/
-├── core/                      # Home-grown agent runtime core
-│   ├── agent/                 # Agent class and the streaming streamText pipeline
-│   ├── controller/            # AgentController scheduling container and Session class
-│   ├── context/               # RequestContext, the request lifecycle context
-│   ├── tools/                 # Tool adapters, argument validation and JSON Schema conversion (toModelTool)
-│   ├── memory/                # Core Memory abstract class
-│   ├── llm/                   # Unified language-model resolution and dynamic wrapping
-│   ├── graph/                 # Execution-mode graph definitions (ReAct / Plan & Solve / Fast) and scheduling
-│   ├── recorder/              # Session recording (JSONL) and offline replay (ReplayLanguageModel)
-│   ├── workspace/             # Workspace resolution and environment abstraction
-│   └── index.ts               # Public entry point of the core layer
+my-agent/
+├── apps/
+│   └── desktop/                   # Electron desktop application (sole GUI shell)
+│       └── src/
+│           ├── index.ts           # Desktop unified export
+│           ├── types.ts           # Cross-process shared types
+│           ├── electron/          # Main process layer
+│           │   ├── main.ts        # App lifecycle, window creation, Harness bootstrap and event forwarding
+│           │   ├── preload.ts     # contextBridge secure bridge injection
+│           │   ├── electron-state.ts    # Workspace-scoped integration state (Linear/GitHub bindings)
+│           │   ├── notifications.ts     # Native system notifications and badges
+│           │   ├── external-links.ts    # External link interception and system browser dispatch
+│           │   ├── logging.ts           # Main process log persistence
+│           │   ├── helpers.ts           # OAuth validation and automatic conversation title generation
+│           │   ├── project-threads.ts       # Project session indexing and persistence
+│           │   ├── project-thread-write.ts  # Session write channel
+│           │   ├── task-changes-store.ts    # Task modified files and diff persistence
+│           │   ├── git-task-snapshot.ts     # Git change snapshots
+│           │   ├── updater/       # App self-updater checks, downloading, and installation
+│           │   ├── __tests__/     # Main process unit tests
+│           │   └── ipc/           # Routing assembly for 19 IPC business sub-modules
+│           │       ├── index.ts                  # Routing entry and dispatch
+│           │       ├── harness-handlers.ts       # Message transport, mode and model scheduling
+│           │       ├── project-handlers.ts       # Project detection, worktree switching and session construction
+│           │       ├── repo-handlers.ts          # Repository metadata and remote URL resolution
+│           │       ├── permission-handlers.ts    # Permission checks, tool approval, question interception
+│           │       ├── a2a-handlers.ts           # A2A service lifecycle and remote session attachment
+│           │       ├── pty-handlers.ts           # node-pty pseudo-terminal lifecycle and I/O
+│           │       ├── git-handlers.ts           # Git status extraction and diff comparison
+│           │       ├── file-handlers.ts          # Read-only file inspection and editor services
+│           │       ├── context-handlers.ts       # Context file/directory additions, removals, and stats
+│           │       ├── integration-handlers.ts   # Linear / GitHub two-way integration protocol
+│           │       ├── mcp-handlers.ts           # MCP server connection lifecycle management
+│           │       ├── settings-handlers.ts      # App preferences and model parameter persistence
+│           │       ├── auth-handlers.ts          # OAuth credential rotation and callbacks
+│           │       ├── dashboard-handlers.ts     # Token statistics and runtime duration aggregation
+│           │       ├── slash-command-handlers.ts # Slash command loading and dynamic injection
+│           │       ├── feedback-handlers.ts      # Message feedback reporting
+│           │       ├── logging-handlers.ts       # Renderer log forwarding
+│           │       ├── update-handlers.ts        # Version checks and update status
+│           │       └── types.ts                  # IPC contract types
+│           └── renderer/          # Renderer process UI layer (React 19 + TypeScript + Vite)
+│               ├── index.html     # Page entry
+│               ├── main.tsx       # React mount entry
+│               ├── App.tsx        # Top-level layout shell, shortcut registration and state assembly
+│               ├── components/    # Core UI panels and interactive components
+│               │   ├── ChatView.tsx           # Conversation pipeline: message grouping, one execution block per turn
+│               │   ├── AssistantMessage.tsx   # Assistant body rendering (Markdown / code highlighting)
+│               │   ├── ExecutionBlock.tsx     # Execution block: Working for … / Worked for …
+│               │   ├── UserMessage.tsx        # User message bubble: sticky, collapsible, image preview
+│               │   ├── ToolExecution.tsx      # Tool execution status card
+│               │   ├── ToolApprovalCard.tsx   # Tool approval card (once/conversation/project/global 4-tier scopes)
+│               │   ├── SubagentExecution.tsx  # Nested subagent execution visualization
+│               │   ├── FilesChangedBar.tsx    # Changed-files card and inline diff for the turn
+│               │   ├── AppModals.tsx          # Centralized global modal mounting
+│               │   ├── TerminalPanel.tsx      # Embedded terminal panel built on xterm.js
+│               │   ├── FileEditor.tsx         # Syntax-highlighted code editor/viewer
+│               │   ├── DiffEditor.tsx         # Diff panel
+│               │   ├── TaskBoard.tsx          # Task board (Linear / GitHub Issues)
+│               │   ├── ProjectList.tsx        # Project and session list (including project-list/ directory)
+│               │   ├── Settings.tsx           # Settings panel (including settings/ directory)
+│               │   ├── ModelSelector.tsx      # Model switcher and auth status
+│               │   ├── CommandPalette.tsx     # Cmd+K global command palette
+│               │   ├── PlanApproval.tsx       # Plan & Solve proposal approval
+│               │   ├── AskQuestionDialog.tsx  # Agent question dialog
+│               │   ├── SessionReplayModal.tsx # Session recording replay
+│               │   └── graph/                 # Flow diagram visualization powered by @xyflow/react
+│               ├── hooks/         # Custom business React Hooks
+│               │   ├── useHarnessEvents.ts    # IPC event-bus subscription and state dispatch
+│               │   ├── useChatReducer.ts      # Chat and tool state machine
+│               │   ├── useProjectManager.ts   # Multi-project and worktree state
+│               │   ├── useProjectThreads.ts   # Project session list and switching
+│               │   ├── useThreadActions.ts    # Session-level actions (rename/delete/export)
+│               │   ├── useThreadModelPermissions.ts # Session-level models and permission policies
+│               │   ├── useGitOperations.ts    # Git operations and diff fetching
+│               │   ├── useDialogManager.ts    # Modal dialog stack management
+│               │   ├── useAuthManager.ts      # Authentication state and credentials
+│               │   ├── useMessageQueue.ts     # Outbound message queue
+│               │   ├── useTabManager.ts       # Multi-tab management
+│               │   └── useKeyboardShortcuts.ts # Global keyboard shortcuts
+│               ├── utils/         # Renderer utility functions
+│               ├── types/         # Renderer TypeScript type definitions
+│               ├── styles/        # Global styles and theme tokens
+│               ├── assets/        # Static assets
+│               └── __tests__/     # Renderer unit tests
 │
-├── harness/                   # Agent assembly and facade proxy (Harness Facade)
-│   ├── index.ts               # createMyAgent entry, adapter assembly and the HarnessProxy dynamic proxy
-│   ├── instructions.ts        # Dynamic system-prompt assembly (getDynamicInstructions)
-│   ├── model-resolver.ts      # Model resolution and credential binding (createModelResolver)
-│   ├── subagents.ts           # Default subagents (explore/plan/execute) assembly
-│   ├── tools.ts               # Dynamic tool assembly and per-mode filtering
-│   ├── thinking.ts            # Reasoning-chain (Thinking/Reasoning) parsing and tag filtering
-│   ├── settings.ts            # Workspace and user settings persistence
-│   └── state.ts               # Session state-machine types and schemas
+├── packages/
+│   ├── core/                      # @my-agent/core headless agent engine
+│   │   └── src/
+│   │       ├── index.ts           # Engine public unified entry point
+│   │       ├── client.ts          # Engine client entry
+│   │       ├── core/              # Core runtime
+│   │       │   ├── agent/         # Agent class and streaming streamText pipeline
+│   │       │   ├── controller/    # AgentController scheduling container and Session class
+│   │       │   ├── context/       # RequestContext lifecycle context
+│   │       │   ├── tools/         # Tool adapters, argument validation and JSON Schema conversion
+│   │       │   ├── memory/        # Core Memory abstract class
+│   │       │   ├── llm/           # Unified language-model resolution and dynamic wrapping
+│   │       │   ├── graph/         # Execution mode graphs (ReAct / Plan & Solve / Fast)
+│   │       │   ├── recorder/      # Session recording (JSONL) and offline replay
+│   │       │   ├── workspace/     # Workspace resolution and environment abstraction
+│   │       │   ├── base/          # Runtime base classes and shared contracts
+│   │       │   └── logger/        # Structured logging
+│   │       ├── harness/           # Agent assembly and facade proxy layer
+│   │       │   ├── index.ts       # createMyAgent / adapter assembly and HarnessProxy
+│   │       │   ├── instructions.ts    # Dynamic system-prompt assembly
+│   │       │   ├── model-resolver.ts  # Model resolution and credential binding
+│   │       │   ├── subagents.ts       # Default subagents assembly
+│   │       │   ├── tools.ts           # Dynamic tool assembly and per-mode filtering
+│   │       │   ├── thinking.ts        # Reasoning-chain parsing and tag filtering
+│   │       │   ├── settings.ts        # Workspace and user settings persistence
+│   │       │   ├── state.ts           # Session state-machine types and schema
+│   │       │   ├── workspace.ts       # Harness-side workspace context
+│   │       │   └── project-purge.ts   # Project data purging
+│   │       ├── agents/            # Tiered subagent definitions (explore / plan / execute)
+│   │       ├── prompts/           # System prompt set (base / build / plan / fast)
+│   │       ├── tools/             # Host extension tool implementations
+│   │       │   ├── shell.ts                   # execute_command
+│   │       │   ├── file-view.ts               # view
+│   │       │   ├── write.ts                   # write_file
+│   │       │   ├── file-editor.ts             # Precision text editing
+│   │       │   ├── grep.ts                    # search_content
+│   │       │   ├── glob.ts                    # find_files
+│   │       │   ├── string-replace-lsp.ts      # string_replace_lsp
+│   │       │   ├── ast-smart-edit.ts          # ast_smart_edit
+│   │       │   ├── subagent.ts                # Subagent spawning tool
+│   │       │   ├── submit-plan.ts             # submit_plan proposal submission
+│   │       │   ├── request-sandbox-access.ts  # request_sandbox_access dynamic elevation
+│   │       │   ├── navigate-browser.ts        # Browser navigation and extraction
+│   │       │   ├── computer-use.ts            # Headless browser vision interaction
+│   │       │   ├── web-search.ts              # Live web search (Tavily)
+│   │       │   ├── wrap-with-confirmation.ts  # Tool confirmation wrapper
+│   │       │   └── utils.ts                   # Path sandbox enforcement and write locks
+│   │       ├── store/             # Native serverless SQLite storage (LibSQL / node:sqlite)
+│   │       │   ├── store.ts       # SQLiteStore main class (WAL mode)
+│   │       │   ├── memory-store.ts    # Thread/message and observational memory persistence
+│   │       │   ├── migrations.ts      # Versioned migrations
+│   │       │   ├── schema.ts          # DDL schemas and indexes
+│   │       │   ├── types.ts           # Storage configuration and domain interfaces
+│   │       │   └── index.ts
+│   │       ├── memory/            # Observational memory module
+│   │       │   ├── memory.ts      # Message CRUD, session restoration, OM prompt injection
+│   │       │   ├── token-counter.ts   # Heuristic token estimation
+│   │       │   └── types.ts
+│   │       ├── mcp/               # MCP client and management (Stdio / SSE)
+│   │       ├── lsp/               # LSP client, process management and TS/JS adapter
+│   │       ├── browser/           # Playwright BrowserManager
+│   │       ├── hooks/             # Project extension hooks (HookManager / phase automation)
+│   │       ├── acp/               # Agent Client Protocol terminal management and event bus
+│   │       ├── auth/              # Credential storage and OAuth PKCE adapters
+│   │       ├── snapshot/          # Git task snapshots and task changes persistence
+│   │       ├── providers/         # Model provider adapters
+│   │       ├── ipc/               # Engine-side IPC contracts and event definitions
+│   │       ├── constants/         # Global constants
+│   │       ├── utils/             # Project detection, path safety, token estimation, instruction loader
+│   │       └── permissions.ts     # Tool permission classification policies (read / edit / execute / mcp / YOLO)
+│   │
+│   ├── a2a/                       # @my-agent/a2a protocol service and client
+│   │   ├── bin/a2a-server.js      # my-agent-a2a executable entry
+│   │   ├── src/server/http-server.ts  # createA2ARequestHandler / startA2AServer / A2AServer
+│   │   ├── src/server/router.ts       # JSON-RPC routing (projects / threads / tasks / approvals)
+│   │   ├── src/server/sse.ts          # SSE streaming event push
+│   │   ├── src/server/cors.ts         # CORS policies
+│   │   ├── src/client/client.ts       # A2A client
+│   │   └── tests/                     # Protocol tests
+│   │
+│   └── cli/                       # @my-agent/cli command-line interface and local daemon
+│       ├── bin/my-agent.js        # my-agent executable entry
+│       ├── src/cli.ts             # Argument parsing and command registration
+│       ├── src/daemon.ts          # Daemon: daemon.json disk persistence + A2A hosting
+│       ├── src/client-runner.ts   # Client command runner
+│       ├── src/commands/          # serve / run / chat / project / thread / status
+│       └── tests/                 # CLI and daemon tests
 │
-├── agents/                    # Tiered subagent definitions
-│   ├── explore.ts             # Read-only code exploration subagent (search, structural analysis)
-│   ├── plan.ts                # Read-only architecture planning subagent (designs the approach)
-│   ├── execute.ts             # Implementation subagent with write and terminal access
-│   └── index.ts               # Subagent exports
-│
-├── prompts/                   # System prompt set
-│   ├── base.ts                # Shared base prompt (coding rules, Git safety, sandbox limits)
-│   ├── build.ts               # ReAct prompt (implement-and-verify loop, modeId=react)
-│   ├── plan.ts                # Plan & Solve prompt (plan first, execute after)
-│   ├── fast.ts                # Fast prompt (direct streaming + read-only tool boundary)
-│   └── index.ts               # buildFullPrompt assembly entry
-│
-├── tools/                     # Host-side tool implementations
-│   ├── shell.ts               # execute_command (process-group control, timeout interception, live streaming)
-│   ├── file-view.ts           # view (read-only file inspection, directory tree walk)
-│   ├── write.ts               # write_file (writes, overwrites, recursive directory creation)
-│   ├── grep.ts                # search_content (ripgrep / regex content search)
-│   ├── glob.ts                # find_files (filename and path wildcard matching)
-│   ├── string-replace-lsp.ts  # string_replace_lsp (LSP-backed precise replacement with diagnostics)
-│   ├── ast-smart-edit.ts      # ast_smart_edit (ast-grep structural refactoring)
-│   ├── subagent.ts            # subagent tool (streams child agent events and results)
-│   ├── request-sandbox-access.ts # request_sandbox_access (interactive sandbox privilege request)
-│   ├── navigate-browser.ts    # Playwright-based page navigation and content extraction
-│   ├── computer-use.ts        # Headless-browser visual interaction tool
-│   └── utils.ts               # Path sandbox enforcement (assertPathAllowed) and concurrent write locks
-│
-├── store/                     # Native serverless SQLite storage engine (LibSQL / node:sqlite)
-│   ├── store.ts               # SQLiteStore main class (WAL-mode local database)
-│   ├── memory-store.ts        # SQLiteMemoryStore (thread/message persistence and observational memory)
-│   ├── schema.ts              # SQLite DDL tables and performance indexes
-│   ├── types.ts               # Storage configuration and domain interfaces
-│   └── index.ts               # Storage-layer exports
-│
-├── memory/                    # Observational memory module
-│   ├── memory.ts              # Extends MyAgentMemory (message CRUD, sub-second session restore, OM prompt injection)
-│   ├── token-counter.ts       # Heuristic token estimator (len / 4)
-│   ├── types.ts               # ObservationalMemoryConfig / MemoryOptions
-│   └── index.ts               # Memory-layer exports
-│
-├── electron/                  # Main process
-│   ├── main.ts                # App lifecycle, window creation, Harness bootstrap and event forwarding
-│   ├── preload.ts             # Secure preload script exposing contextBridge
-│   ├── electron-state.ts      # Workspace-scoped integration state (Linear/GitHub bindings)
-│   ├── harness-handlers.ts       # Message transport, mode and model scheduling
-│   ├── project-handlers.ts       # Project detection, worktree switching and session construction
-│   ├── permission-handlers.ts    # Permission checks, tool approval, question interception
-│   ├── pty-handlers.ts           # node-pty pseudo-terminal lifecycle and I/O
-│   ├── git-handlers.ts           # Git status extraction and diff comparison
-│   ├── file-handlers.ts          # Read-only file access and editor services
-│   ├── integration-handlers.ts   # Linear / GitHub two-way integration protocol
-│   ├── mcp-handlers.ts           # MCP server connection lifecycle
-│   ├── settings-handlers.ts      # App preference and model parameter persistence
-│   ├── auth-handlers.ts          # OAuth credential rotation and callbacks
-│   ├── dashboard-handlers.ts     # Token statistics and agent duration aggregation
-│   ├── slash-command-handlers.ts # Slash-command loading and dynamic injection
-│   └── index.ts                  # IPC routing and dispatch entry
-│
-├── renderer/                  # Renderer UI layer (React 19 + TypeScript + Vite)
-│   ├── index.html             # HTML entry
-│   ├── main.tsx              # React mount entry
-│   ├── App.tsx                # Top-level layout shell, shortcut registration and state assembly
-│   ├── components/            # Core UI panels and interactive components
-│   │   ├── ChatView.tsx              # Conversation pipeline: message grouping, one execution block per turn, sticky user messages
-│   │   ├── AssistantMessage.tsx      # Assistant body rendering (Markdown / highlighting / copy)
-│   │   ├── ExecutionBlock.tsx        # Execution block: "Working for …" (staggered entrance) while running, "Worked for …" when done
-│   │   ├── UserMessage.tsx           # User bubble: sticky, collapsible, image preview
-│   │   ├── FilesChangedBar.tsx       # Changed-files card and inline diff for the turn
-│   │   ├── TodoProgress.tsx          # Task progress bar
-│   │   ├── ToolExecution.tsx         # Tool-execution status card
-│   │   ├── SubagentExecution.tsx     # Nested subagent execution view
-│   │   ├── TerminalPanel.tsx         # Embedded terminal panel built on xterm.js
-│   │   ├── FileEditor.tsx            # Syntax-highlighted code editor/viewer
-│   │   ├── DiffEditor.tsx            # Diff panel
-│   │   ├── TaskBoard.tsx             # Task board (Linear / GitHub Issues)
-│   │   ├── ToolApprovalDialog.tsx    # Tool-approval interception modal
-│   │   ├── ModelSelector.tsx         # Model switcher and auth-status dropdown
-│   │   └── CommandPalette.tsx        # Cmd+K global command palette
-│   ├── hooks/                 # Custom business hooks
-│   │   ├── useHarnessEvents.ts       # IPC event-bus subscription and state dispatch
-│   │   ├── useChatReducer.ts         # Chat and tool state machine
-│   │   ├── useProjectManager.ts      # Multi-project and worktree state
-│   │   └── useGitOperations.ts       # Git operations and diff fetching
-│   ├── types/                 # Renderer TypeScript types
-│   └── styles/                # Global styles and theme tokens
-│
-├── mcp/                       # Model Context Protocol (MCP) client and management
-│   ├── client.ts              # MCP protocol client (Stdio / SSE transports)
-│   ├── manager.ts             # MCP server discovery, lifecycle and tool injection
-│   └── types.ts               # MCP protocol types
-│
-├── lsp/                       # Language Server Protocol (LSP) and AST-aware edits
-│   ├── client.ts              # LSP client and diagnostics collection
-│   ├── manager.ts             # Language-server process lifecycle
-│   └── server.ts              # TypeScript/JavaScript language-service adapter
-│
-├── browser/                   # Playwright browser automation manager (BrowserManager)
-├── hooks/                     # Project extension hooks (HookManager / phase automation)
-├── acp/                       # Agent Client Protocol terminal management and event bus
-├── auth/                      # Credential storage (AuthStorage) and OAuth adapters
-├── permissions.ts             # Tool permission classes (read / edit / execute / mcp / YOLO)
-└── utils/                     # Shared utilities (project detection, path safety, token estimation)
+├── scripts/                       # Build and release scripts (build-dispatch / build-local / update-readme-release)
+├── resources/                     # App icons and packaging resources
+├── docs/                          # Supplementary documentation
+├── electron.vite.config.ts        # Electron 3-process build configuration
+├── tsconfig.base.json             # Cross-package shared TS configuration
+└── vitest.config.ts               # Unified test configuration
 ```
+
+**Package Dependency Direction** (one-way downward, acyclic):
+
+```mermaid
+flowchart LR
+    desktop["apps/desktop"] --> core["packages/core<br/>@my-agent/core"]
+    desktop --> a2a["packages/a2a<br/>@my-agent/a2a"]
+    cli["packages/cli<br/>@my-agent/cli"] --> core
+    cli --> a2a
+    a2a --> core
+```
+
+- `packages/core` does not depend on any Electron / DOM APIs, running in pure Node environments — a prerequisite for CLI and A2A services to share the same engine.
+- `packages/a2a` only depends on `core`, agnostic to desktop GUI; both desktop and CLI expose the same JSON-RPC session capabilities through it.
+- `packages/cli` depends on `core` and `a2a`, acting both as a CLI entry and daemon host.
+- `apps/desktop` depends on `core` and `a2a`, serving as the sole GUI consumer.
+
+<!-- This document is continuously maintained; in case of discrepancy with the code, the code takes precedence. -->

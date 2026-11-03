@@ -890,6 +890,10 @@ export class Session<TState = any> {
 		this._isRunning = this._threadRuns.size > 0
 	}
 
+	get abortSignal(): AbortSignal | undefined {
+		return this._activeAbortController?.signal
+	}
+
 	async steer(_options: any): Promise<void> {}
 
 	async followUp(_options: any): Promise<void> {}

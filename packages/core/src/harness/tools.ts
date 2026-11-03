@@ -5,6 +5,8 @@ import {
 	type RequestContext,
 	ExecutionMode,
 	DEFAULT_EXECUTION_MODE,
+	taskWriteTool,
+	taskCheckTool,
 } from "../core/index.js"
 import { requestSandboxAccessTool } from "../tools/request-sandbox-access.js"
 import { createViewTool } from "../tools/file-view.js"
@@ -15,6 +17,7 @@ import { createExecuteCommandTool } from "../tools/shell.js"
 import { createSubmitPlanTool } from "../tools/submit-plan.js"
 import { stringReplaceLspTool } from "../tools/string-replace-lsp.js"
 import { astSmartEditTool } from "../tools/ast-smart-edit.js"
+import { createSubagentTool } from "../tools/subagent.js"
 import {
 	createWebSearchTool,
 	createWebExtractTool,
@@ -39,6 +42,7 @@ export const WRITE_TOOL_NAMES = [
 	"write_file",
 	"string_replace_lsp",
 	"ast_smart_edit",
+	"subagent",
 ] as const
 
 export const PLAN_TOOL_NAMES = [
@@ -74,6 +78,7 @@ export function createDynamicTools(
 	extraTools?:
 		| Record<string, any>
 		| ((ctx: { requestContext: RequestContext }) => Record<string, any>),
+	resolveModel?: (modelId: string) => any,
 ) {
 	let lastSignature = ""
 	return function getDynamicTools({
@@ -113,6 +118,24 @@ export function createDynamicTools(
 			session?.mode?.get?.() ??
 			(ctx?.modeId as string) ??
 			DEFAULT_EXECUTION_MODE
+
+		const projectTools: Record<string, any> = {}
+		const tools: Record<string, any> = {}
+
+		const subagentRegistry = new Proxy(tools, {
+			get(target, prop: string) {
+				if (prop === "task_write") return taskWriteTool
+				if (prop === "task_check") return taskCheckTool
+				if (prop in target) return target[prop]
+				if (prop in projectTools) return projectTools[prop]
+				return undefined
+			},
+			has(target, prop: string) {
+				if (prop === "task_write" || prop === "task_check") return true
+				return prop in target || prop in projectTools
+			},
+		})
+
 		const factories: Record<string, () => any> = {
 			view: () => createViewTool(projectRoot),
 			search_content: () => createGrepTool(projectRoot),
@@ -122,20 +145,37 @@ export function createDynamicTools(
 			string_replace_lsp: () => stringReplaceLspTool,
 			ast_smart_edit: () => astSmartEditTool,
 			submit_plan: () => createSubmitPlanTool(projectRoot),
+			request_sandbox_access: () => requestSandboxAccessTool,
+			subagent: () => {
+				const effectiveResolver =
+					resolveModel ??
+					((id: string) => {
+						const harness = (requestContext.get("harness") ||
+							requestContext.get("controller")) as any
+						if (typeof harness?.resolveModel === "function") {
+							return harness.resolveModel(id)
+						}
+						return { id }
+					})
+				return createSubagentTool({
+					tools: subagentRegistry,
+					resolveModel: effectiveResolver,
+					defaultModelId: modelId || undefined,
+				})
+			},
 		}
 
 		// Plan mode is read-only: writes and edits stay disabled. The name list and
 		// the prompt both come from `describeToolNames`, so they cannot drift.
-		const projectTools: Record<string, any> = {}
 		for (const name of describeToolNames(modeId)) {
 			const make = factories[name]
 			if (make) projectTools[name] = make()
 		}
 
-		const tools: Record<string, any> = {
+		Object.assign(tools, {
 			...projectTools,
 			request_sandbox_access: requestSandboxAccessTool,
-		}
+		})
 
 		if (hasTavilyKey()) {
 			tools.web_search = createWebSearchTool()

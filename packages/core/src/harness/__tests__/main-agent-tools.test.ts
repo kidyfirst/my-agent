@@ -35,6 +35,7 @@ describe("main agent toolset", () => {
 				"execute_command",
 				"write_file",
 				"string_replace_lsp",
+				"subagent",
 			]),
 		)
 	})
@@ -47,6 +48,7 @@ describe("main agent toolset", () => {
 		expect(tools).toContain("write_file")
 		expect(tools).not.toContain("string_replace_lsp")
 		expect(tools).not.toContain("ast_smart_edit")
+		expect(tools).not.toContain("subagent")
 	})
 
 	it("keeps read-only tools in fast mode and drops every write path", async () => {
@@ -62,6 +64,7 @@ describe("main agent toolset", () => {
 		expect(tools).not.toContain("ast_smart_edit")
 		expect(tools).not.toContain("execute_command")
 		expect(tools).not.toContain("submit_plan")
+		expect(tools).not.toContain("subagent")
 	})
 
 	// The system prompt used to advertise `grep` / `glob` / `task_write` /
