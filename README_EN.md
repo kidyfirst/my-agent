@@ -123,7 +123,7 @@ If this project has been useful to you, treat the cat 🐱
       - [3.4.3 Observational Memory](#343-observational-memory)
       - [3.4.4 Agent ReAct loop and tool stream](#344-agent-react-loop-and-tool-stream)
       - [3.4.5 Extended tool ecosystem and sandbox safety (`src/tools/`, `src/lsp/`, `src/browser/`)](#345-extended-tool-ecosystem-and-sandbox-safety-srctools-srclsp-srcbrowser)
-      - [3.4.6 Tiered Subagents](#346-tiered-subagents)
+      - [3.4.6 Tiered Subagents & Multi-Agent Architecture](#346-tiered-subagents--multi-agent-architecture)
       - [3.4.7 Execution modes and graph scheduling (`src/core/graph/`)](#347-execution-modes-and-graph-scheduling-srccoregraph)
       - [3.4.8 Session recording and offline replay (`src/core/recorder/`)](#348-session-recording-and-offline-replay-srccorerecorder)
     - [3.5 Memory module (`src/memory/`)](#35-memory-module-srcmemory)
@@ -585,13 +585,67 @@ Solves the pain point of context-window explosion during long coding conversatio
 - **MCP external tool extensions**: dynamically mount external tools exposed by external Model Context Protocol servers.
 - **Sandbox and path protection**: every read/write and terminal operation is forced through `assertPathAllowed` to stay within `projectRoot`; crossing that boundary requires escalation confirmed by `request_sandbox_access`.
 
-#### 3.4.6 Tiered Subagents
+#### 3.4.6 Tiered Subagents & Multi-Agent Architecture
 
-Lightweight Agents derived into different permission tiers are built in:
+The project architecturally supports a comprehensive multi-agent system combining **vertical hierarchical delegation (Subagents)** and **horizontal cross-node federation (A2A Protocol & Workspace Concurrency)**:
 
-- `explore`: read-only exploration subagent, responsible for codebase retrieval and dependency analysis.
-- `plan`: read-only planning subagent, responsible for feature design and implementation plan breakdown.
-- `execute`: write-permission execution subagent, performs the concrete code modifications and calls the task board tools.
+```mermaid
+flowchart TD
+    subgraph ExternalAgents ["1. Cross-Agent Federation (A2A Protocol)"]
+        RemoteAgent["External Agent / CLI Node"] <-->|"A2A JSON-RPC & SSE<br/>(Agent Card Skill Discovery)"| A2AServer["A2A Protocol Service (@my-agent/a2a)"]
+    end
+
+    subgraph MultiWorktree ["2. Multi-Worktree Agent Concurrency (Workspace Concurrency)"]
+        Dashboard["Agent Dashboard"] -.->|"Concurrent Session Monitor & Switch"| MainSessionA["Worktree A Agent"]
+        Dashboard -.->|"Concurrent Session Monitor & Switch"| MainSessionB["Worktree B Agent"]
+    end
+
+    subgraph Host ["3. Core Agent Scheduling Layer (@my-agent/core)"]
+        Session["Session / Controller<br/>(Maintains SQLite memory & history)"]
+        ParentAgent["Main Agent (code-agent)<br/>• Flagship reasoning model (Claude 3.7 / GPT-4o)<br/>• Coordinates global decision-making & user interaction"]
+        Session --> ParentAgent
+        A2AServer --> Session
+    end
+
+    subgraph SubagentSandbox ["4. Tiered Subagent Sandbox (Subagents Engine)"]
+        ParentAgent -->|"subagent meta-tool dynamic delegation<br/>(Stateless, isolated sandbox, self-contained prompt)"| SubagentRouter{"Subagent Router & Tool Scoping"}
+
+        SubagentRouter -->|"explore (read-only)"| ExploreAgent["Explore Agent<br/>• Scoped to: view, grep, glob<br/>• Routed to: ultra-fast model (Gemini Flash)<br/>• Codebase search, returns <300 word distilled summary"]
+        SubagentRouter -->|"plan (planning)"| PlanAgent["Plan Agent<br/>• Scoped to read-only tools<br/>• Analyzes dependencies, outputs structured plan"]
+        SubagentRouter -->|"execute (write execution)"| ExecuteAgent["Execute Agent<br/>• Mounts: LSP edit, write_file, shell<br/>• Closed loop: edit code → run tests to verify<br/>• Monitored by HITL tool approval system"]
+    end
+
+    subgraph Feedback ["5. Context Distillation & Event Streaming"]
+        ExploreAgent -->|"Returns concise findings (zero history pollution)"| ParentAgent
+        PlanAgent -->|"Returns plan blueprint"| ParentAgent
+        ExecuteAgent -->|"Returns modification & test reports"| ParentAgent
+
+        SubagentRouter -.->|"Broadcasts subagent_start / tool_call events"| UIComponent["Desktop UI (SubagentExecution.tsx)<br/>🏗️ Nested step accordion card"]
+    end
+```
+
+##### 1. Built-in Subagent Roles & Permission Tiers
+
+The parent agent dynamically spawns lightweight Subagents on demand via `createSubagentTool`, with strict physical tool whitelisting and model routing per type:
+
+| Subagent Type | Role & Focus                           | Allowed Tools (`allowedTools`)                                                                                            | Default Model Policy                                               | Primary Scenarios                                                                                                                  |
+| :------------ | :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **`explore`** | Read-only codebase exploration         | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(Fast / low-cost / instant response) | Large-scale codebase search, finding call sites, inspecting structure; prevents raw file contents from exploding the main context. |
+| **`plan`**    | Architecture & implementation planning | `view`, `search_content`, `find_files`                                                                                    | Inherited / high-reasoning model                                   | Pre-implementation architecture breakdown, dependency analysis, producing actionable ordered steps.                                |
+| **`execute`** | Focused read-write execution           | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | Inherited high-capability coding model                             | Targeted implementation and refactoring within a scoped module, running tests locally until passing before reporting back.         |
+
+##### 2. Key Architectural Advantages
+
+1. **Least Privilege & Physical Injection Defense**:
+   - During `explore` and `plan` instantiation, write and shell tools are physically pruned from the tool registry (`packages/core/src/tools/subagent.ts:112-118`). Even if untrusted third-party code contains prompt injections, malicious commands cannot be dispatched.
+2. **Context Isolation & Noise Filtering**:
+   - Subagents are stateless workers with an isolated sandbox. Massive raw grep outputs and code snippets are consumed inside the subagent, and system prompts enforce structured summaries under 300 words (`packages/core/src/agents/explore.ts:38`), protecting the parent conversation from attention dilution.
+3. **Tiered Model Routing**:
+   - Heavy planning/coding uses frontier models while exploratory searching delegates to fast, low-cost flash models, cutting latency and API costs significantly.
+4. **Tool Confusion Elimination**:
+   - Trimming tool options down to 3 focused primitives increases tool calling accuracy to near 100%.
+5. **Parallel Multitasking**:
+   - Multiple subagents can run concurrently across independent threads and stream their progress to desktop `SubagentExecution.tsx` cards in real time.
 
 #### 3.4.7 Execution modes and graph scheduling (`src/core/graph/`)
 

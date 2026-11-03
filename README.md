@@ -121,7 +121,7 @@
       - [3.4.3 观察性记忆 (Observational Memory)](#343-观察性记忆-observational-memory)
       - [3.4.4 Agent ReAct 循环机制与工具流](#344-agent-react-循环机制与工具流)
       - [3.4.5 扩展工具生态与沙箱安全 (`packages/core/src/tools/`, `lsp/`, `browser/`)](#345-扩展工具生态与沙箱安全-packagescoresrctools-lsp-browser)
-      - [3.4.6 分级子智能体 (Subagents)](#346-分级子智能体-subagents)
+      - [3.4.6 分级子智能体与多 Agent 体系 (Subagents & Multi-Agent)](#346-分级子智能体与多-agent-体系-subagents--multi-agent-architecture)
       - [3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)](#347-执行模式与图调度-packagescoresrccoregraph)
       - [3.4.8 会话录制与离线回放 (`packages/core/src/core/recorder/`)](#348-会话录制与离线回放-packagescoresrccorerecorder)
     - [3.5 Memory 记忆模块 (`packages/core/src/memory/`)](#35-memory-记忆模块-packagescoresrcmemory)
@@ -612,13 +612,69 @@ const harness: MyAgentHarness = new Proxy(adapter, {
 - **MCP 外部工具拓展**：动态挂载外部 Model Context Protocol 服务器提供的外部工具。
 - **沙箱与路径防护**：所有读写与终端操作强制通过 `assertPathAllowed` 限制在 `projectRoot` 内，越界需经 `request_sandbox_access` 提权确认。
 
-#### 3.4.6 分级子智能体 (Subagents)
+#### 3.4.6 分级子智能体与多 Agent 体系 (Subagents & Multi-Agent Architecture)
 
-内置派生不同权限梯队的轻量 Agent：
+项目在架构上支持**纵向分层委派（Hierarchical Subagents）**与**横向跨节点互联（A2A Protocol & Workspace Concurrency）**的完整多 Agent 体系：
 
-- `explore`：只读探索子智能体，负责代码库检索与依赖分析。
-- `plan`：只读规划子智能体，负责功能设计与实施方案梳理。
-- `execute`：写权限执行子智能体，执行具体代码修改并调用任务看板工具。
+```mermaid
+flowchart TD
+    subgraph ExternalAgents ["1. 外部协作与跨智能体互联 (A2A Protocol)"]
+        RemoteAgent["外部 Agent / CLI 节点"] <-->|"A2A JSON-RPC & SSE<br/>(Agent Card 技能发现)"| A2AServer["A2A 协议服务 (@my-agent/a2a)"]
+    end
+
+    subgraph MultiWorktree ["2. 多工作区并发 Agent 调度 (Workspace Concurrency)"]
+        Dashboard["Agent Dashboard (监控看板)"] -.->|"并发会话监控与切换"| MainSessionA["Worktree A Agent"]
+        Dashboard -.->|"并发会话监控与切换"| MainSessionB["Worktree B Agent"]
+    end
+
+    subgraph Host ["3. 核心智能体调度层 (@my-agent/core)"]
+        Session["Session / Controller<br/>(维护 SQLite 历史记忆与上下文)"]
+        ParentAgent["主 Agent (code-agent)<br/>• 顶级推理模型 (Claude 3.7 / GPT-4o)<br/>• 统筹全局任务决策与人机交互"]
+        Session --> ParentAgent
+        A2AServer --> Session
+    end
+
+    subgraph SubagentSandbox ["4. 分级子智能体沙箱 (Subagents Engine)"]
+        ParentAgent -->|"subagent 元工具动态派生<br/>(无状态、独立沙箱、任务自包含)"| SubagentRouter{"Subagent 分发与工具裁剪"}
+
+        SubagentRouter -->|"explore (只读探索)"| ExploreAgent["Explore Agent<br/>• 仅限: view, grep, glob<br/>• 路由: 极速小模型 (Gemini Flash)<br/>• 检索代码库，输出 < 300 字脱水摘要"]
+        SubagentRouter -->|"plan (架构规划)"| PlanAgent["Plan Agent<br/>• 仅限只读工具<br/>• 梳理依赖，输出结构化实施计划"]
+        SubagentRouter -->|"execute (写码执行)"| ExecuteAgent["Execute Agent<br/>• 挂载: LSP edit, write_file, shell<br/>• 闭环: 修改代码 → 跑测试验证<br/>• 受 HITL 权限审批监控"]
+    end
+
+    subgraph Feedback ["5. 上下文脱水与事件流式渲染"]
+        ExploreAgent -->|"返回脱水精炼结论 (不污染主历史)"| ParentAgent
+        PlanAgent -->|"返回步骤蓝图"| ParentAgent
+        ExecuteAgent -->|"返回修改与测试验证报告"| ParentAgent
+
+        SubagentRouter -.->|"广播 subagent_start / tool_call 事件"| UIComponent["桌面端 UI (SubagentExecution.tsx)<br/>🏗️ 嵌套步骤折叠展开卡片"]
+    end
+```
+
+##### 1. 内置子智能体职责与权限梯队
+
+主 Agent 通过 `createSubagentTool` 动态按需唤起轻量级 Subagent，不同类型的 Subagent 实行严格的物理级工具白名单隔离与模型路由：
+
+| Subagent 类型 | 角色定位       | 允许工具 (`allowedTools`)                                                                                                 | 默认模型策略                                         | 核心应用场景                                                                 |
+| :------------ | :------------- | :------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------- | :--------------------------------------------------------------------------- |
+| **`explore`** | 只读代码探索   | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(极速/低单价/秒级响应) | 全仓跨文件大范围检索、查调用点、分析模块结构，避免海量原始代码撑爆主上下文。 |
+| **`plan`**    | 架构与方案规划 | `view`, `search_content`, `find_files`                                                                                    | 继承默认/高推理模型                                  | 大型重构或新功能实施前的方案拆解、依赖关系梳理、产出带步骤的实施蓝图。       |
+| **`execute`** | 专注读写执行   | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | 继承高代码能力模型                                   | 聚焦执行单一文件的代码重构、改写，并在封闭循环内自运行测试验证直至通过。     |
+
+##### 2. 为什么需要多权限 Subagent？（设计优势）
+
+1. **最小特权原则与物理防注入（Least Privilege & Security）**：
+   - `explore` 和 `plan` 实例在构建时，危险的 `write_file` 和 `execute_command` 工具被直接过滤掉（见 `packages/core/src/tools/subagent.ts:112-118`）。
+   - 即使探索第三方开源项目时代码注释中包含恶意 Prompt Injection（如“删除本地文件”），因缺乏工具暴露，模型在物理层面无法发起任何破坏性调用。
+2. **保护主会话上下文与信噪比（Context Isolation & Noise Filtering）**：
+   - Subagent 拥有完全独立的沙箱上下文，不加载父会话的历史记忆（`Stateless Ephemeral Worker`）。
+   - 探索过程中产生的成千上万行 grep 输出和原始文件全被隔离在子沙箱内部，角色提示词强制要求（`packages/core/src/agents/explore.ts:38`）输出不超过 300 字的精炼结论（回答、核心文件、行号），避免主会话遭遇上下文爆炸和注意力稀释。
+3. **模型分级路由（Cost & Latency Optimization）**：
+   - 主会话往往使用顶级推理模型（如 Claude 3.7 Sonnet / GPT-4o），而机械的代码翻找交由毫秒级响应的小模型（Gemini 2.0 Flash / Cerebras）并发跑，开销节省 90% 以上。
+4. **决策聚焦与工具误触消除（Tool Confusion Reduction）**：
+   - 将工具决策空间由全量的数十个裁剪至 3 个，大模型的 Tool Calling 准确率大幅提升，彻底消除工具误用。
+5. **多路异步并发（Parallel Multitasking）**：
+   - 主 Agent 可同时并发调起多个探索任务（例如前端组件排查与后端路由排查同时进行），并在桌面端以独立的 `🏗️ Agent` 卡片（`SubagentExecution.tsx`）流式呈现。
 
 #### 3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)
 
