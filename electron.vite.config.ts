@@ -4,6 +4,13 @@ import { resolve } from "path"
 
 export default defineConfig({
 	main: {
+		resolve: {
+			alias: {
+				"@my-agent/core": resolve(__dirname, "packages/core/src/index.ts"),
+				"@my-agent/a2a": resolve(__dirname, "packages/a2a/src/index.ts"),
+				"@my-agent/cli": resolve(__dirname, "packages/cli/src/index.ts"),
+			},
+		},
 		plugins: [
 			externalizeDepsPlugin({
 				include: ["@ast-grep/napi", "node-pty", "playwright-core"],
@@ -12,7 +19,7 @@ export default defineConfig({
 		build: {
 			outDir: "dist/main",
 			rollupOptions: {
-				input: "src/electron/main.ts",
+				input: "apps/desktop/src/electron/main.ts",
 				external: ["@ast-grep/napi", "node-pty", "playwright-core"],
 				output: {
 					format: "cjs",
@@ -33,7 +40,7 @@ export default defineConfig({
 		build: {
 			outDir: "dist/preload",
 			rollupOptions: {
-				input: "src/electron/preload.ts",
+				input: "apps/desktop/src/electron/preload.ts",
 				output: {
 					format: "cjs",
 				},
@@ -41,12 +48,19 @@ export default defineConfig({
 		},
 	},
 	renderer: {
-		root: "src/renderer",
+		root: "apps/desktop/src/renderer",
+		resolve: {
+			alias: {
+				"@my-agent/core": resolve(__dirname, "packages/core/src/client.ts"),
+				"@my-agent/a2a": resolve(__dirname, "packages/a2a/src/index.ts"),
+				"@my-agent/cli": resolve(__dirname, "packages/cli/src/index.ts"),
+			},
+		},
 		plugins: [react()],
 		build: {
 			outDir: resolve(__dirname, "dist/renderer"),
 			rollupOptions: {
-				input: resolve(__dirname, "src/renderer/index.html"),
+				input: resolve(__dirname, "apps/desktop/src/renderer/index.html"),
 			},
 		},
 	},
