@@ -72,6 +72,7 @@ export type HarnessEventType =
 	| "update_download_complete"
 	| "update_download_error"
 	| "project_changed"
+	| "projects_updated"
 	| "thread_title_updated"
 	| "display_state_changed"
 	| "session_recording_changed"

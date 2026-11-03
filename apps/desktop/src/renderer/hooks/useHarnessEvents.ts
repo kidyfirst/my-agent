@@ -640,8 +640,13 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						errorMessage: event.error as string,
 					}))
 					break
+				case "projects_updated": {
+					cb.loadEnrichedProjects()
+					break
+				}
 				case "project_changed": {
 					cb.dispatch({ type: "CLEAR" })
+					cb.loadEnrichedProjects()
 					const oldPath = cb.projectInfoRef.current?.rootPath
 					if (oldPath) {
 						cb.setActiveWorktrees((prev) => {

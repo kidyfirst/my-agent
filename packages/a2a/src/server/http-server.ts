@@ -9,6 +9,14 @@ export interface StartA2AServerOptions {
 	port?: number
 	host?: string
 	version?: string
+	getHarness?: () =>
+		| Promise<MyAgentHarness | undefined>
+		| MyAgentHarness
+		| undefined
+	onSwitchProject?: (
+		projectPath: string,
+	) => Promise<void | { harness?: MyAgentHarness }>
+	onProjectListChanged?: () => void
 }
 
 export interface A2AServerInstance {
@@ -19,20 +27,25 @@ export interface A2AServerInstance {
 	close: () => Promise<void>
 }
 
-export function createA2ARequestHandler(options: {
-	harness: MyAgentHarness
-	host?: string
-	port?: number
-	version?: string
-}): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+export function createA2ARequestHandler(
+	options: StartA2AServerOptions,
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
 	const {
 		harness,
 		port = 3888,
 		host = "127.0.0.1",
 		version = "0.1.3",
+		getHarness,
+		onSwitchProject,
+		onProjectListChanged,
 	} = options
 
-	const router = new A2ARouter({ harness })
+	const router = new A2ARouter({
+		harness,
+		getHarness,
+		onSwitchProject,
+		onProjectListChanged,
+	})
 
 	return async (req: IncomingMessage, res: ServerResponse) => {
 		// CORS headers

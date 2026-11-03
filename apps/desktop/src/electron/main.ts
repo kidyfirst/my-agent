@@ -993,6 +993,46 @@ app.whenReady().then(async () => {
 				harness: initialSession.harness as any,
 				port: 3888,
 				host: "127.0.0.1",
+				getHarness: () => getActiveSession()?.harness,
+				onSwitchProject: async (targetPath: string) => {
+					const safePath = path.resolve(targetPath)
+					const handlers = getAllHandlers()
+					const switchHandler = handlers["switchProject"]
+					if (switchHandler) {
+						await switchHandler(
+							{ type: "switchProject", path: safePath },
+							{
+								getActiveSession,
+								mainWindow,
+								sessions,
+								activeSessionPath,
+								setActiveSessionPath: (p: string) => {
+									activeSessionPath = p
+								},
+								sessionTimings,
+								cleanupSession,
+								bridgeAllEvents,
+								createHarness,
+								ensureAuthenticatedModel,
+								generateThreadTitle,
+								deleteThread,
+							},
+						)
+					}
+					if (mainWindow && !mainWindow.isDestroyed()) {
+						safeSend(mainWindow, "harness:event", {
+							type: "projects_updated",
+						})
+					}
+					return { harness: getActiveSession()?.harness }
+				},
+				onProjectListChanged: () => {
+					if (mainWindow && !mainWindow.isDestroyed()) {
+						safeSend(mainWindow, "harness:event", {
+							type: "projects_updated",
+						})
+					}
+				},
 			})
 			setA2AServerInstance(a2aInst)
 			log.info("a2a", `A2A server ready at ${a2aInst.baseUrl}/a2a`)

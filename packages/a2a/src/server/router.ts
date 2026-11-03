@@ -13,13 +13,42 @@ import {
 
 export interface A2ARouterOptions {
 	harness: MyAgentHarness
+	getHarness?: () =>
+		| Promise<MyAgentHarness | undefined>
+		| MyAgentHarness
+		| undefined
+	onSwitchProject?: (
+		projectPath: string,
+	) => Promise<void | { harness?: MyAgentHarness }>
+	onProjectListChanged?: () => void
 }
 
 export class A2ARouter {
 	private harness: MyAgentHarness
+	private options: A2ARouterOptions
 
 	constructor(options: A2ARouterOptions) {
 		this.harness = options.harness
+		this.options = options
+	}
+
+	private async getEffectiveHarness(
+		projectPath?: string,
+	): Promise<MyAgentHarness> {
+		if (projectPath) {
+			const absPath = path.resolve(projectPath)
+			if (this.options.onSwitchProject) {
+				const res = await this.options.onSwitchProject(absPath)
+				if (res && res.harness) {
+					this.harness = res.harness
+				}
+			}
+		}
+		const dynamic = await this.options.getHarness?.()
+		if (dynamic) {
+			this.harness = dynamic
+		}
+		return this.harness
 	}
 
 	async handle(request: JSONRPCRequest): Promise<JSONRPCResponse> {
@@ -147,6 +176,17 @@ export class A2ARouter {
 		const customName = params.name || path.basename(absPath)
 		saveRecentProject(absPath, customName)
 
+		if (this.options.onProjectListChanged) {
+			this.options.onProjectListChanged()
+		}
+
+		if (this.options.onSwitchProject) {
+			const res = await this.options.onSwitchProject(absPath)
+			if (res && res.harness) {
+				this.harness = res.harness
+			}
+		}
+
 		return {
 			success: true,
 			project: {
@@ -170,15 +210,29 @@ export class A2ARouter {
 		}
 
 		saveRecentProject(absPath, path.basename(absPath))
+
+		if (this.options.onProjectListChanged) {
+			this.options.onProjectListChanged()
+		}
+
+		if (this.options.onSwitchProject) {
+			const res = await this.options.onSwitchProject(absPath)
+			if (res && res.harness) {
+				this.harness = res.harness
+			}
+		}
+
 		return {
 			success: true,
 			activePath: absPath,
 		}
 	}
 
-	private async listThreads(_params?: { projectPath?: string }) {
-		const threads = await this.harness.listThreads()
-		const resourceId = this.harness.activeSession?.resourceId || process.cwd()
+	private async listThreads(params?: { projectPath?: string }) {
+		const harness = await this.getEffectiveHarness(params?.projectPath)
+		const threads = await harness.listThreads()
+		const resourceId =
+			harness.activeSession?.resourceId || params?.projectPath || process.cwd()
 
 		return {
 			resourceId,
@@ -192,11 +246,13 @@ export class A2ARouter {
 	}
 
 	private async createThread(params: { projectPath?: string; title?: string }) {
-		const created = await this.harness.createThread({
+		const harness = await this.getEffectiveHarness(params.projectPath)
+		const created = await harness.createThread({
 			title: params.title || "New Session",
 		})
-		const threadId = created?.id || this.harness.getCurrentThreadId()
-		const resourceId = this.harness.activeSession?.resourceId || process.cwd()
+		const threadId = created?.id || harness.getCurrentThreadId()
+		const resourceId =
+			harness.activeSession?.resourceId || params.projectPath || process.cwd()
 
 		return {
 			threadId,
@@ -251,27 +307,50 @@ export class A2ARouter {
 			}
 		}
 
+		const harness = await this.getEffectiveHarness(params.projectPath)
 		let threadId = params.contextId
 		if (!threadId) {
-			const created = await this.harness.createThread()
-			threadId = created?.id || this.harness.getCurrentThreadId()
-		} else if (threadId !== this.harness.getCurrentThreadId()) {
-			await this.harness.switchThread({ threadId })
+			const created = await harness.createThread()
+			threadId = created?.id || harness.getCurrentThreadId()
+		} else if (threadId !== harness.getCurrentThreadId()) {
+			await harness.switchThread({ threadId })
 		}
 
 		const startTime = Date.now()
 
 		// Execute turn and await completion
-		await this.harness.sendMessage({
+		await harness.sendMessage({
 			content: text,
 			threadId,
 		})
 
 		// Fetch resulting messages from store
-		const messages = (await this.harness.listMessages({ threadId })) || []
+		const messages = (await harness.listMessages({ threadId })) || []
 		const lastAssistant = [...messages]
 			.reverse()
 			.find((m: any) => m.role === "assistant")
+
+		const rawContent = lastAssistant?.content
+		let parts: any[] = []
+		if (Array.isArray(rawContent)) {
+			parts = rawContent
+		} else if (
+			rawContent &&
+			typeof rawContent === "object" &&
+			Array.isArray((rawContent as any).parts)
+		) {
+			parts = (rawContent as any).parts
+		} else if (
+			rawContent &&
+			typeof rawContent === "object" &&
+			typeof (rawContent as any).content === "string"
+		) {
+			parts = [{ type: "text", text: (rawContent as any).content }]
+		} else if (typeof rawContent === "string") {
+			parts = [{ type: "text", text: rawContent }]
+		} else {
+			parts = [{ type: "text", text: "" }]
+		}
 
 		return {
 			taskId: `task-${Date.now()}`,
@@ -280,17 +359,7 @@ export class A2ARouter {
 			durationMs: Date.now() - startTime,
 			message: {
 				role: "agent",
-				parts: Array.isArray(lastAssistant?.content)
-					? lastAssistant.content
-					: [
-							{
-								type: "text",
-								text:
-									typeof lastAssistant?.content === "string"
-										? lastAssistant.content
-										: "",
-							},
-						],
+				parts,
 			},
 		}
 	}
