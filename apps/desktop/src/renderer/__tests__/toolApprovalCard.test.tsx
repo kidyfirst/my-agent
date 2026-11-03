@@ -134,4 +134,37 @@ describe("ToolApprovalCard Component", () => {
 		expect(html).toContain('title="Yes, allow this time"')
 		expect(html).toContain("curl -s -X POST http://127.0.0.1:3888/a2a")
 	})
+
+	it("omits middle of long command while preserving 'in this conversation' and 'in this project'", () => {
+		const longApproval: PendingApprovalData = {
+			threadId: "test-thread-long",
+			toolCallId: "call_long456",
+			toolName: "execute_command",
+			category: "bash",
+			categoryLabel: "Bash",
+			args: {
+				command:
+					"cd /Users/timlyu/gitcode/github/mastra-code-ui && git diff packages/core/src/tools/subagent.ts packages/core/src/tools/shell.ts packages/core/src/tools/subagent.test.ts",
+			},
+		}
+
+		const html = renderToStaticMarkup(
+			<ToolApprovalCard
+				approval={longApproval}
+				onRespond={vi.fn()}
+			/>,
+		)
+
+		// Option 2 & 3 must show middle ellipsis for command
+		expect(html).toContain("cd /Users/timlyu...subagent.test.ts")
+
+		// Scope endings must always be present and wrapped
+		expect(html).toContain("in this conversation")
+		expect(html).toContain("in this project")
+
+		// Hover tooltip retains the full untruncated command (with HTML attribute escaping)
+		expect(html).toContain("in this conversation")
+		expect(html).toContain("in this project")
+		expect(html).toContain("packages/core/src/tools/subagent.test.ts")
+	})
 })

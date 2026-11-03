@@ -148,6 +148,38 @@ function renderCodeTokens(text: string) {
 	})
 }
 
+function truncateMiddle(text: string, maxLen = 36): string {
+	const cleaned = text.trim().replace(/\s+/g, " ")
+	if (cleaned.length <= maxLen) return cleaned
+
+	const ellipsis = "..."
+	const keep = maxLen - ellipsis.length
+	let headLen = Math.ceil(keep / 2)
+	let tailLen = Math.floor(keep / 2)
+
+	// Snap head to space or path separator if close
+	const headSlice = cleaned.slice(0, headLen)
+	const lastHeadSep = Math.max(
+		headSlice.lastIndexOf(" "),
+		headSlice.lastIndexOf("/"),
+	)
+	if (lastHeadSep > headLen - 6 && lastHeadSep > 6) {
+		headLen = lastHeadSep
+	}
+
+	// Snap tail to space or path separator if close
+	const tailStart = cleaned.length - tailLen
+	const tailSlice = cleaned.slice(tailStart)
+	const firstTailSep = tailSlice.search(/[\s/]/)
+	if (firstTailSep > 0 && firstTailSep < 6) {
+		tailLen -= firstTailSep + 1
+	}
+
+	const head = cleaned.slice(0, headLen).trim()
+	const tail = cleaned.slice(cleaned.length - tailLen).trim()
+	return `${head}${ellipsis}${tail}`
+}
+
 function renderActionText(
 	commandText: string,
 	url?: string,
@@ -183,6 +215,11 @@ export function ToolApprovalCard({
 	const { commandText, url } = useMemo(
 		() => extractCommandInfo(approval.args),
 		[approval.args],
+	)
+
+	const displayCommand = useMemo(
+		() => truncateMiddle(commandText, 36),
+		[commandText],
 	)
 
 	const title = useMemo(
@@ -328,7 +365,8 @@ export function ToolApprovalCard({
 			num: 2,
 			label: (
 				<>
-					Yes, and always allow &apos;{renderActionText(commandText, url)}&apos; in this conversation
+					Yes, and always allow &apos;{renderActionText(displayCommand, url)}&apos;{" "}
+					<span style={{ whiteSpace: "nowrap" }}>in this conversation</span>
 				</>
 			),
 			title: `Yes, and always allow '${commandText}' in this conversation`,
@@ -338,7 +376,8 @@ export function ToolApprovalCard({
 			num: 3,
 			label: (
 				<>
-					Yes, and always allow &apos;{renderActionText(commandText, url)}&apos; in this project
+					Yes, and always allow &apos;{renderActionText(displayCommand, url)}&apos;{" "}
+					<span style={{ whiteSpace: "nowrap" }}>in this project</span>
 				</>
 			),
 			title: `Yes, and always allow '${commandText}' in this project`,
@@ -348,7 +387,7 @@ export function ToolApprovalCard({
 			num: 4,
 			label: (
 				<>
-					Yes, and always allow &apos;{renderActionText(commandText, url)}&apos;
+					Yes, and always allow &apos;{renderActionText(displayCommand, url)}&apos;
 				</>
 			),
 			title: `Yes, and always allow '${commandText}'`,
@@ -553,11 +592,7 @@ export function ToolApprovalCard({
 										lineHeight: 1.45,
 										flex: 1,
 										minWidth: 0,
-										display: "-webkit-box",
-										WebkitLineClamp: 2,
-										WebkitBoxOrient: "vertical",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
+										wordBreak: "break-word",
 									}}
 								>
 									{opt.label}
