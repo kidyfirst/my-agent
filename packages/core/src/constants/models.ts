@@ -136,12 +136,15 @@ export const PROVIDER_THINKING_LEVELS: Record<string, ThinkingLevelOption[]> = {
 		{ id: "medium", label: "Med", description: "Medium reasoning effort" },
 		{ id: "high", label: "High", description: "High reasoning effort" },
 	],
+	// DeepSeek folds effort levels: `medium`/`high`/`xhigh` all collapse to either
+	// "high" or "max", so only four distinct levels are exposed here (verified by
+	// measuring reasoning length per level). `xhigh` is the Max tier because a
+	// "Max" label that sends "high" is indistinguishable from "High".
 	deepseek: [
 		{ id: "off", label: "Off", description: "Thinking disabled" },
 		{ id: "low", label: "Low", description: "Low reasoning effort" },
-		{ id: "medium", label: "Med", description: "Maps to high effort" },
 		{ id: "high", label: "High", description: "High reasoning effort" },
-		{ id: "xhigh", label: "Max", description: "Maps to high effort" },
+		{ id: "xhigh", label: "Max", description: "Maximum reasoning effort" },
 	],
 }
 

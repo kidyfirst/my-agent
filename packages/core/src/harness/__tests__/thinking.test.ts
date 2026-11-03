@@ -35,7 +35,8 @@ describe("withThinkingOptions / deepseek", () => {
 			low: "low",
 			medium: "high",
 			high: "high",
-			xhigh: "high",
+			// Deliberately not the documented "high": see DEEPSEEK_EFFORT.
+			xhigh: "max",
 		}
 
 		for (const [level, effort] of Object.entries(expected)) {
@@ -53,12 +54,13 @@ describe("withThinkingOptions / deepseek", () => {
 		// `none` is not a valid reasoning_effort for DeepSeek.
 		expect(options.deepseek.reasoningEffort).toBeUndefined()
 	})
-
-	it("never sends 'max', which no UI level maps to", async () => {
-		for (const level of ["low", "medium", "high", "xhigh"]) {
+	it("sends 'max' only for the Max tier", async () => {
+		for (const level of ["low", "medium", "high"]) {
 			const options = await optionsFor("deepseek", level)
 			expect(options.deepseek.reasoningEffort).not.toBe("max")
 		}
+		const max = await optionsFor("deepseek", "xhigh")
+		expect(max.deepseek.reasoningEffort).toBe("max")
 	})
 
 	it("round-trips reasoning_content on assistant messages", async () => {

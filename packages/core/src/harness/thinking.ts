@@ -24,10 +24,13 @@ const OPENAI_EFFORT: Record<ThinkingLevel, string> = {
 }
 /**
  * DeepSeek accepts low/high/max and folds the rest: `minimal` and `low` both mean
- * "low", `medium`, `high` and `xhigh` all mean "high", `max` and `ultra` mean
- * "max". Thinking is on by default, so it is switched off via the `thinking`
- * request option rather than an effort level — `none` is not a valid
- * `reasoning_effort`.
+ * "low", and `medium` means "high". Thinking is on by default, so it is switched
+ * off via the `thinking` request option rather than an effort level — `none` is
+ * not a valid `reasoning_effort`.
+ *
+ * `xhigh` deliberately means "max" rather than the documented "high": the levels
+ * exposed for DeepSeek are off/low/high/xhigh, and a "Max" entry that sends
+ * "high" would be indistinguishable from "High" in both the UI and the request.
  *
  * Source: https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
  */
@@ -35,7 +38,7 @@ const DEEPSEEK_EFFORT: Record<Exclude<ThinkingLevel, "off">, string> = {
 	low: "low",
 	medium: "high",
 	high: "high",
-	xhigh: "high",
+	xhigh: "max",
 }
 
 /** Anthropic has no effort levels, only a token budget (minimum is 1024). */

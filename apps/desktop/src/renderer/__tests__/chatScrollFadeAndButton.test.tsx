@@ -36,8 +36,23 @@ describe("chat scroll bottom fade and scroll-to-latest button", () => {
 		expect(html).toContain('data-testid="chat-bottom-fade"')
 		expect(html).toContain("linear-gradient(to bottom, transparent, var(--bg))")
 	})
+    it("renders top transparent gradient overlay in ChatView", () => {
+        const html = renderToStaticMarkup(
+            <ChatView
+                messages={messages}
+                tools={new Map()}
+                subagents={new Map()}
+                isAgentActive={false}
+                agentStartedAt={null}
+                streamingMessageId={null}
+                todos={[]}
+            />,
+        )
+        expect(html).toContain('data-testid="chat-top-fade"')
+        expect(html).toContain("linear-gradient(to top, transparent, var(--bg))")
+    })
 
-	it("renders floating circular scroll-to-latest button with down arrow icon", () => {
+    it("renders floating circular scroll-to-latest button with down arrow icon", () => {
 		const html = renderToStaticMarkup(
 			<ChatView
 				messages={messages}

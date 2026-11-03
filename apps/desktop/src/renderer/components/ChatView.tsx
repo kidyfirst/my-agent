@@ -284,18 +284,22 @@ export function ChatView({
 	reverted,
 }: ChatViewProps) {
 	const scrollRef = useRef<HTMLDivElement>(null)
+	const contentRef = useRef<HTMLDivElement>(null)
 	const isAutoScroll = useRef(true)
 	const [isScrolledUp, setIsScrolledUp] = useState(false)
+	const [isScrolledDown, setIsScrolledDown] = useState(false)
+	const [hasOverflow, setHasOverflow] = useState(false)
 	const prevThreadIdRef = useRef(threadId)
 	const scrollRafRef = useRef<number | null>(null)
 
 	useEffect(() => {
 		if (prevThreadIdRef.current !== threadId) {
-			prevThreadIdRef.current = threadId
-			isAutoScroll.current = true
-			setIsScrolledUp(false)
-		}
-	}, [threadId])
+            prevThreadIdRef.current = threadId
+            isAutoScroll.current = true
+            setIsScrolledUp(false)
+            setIsScrolledDown(false)
+        }
+    }, [threadId])
 
 	// Auto-scroll on new messages or tool updates. A message the user just sent
 	// always belongs in view: reading history first must not push the fresh
@@ -339,13 +343,30 @@ export function ChatView({
 		if (!scrollRef.current) return
 		const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
 		const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-		const scrolledUp = distanceFromBottom > 80
-		isAutoScroll.current = !scrolledUp
-		setIsScrolledUp(scrolledUp)
-	}
+        const scrolledUp = distanceFromBottom > 80
+        isAutoScroll.current = !scrolledUp
+        setIsScrolledUp(scrolledUp)
+        setIsScrolledDown(scrollTop > 8)
+        setHasOverflow(scrollHeight - clientHeight > 1)
+    }
+    // `scroll` only fires on user or programmatic scrolling; streaming output
+    // grows the content without one, so the fades need a separate signal. The
+    // observer watches both boxes: the viewport can shrink (window resize) and
+    // the content can grow, and either flips overflow.
+    useEffect(() => {
+        const el = scrollRef.current
+        if (!el) return
+        const sync = () => setHasOverflow(el.scrollHeight - el.clientHeight > 1)
+        sync()
+        if (typeof ResizeObserver === "undefined") return
+        const observer = new ResizeObserver(sync)
+        observer.observe(el)
+        if (contentRef.current) observer.observe(contentRef.current)
+        return () => observer.disconnect()
+    }, [isLoadingThread])
 
-	const scrollToLatest = () => {
-		if (scrollRef.current) {
+    const scrollToLatest = () => {
+        if (scrollRef.current) {
 			if (typeof scrollRef.current.scrollTo === "function") {
 				scrollRef.current.scrollTo({
 					top: scrollRef.current.scrollHeight,
@@ -1052,18 +1073,19 @@ export function ChatView({
 					scrollbarGutter: "stable",
 				}}
 			>
-			<div
-				style={{
-					maxWidth: 800,
-					width: "100%",
-					margin: "0 auto",
-					padding: "16px 24px 0",
-					display: "flex",
-					flexDirection: "column",
-					flex: "1 0 auto",
-					minHeight: "100%",
-				}}
-			>
+            <div
+                ref={contentRef}
+                style={{
+                    maxWidth: 800,
+                    width: "100%",
+                    margin: "0 auto",
+                    padding: "16px 24px 0",
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: "1 0 auto",
+                    minHeight: "100%",
+                }}
+            >
 				{showReplayBanner && (
 					<div
 						style={{
@@ -1288,7 +1310,29 @@ export function ChatView({
 			</div>
 		</div>
 
-		{/* Gradient fade at bottom when scrolled away from latest */}
+		{/* Gradient fade at top, so content dissolves into the edge instead of
+		    being cut by a hard line. Hidden at scrollTop 0 to keep the first
+		    message fully legible. */}
+		<div
+			data-testid="chat-top-fade"
+			aria-hidden="true"
+			style={{
+				position: "absolute",
+				top: 0,
+				left: 0,
+				right: 0,
+                height: 56,
+                background: "linear-gradient(to top, transparent, var(--bg))",
+                pointerEvents: "none",
+                zIndex: 10,
+                opacity: isScrolledDown ? 1 : 0,
+                transition: "opacity 0.2s ease",
+            }}
+        />
+
+		{/* Gradient fade at bottom, shown whenever content continues past the
+		    edge — not only after scrolling up, or the cut is a hard line until
+		    the user moves. */}
 		<div
 			data-testid="chat-bottom-fade"
 			aria-hidden="true"
@@ -1301,10 +1345,10 @@ export function ChatView({
 				background: "linear-gradient(to bottom, transparent, var(--bg))",
 				pointerEvents: "none",
 				zIndex: 10,
-				opacity: isScrolledUp ? 1 : 0,
-				transition: "opacity 0.2s ease",
-			}}
-		/>
+                opacity: hasOverflow ? 1 : 0,
+                transition: "opacity 0.2s ease",
+            }}
+        />
 
 		{/* Floating button to jump to latest message */}
 		<button
