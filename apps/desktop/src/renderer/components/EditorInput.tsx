@@ -856,7 +856,7 @@ export function EditorInput({
 
 	const numThinkingSteps = activeThinkingLevels.length
 	const thinkingStepInterval =
-		numThinkingSteps > 1 ? 214 / (numThinkingSteps - 1) : 0
+		numThinkingSteps > 1 ? 212 / (numThinkingSteps - 1) : 0
 
 	const handleSetThinkingLevel = useCallback(
 		(newLevel: string) => {
@@ -885,10 +885,10 @@ export function EditorInput({
 			if (!thinkingTrackRef.current || numThinkingSteps <= 1) return
 			const rect = thinkingTrackRef.current.getBoundingClientRect()
 			const thumbRadius = 13
-			const availableWidth = rect.width - thumbRadius * 2
+			const availableWidth = Math.max(1, rect.width - 2 - thumbRadius * 2)
 			const x = Math.max(
 				0,
-				Math.min(availableWidth, clientX - rect.left - thumbRadius),
+				Math.min(availableWidth, clientX - rect.left - 1 - thumbRadius),
 			)
 			const step = Math.round((x / availableWidth) * (numThinkingSteps - 1))
 			const target = activeThinkingLevels[step]
@@ -1606,7 +1606,7 @@ export function EditorInput({
 													width:
 														currentLevelIndex === 0
 															? 0
-															: 13 + currentLevelIndex * thinkingStepInterval,
+															: 26 + currentLevelIndex * thinkingStepInterval,
 													background: "var(--accent)",
 													borderRadius: 9999,
 													transition: isThinkingDragging
@@ -1643,7 +1643,9 @@ export function EditorInput({
 												style={{
 													position: "absolute",
 													left: currentLevelIndex * thinkingStepInterval,
-													top: 1,
+													top: 0,
+													bottom: 0,
+													margin: "auto 0",
 													width: 26,
 													height: 26,
 													borderRadius: "50%",
