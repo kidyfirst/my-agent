@@ -175,13 +175,14 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 		(isError
 			? message.errorMessage || "An error occurred during generation"
 			: "")
-	const isActivelyStreaming = Boolean(message.isStreaming)
+	const isActivelyStreaming = Boolean(
+		message.isStreaming && isAgentActive !== false,
+	)
 	const lineCount = thinking ? thinking.split("\n").length : 0
 
 	const formatTime = (iso?: string) => {
-		if (!iso) return ""
 		try {
-			const date = new Date(iso)
+			const date = iso ? new Date(iso) : new Date()
 			if (isNaN(date.getTime())) return ""
 			return date.toLocaleTimeString([], {
 				hour: "2-digit",

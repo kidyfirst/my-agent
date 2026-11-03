@@ -202,7 +202,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						cb.loadThreads()
 						cb.loadPRStatus()
 						if ((event as any).reason !== "error") {
-							cb.loadMessages().catch(() => {})
+							cb.loadMessages(undefined, true).catch(() => {})
 						}
 					} else {
 						cb.loadThreads()

@@ -465,9 +465,10 @@ export function ChatView({
 					isAgentActive && isLastAssistantInCurrentTurn && i === lastAssistantMsgIdx,
 				)
 				const isStreaming =
-					msg.id === streamingMessageId ||
-					Boolean((msg as any).isStreaming) ||
-					isCurrentTurnStreaming
+					isAgentActive &&
+					(msg.id === streamingMessageId ||
+						Boolean((msg as any).isStreaming) ||
+						isCurrentTurnStreaming)
 				const msgDurationMs = msg.durationMs ?? turnDurationById.get(msg.id)
 				const contentBlocks = normalizeMessageContent(
 					msg.content,

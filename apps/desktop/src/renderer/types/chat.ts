@@ -327,14 +327,17 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				}
 			}
 			const msgs = state.messages.map((m, idx) => {
+				const cleaned = (m as any).isStreaming
+					? { ...m, isStreaming: false }
+					: m
 				if (idx === lastAssistantIdx) {
 					return {
-						...m,
+						...cleaned,
 						durationMs: m.durationMs ?? durationMs,
 						changedFiles: action.changedFiles ?? m.changedFiles,
 					}
 				}
-				return m
+				return cleaned
 			})
 			return {
 				...state,
@@ -471,6 +474,7 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 					content: newContent,
 					durationMs: existing.durationMs ?? (incoming as any).durationMs,
 					attachments: existing.attachments || incoming.attachments,
+					isStreaming: false,
 				}
 				const newMessages = [...state.messages]
 				newMessages[matchIdx] = merged
@@ -541,6 +545,7 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 					content: newContent,
 					durationMs: existing.durationMs ?? (incoming as any).durationMs,
 					attachments: existing.attachments || incoming.attachments,
+					isStreaming: false,
 				}
 				const newMessages = [...state.messages]
 				newMessages[matchIdx] = merged
@@ -984,6 +989,11 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				streamingMessageId: action.active
 					? state.streamingMessageId || lastAssistant?.id || null
 					: null,
+				messages: action.active
+					? state.messages
+					: state.messages.map((m) =>
+							(m as any).isStreaming ? { ...m, isStreaming: false } : m,
+						),
 			}
 		}
 		case "CLEAR":

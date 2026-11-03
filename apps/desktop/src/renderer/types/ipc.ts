@@ -158,6 +158,7 @@ export interface Message {
 	errorMessage?: string
 	durationMs?: number
 	attachments?: AttachedFile[]
+	isStreaming?: boolean
 	/** Files changed by this task, resolved when the task ends. */
 	changedFiles?: Array<{
 		path: string

@@ -76,10 +76,37 @@ describe("AssistantMessage footer", () => {
 		expect(html).toContain("Bad response")
 	})
 
-	it("hides it while the answer is still streaming", () => {
+	it("hides it while the answer is actively streaming with isAgentActive", () => {
 		const html = renderToStaticMarkup(
-			<AssistantMessage message={{ ...answer, isStreaming: true }} />,
+			<AssistantMessage
+				message={{ ...answer, isStreaming: true }}
+				isAgentActive={true}
+			/>,
 		)
 		expect(html).not.toContain("Bad response")
+	})
+
+	it("shows the feedback pill when isAgentActive is false even if message had isStreaming flag", () => {
+		const html = renderToStaticMarkup(
+			<AssistantMessage
+				message={{ ...answer, isStreaming: true }}
+				isAgentActive={false}
+			/>,
+		)
+		expect(html).toContain("Helpful")
+		expect(html).toContain("Bad response")
+	})
+
+	it("renders a valid time string even if createdAt is missing", () => {
+		const msgWithoutCreated = {
+			...answer,
+			createdAt: undefined,
+		} as any
+		const html = renderToStaticMarkup(
+			<AssistantMessage message={msgWithoutCreated} isAgentActive={false} />,
+		)
+		// Should contain HH:MM timestamp
+		expect(html).toMatch(/\d{2}:\d{2}/)
+		expect(html).toContain("Helpful")
 	})
 })
