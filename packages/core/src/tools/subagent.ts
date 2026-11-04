@@ -2,19 +2,20 @@
  * Subagent tool — spawns a subagent to perform a focused task.
  *
  * The parent agent calls this tool with a task description and agent type.
- * A fresh Agent instance is created with the subagent's constrained tool set,
- * runs via agent.stream(), and returns the text result.
- *
- * Stream events are forwarded to the parent harness so the TUI can show
- * real-time subagent activity (tool calls, text deltas, etc.).
+ * Under Worker mode, a fresh SubagentWorker runs on an isolated thread / process
+ * with its constrained tool set, streaming events via IPC to the parent harness,
+ * completely offloading heavy CPU operations (grep, glob, AST parsing, diff)
+ * from the Main process Event Loop.
  */
-import { createTool, Agent } from "../core/index.js"
+import { createTool } from "../core/index.js"
 import { logger } from "../core/logger/index.js"
 import { z } from "zod/v3"
 import { getSubagentDefinition, getSubagentIds } from "../agents/index.js"
-import type { HarnessEvent, HarnessRequestContext } from "../harness/index.js"
+import type { HarnessRequestContext } from "../harness/index.js"
+import { SubagentWorkerHost } from "../subagent/worker-host.js"
+import { buildSubagentMeta } from "../subagent/worker-executor.js"
 
-interface SubagentToolDeps {
+export interface SubagentToolDeps {
 	/**
 	 * The full tool registry from the parent agent.
 	 * The subagent will receive a subset based on its allowedTools.
@@ -38,6 +39,12 @@ interface SubagentToolDeps {
 	 * If not provided, all registered agent types are available.
 	 */
 	allowedAgentTypes?: string[]
+
+	/**
+	 * Execution mode: "worker" (isolated thread) or "direct" (in-process fallback).
+	 * Defaults to "worker" unless running inside Vitest or explicitly set.
+	 */
+	mode?: "worker" | "direct"
 }
 
 // Default model for subagent tasks — fast and cheap
@@ -105,20 +112,7 @@ Use this tool when:
 				context?.requestContext?.get("harness")) as
 				| HarnessRequestContext
 				| undefined
-			const emitEvent = harnessCtx?.emitEvent
-			const abortSignal = harnessCtx?.abortSignal
-			// toolCallId from the parent agent's tool invocation. The controller
-			// passes the execution context as `{ requestContext, toolCallId }`,
-			// so it lives at the top level, not under `agent`.
 			const toolCallId = context?.toolCallId ?? "unknown"
-
-			// Build the constrained tool set
-			const subagentTools: Record<string, any> = {}
-			for (const toolId of definition.allowedTools) {
-				if (deps.tools[toolId]) {
-					subagentTools[toolId] = deps.tools[toolId]
-				}
-			}
 
 			// Resolve the model with the following precedence:
 			// 1. Explicit modelId from tool call
@@ -140,9 +134,10 @@ Use this tool when:
 				configuredSubagentModel ??
 				deps.defaultModelId ??
 				defaultForType
-			let model: any
+
+			// Pre-validate model resolution
 			try {
-				model = deps.resolveModel(resolvedModelId)
+				deps.resolveModel(resolvedModelId)
 			} catch (err) {
 				return {
 					content: `Failed to resolve model "${resolvedModelId}": ${err instanceof Error ? err.message : String(err)}`,
@@ -150,260 +145,52 @@ Use this tool when:
 				}
 			}
 
-			// Create a fresh agent with constrained tools
-			const subagent = new Agent({
-				id: `subagent-${definition.id}`,
-				name: `${definition.name} Subagent`,
-				instructions: definition.instructions,
-				model,
-				tools: subagentTools,
-			})
+			const session = (harnessCtx as any)?.requestContext?.get?.(
+				"session",
+			) as any
+			const state =
+				session?.state?.get?.() ??
+				(harnessCtx as any)?.state ??
+				(harnessCtx as any)?.getState?.()
+			const projectRoot =
+				(state?.projectPath as string | undefined) || process.cwd()
 
-			const startTime = Date.now()
-
-			logger.info("subagent", `subagent started: [${agentType}]`, {
+			logger.info("subagent", `spawning subagent worker: [${agentType}]`, {
 				toolCallId,
 				agentType,
 				task,
 				model: resolvedModelId,
-				availableTools: Object.keys(subagentTools),
+				allowedTools: definition.allowedTools,
 			})
 
-			// Notify TUI that subagent is starting
-			emitEvent?.({
-				type: "subagent_start",
-				toolCallId,
-				agentType,
-				task,
-				modelId: resolvedModelId,
+			const effectiveMode =
+				deps.mode ??
+				(process.env.MY_AGENT_SUBAGENT_MODE as
+					| "worker"
+					| "direct"
+					| undefined) ??
+				(process.env.VITEST ? "direct" : "worker")
+
+			const host = new SubagentWorkerHost({
+				tools: deps.tools,
+				resolveModel: deps.resolveModel,
+				mode: effectiveMode,
 			})
 
-			// Track partial output in case of abort
-			let partialText = ""
-			// Track tool calls for metadata embedding
-			const toolCallLog: Array<{ name: string; isError?: boolean }> = []
-
-			try {
-				const response = await subagent.stream(task, {
-					maxSteps: 50,
-					abortSignal,
-				})
-
-				// Consume the fullStream to forward events to the TUI
-				const reader = response.fullStream.getReader()
-
-				while (true) {
-					const { done, value: chunk } = await reader.read()
-					if (done) break
-
-					switch (chunk.type) {
-						case "text-delta":
-							partialText += chunk.payload.text
-							emitEvent?.({
-								type: "subagent_text_delta",
-								toolCallId,
-								agentType,
-								textDelta: chunk.payload.text,
-							})
-							break
-
-						case "tool-call":
-							toolCallLog.push({ name: chunk.payload.toolName })
-							logger.info(
-								"subagent",
-								`subagent tool call: [${agentType}] -> ${chunk.payload.toolName}`,
-								{
-									toolCallId,
-									agentType,
-									subToolName: chunk.payload.toolName,
-									args: chunk.payload.args,
-								},
-							)
-							emitEvent?.({
-								type: "subagent_tool_start",
-								toolCallId,
-								agentType,
-								subToolName: chunk.payload.toolName,
-								subToolArgs: chunk.payload.args,
-							})
-							break
-
-						case "tool-result": {
-							const isErr = chunk.payload.isError ?? false
-							// Update the last matching tool call
-							for (let i = toolCallLog.length - 1; i >= 0; i--) {
-								if (
-									toolCallLog[i].name === chunk.payload.toolName &&
-									toolCallLog[i].isError === undefined
-								) {
-									toolCallLog[i].isError = isErr
-									break
-								}
-							}
-							if (isErr) {
-								logger.warn(
-									"subagent",
-									`subagent tool error: [${agentType}] -> ${chunk.payload.toolName}`,
-									{
-										toolCallId,
-										agentType,
-										subToolName: chunk.payload.toolName,
-										result: chunk.payload.result,
-									},
-								)
-							} else {
-								logger.info(
-									"subagent",
-									`subagent tool end: [${agentType}] -> ${chunk.payload.toolName}`,
-									{
-										toolCallId,
-										agentType,
-										subToolName: chunk.payload.toolName,
-									},
-								)
-							}
-							emitEvent?.({
-								type: "subagent_tool_end",
-								toolCallId,
-								agentType,
-								subToolName: chunk.payload.toolName,
-								subToolResult: chunk.payload.result,
-								isError: isErr,
-							})
-							break
-						}
-					}
-				}
-
-				// Check if we were aborted
-				if (abortSignal?.aborted) {
-					const durationMs = Date.now() - startTime
-					logger.warn("subagent", `subagent aborted by user: [${agentType}]`, {
-						toolCallId,
-						agentType,
-						durationMs,
-					})
-					const abortResult = partialText
-						? `[Aborted by user]\n\nPartial output:\n${partialText}`
-						: "[Aborted by user]"
-
-					emitEvent?.({
-						type: "subagent_end",
-						toolCallId,
-						agentType,
-						result: abortResult,
-						isError: false,
-						durationMs,
-					})
-
-					return {
-						content: abortResult,
-						isError: false,
-					}
-				}
-
-				// Use getFullOutput to get the authoritative final text
-				const fullOutput = await response.getFullOutput()
-				const resultText = fullOutput.text || partialText
-
-				const durationMs = Date.now() - startTime
-				logger.info(
-					"subagent",
-					`subagent completed: [${agentType}] in ${durationMs}ms`,
-					{
-						toolCallId,
-						agentType,
-						durationMs,
-						toolCallsCount: toolCallLog.length,
-					},
-				)
-				emitEvent?.({
-					type: "subagent_end",
+			return await host.execute(
+				{
 					toolCallId,
 					agentType,
-					result: resultText,
-					isError: false,
-					durationMs,
-				})
-
-				const meta = buildSubagentMeta(resolvedModelId, durationMs, toolCallLog)
-				return {
-					content: resultText + meta,
-					isError: false,
-				}
-			} catch (err) {
-				const isAbort =
-					err instanceof Error &&
-					(err.name === "AbortError" ||
-						err.message?.includes("abort") ||
-						err.message?.includes("cancel"))
-				const durationMs = Date.now() - startTime
-				logger.error("subagent", `subagent error: [${agentType}]`, {
-					toolCallId,
-					agentType,
-					durationMs,
-					error: err instanceof Error ? err.message : String(err),
-				})
-
-				if (isAbort) {
-					// Return partial output on abort
-					const abortResult = partialText
-						? `[Aborted by user]\n\nPartial output:\n${partialText}`
-						: "[Aborted by user]"
-
-					emitEvent?.({
-						type: "subagent_end",
-						toolCallId,
-						agentType,
-						result: abortResult,
-						isError: false, // Not an error, just aborted
-						durationMs,
-					})
-
-					const meta = buildSubagentMeta(
-						resolvedModelId,
-						durationMs,
-						toolCallLog,
-					)
-					return {
-						content: abortResult + meta,
-						isError: false,
-					}
-				}
-
-				const message = err instanceof Error ? err.message : String(err)
-
-				emitEvent?.({
-					type: "subagent_end",
-					toolCallId,
-					agentType,
-					result: message,
-					isError: true,
-					durationMs,
-				})
-
-				const meta = buildSubagentMeta(resolvedModelId, durationMs, toolCallLog)
-				return {
-					content: `Subagent "${definition.name}" failed: ${message}` + meta,
-					isError: true,
-				}
-			}
+					task,
+					modelId: resolvedModelId,
+					projectRoot,
+					allowedTools: definition.allowedTools,
+				},
+				harnessCtx,
+				context?.requestContext,
+			)
 		},
 	})
 }
 
-/**
- * Build a metadata tag appended to subagent results.
- * The TUI parses this to display model ID, duration, and tool calls
- * when loading from history (where live events aren't available).
- */
-function buildSubagentMeta(
-	modelId: string,
-	durationMs: number,
-	toolCalls: Array<{ name: string; isError?: boolean }>,
-): string {
-	const tools = toolCalls
-		.map((tc) => `${tc.name}:${tc.isError ? "err" : "ok"}`)
-		.join(",")
-	return `\n<subagent-meta modelId="${modelId}" durationMs="${durationMs}" tools="${tools}" />`
-}
+export { buildSubagentMeta }

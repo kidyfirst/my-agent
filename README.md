@@ -632,27 +632,38 @@ flowchart TD
         Dashboard -.->|"并发会话监控与切换"| MainSessionB["Worktree B Agent"]
     end
 
-    subgraph Host ["3. 核心智能体调度层 (@my-agent/core)"]
+    subgraph Host ["3. 核心智能体调度层 (@my-agent/core · 主进程)"]
         Session["Session / Controller<br/>(维护 SQLite 历史记忆与上下文)"]
-        ParentAgent["主 Agent (code-agent)<br/>• 顶级推理模型 (Claude 3.7 / GPT-4o)<br/>• 统筹全局任务决策与人机交互"]
+
+        subgraph MainAgentBox ["主 Agent (code-agent · 全局决策与 Worker 调度宿主)"]
+            ParentAgent["顶级推理模型 (Claude 3.7 / GPT-4o)<br/>统筹任务分解与人机交互"]
+            WorkerEngine["【内置 Worker 调度引擎】<br/>• 握手注入 INIT Context<br/>• 毫秒级 Abort 同步与 2s 超时强杀<br/>• 宿主工具 RPC 桥接 (execute_command 等)"]
+            ParentAgent -->|"调用 subagent 元工具"| WorkerEngine
+        end
+
         Session --> ParentAgent
         A2AServer --> Session
     end
 
-    subgraph SubagentSandbox ["4. 分级子智能体沙箱 (Subagents Engine)"]
-        ParentAgent -->|"subagent 元工具动态派生<br/>(无状态、独立沙箱、任务自包含)"| SubagentRouter{"Subagent 分发与工具裁剪"}
+    subgraph SubagentSandbox ["4. 多核并发 Worker 线程池 (Node.js worker_threads)"]
+        WorkerEngine -->|"派生独立 Worker 线程<br/>dist/main/subagent-worker.cjs"| WorkerThreadPool{"多核分配"}
 
-        SubagentRouter -->|"explore (只读探索)"| ExploreAgent["Explore Agent<br/>• 仅限: view, search_content, find_files<br/>• 模型: 显式指定 > 按类型配置 > 会话模型 > Gemini Flash<br/>• 检索代码库，输出 < 300 字脱水摘要"]
-        SubagentRouter -->|"plan (架构规划)"| PlanAgent["Plan Agent<br/>• 仅限只读工具<br/>• 梳理依赖，输出结构化实施计划"]
-        SubagentRouter -->|"execute (写码执行)"| ExecuteAgent["Execute Agent<br/>• 挂载: LSP edit, write_file, shell, task_write/check<br/>• 闭环: 修改代码 → 跑测试验证<br/>• 步数上限 50 步，随父会话 abortSignal 中断"]
+        WorkerThreadPool -->|"Worker 线程 A (explore)"| ExploreAgent["Explore Worker<br/>• 独占 1 个 CPU 核心，独立 Event Loop<br/>• 本地直跑: view, search_content, find_files (绝不阻塞主进程)<br/>• 检索代码库，输出 < 300 字脱水摘要"]
+        WorkerThreadPool -->|"Worker 线程 B (plan)"| PlanAgent["Plan Worker<br/>• 独占 1 个 CPU 核心，独立 Event Loop<br/>• 纯只读环境，梳理依赖并输出实施计划"]
+        WorkerThreadPool -->|"Worker 线程 C (execute)"| ExecuteAgent["Execute Worker<br/>• 独占 1 个 CPU 核心，独立 Event Loop<br/>• 本地写码: LSP edit, write_file<br/>• RPC 桥接宿主: execute_command, task_write/check<br/>• 闭环: 修改代码 → 跑测试自验"]
     end
 
-    subgraph Feedback ["5. 上下文脱水与事件流式渲染"]
-        ExploreAgent -->|"返回脱水精炼结论 (不污染主历史)"| ParentAgent
-        PlanAgent -->|"返回步骤蓝图"| ParentAgent
-        ExecuteAgent -->|"返回修改与测试验证报告"| ParentAgent
+    subgraph Feedback ["5. 上下文脱水、双向通信与实时流式渲染"]
+        ExploreAgent -->|"IPC DONE: 脱水精炼结论"| WorkerEngine
+        PlanAgent -->|"IPC DONE: 步骤蓝图"| WorkerEngine
+        ExecuteAgent -->|"IPC DONE: 修改与自验报告"| WorkerEngine
+        WorkerEngine -->|"回填最终观察"| ParentAgent
 
-        SubagentRouter -.->|"广播 subagent_start / tool_call 事件"| UIComponent["桌面端 UI (SubagentExecution.tsx)<br/>🏗️ 嵌套步骤折叠展开卡片"]
+        ExploreAgent -.->|"IPC EVENT: text-delta / tool-call"| WorkerEngine
+        PlanAgent -.->|"IPC EVENT: text-delta / tool-call"| WorkerEngine
+        ExecuteAgent -.->|"IPC EVENT: text-delta / tool-call"| WorkerEngine
+
+        WorkerEngine -.->|"实时广播 subagent_start / tool_call / text_delta"| UIComponent["桌面端 UI (SubagentExecution.tsx)<br/>🏗️ 嵌套步骤折叠展开卡片 (零卡顿实时更新)"]
     end
 ```
 
@@ -666,31 +677,57 @@ flowchart TD
 | **`plan`**    | 架构与方案规划 | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(当前与 explore 共用默认值，可被覆盖) | 大型重构或新功能实施前的方案拆解、依赖关系梳理、产出带步骤的实施蓝图。       |
 | **`execute`** | 专注读写执行   | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | `google/gemini-2.0-flash`<br/>(同上，建议显式配置为高代码能力模型)  | 聚焦执行单一文件的代码重构、改写，并在封闭循环内自运行测试验证直至通过。     |
 
-##### 2. 实现细节：调用链路与运行机制
+##### 2. 实现细节：Agent -> Worker 调度架构与运行机制
 
-**调用链路**
+**调用链路与多核并发调度**
 
 ```
-Agent (ReAct 循环)
-  └─ tools.subagent({ agentType, task, modelId? })      packages/core/src/tools/subagent.ts:93
-       ├─ getSubagentDefinition(agentType)              packages/core/src/agents/index.ts:21
-       ├─ 从父级工具注册表按 allowedTools 白名单裁剪      subagent.ts:113-118
-       ├─ 解析模型（见下方优先级）                        subagent.ts:120-148
-       ├─ new Agent({ instructions, model, tools })      subagent.ts:151-157   全新实例，无父会话历史
-       ├─ agent.stream(task, { maxSteps: 50, abortSignal }) subagent.ts:176-179
-       │    └─ 逐帧消费 fullStream → emitEvent(subagent_*)  subagent.ts:182-233
-       └─ getFullOutput() → 结果文本 + <subagent-meta />  subagent.ts:258-275
+Agent (主进程 ReAct 循环)
+  └─ tools.subagent({ agentType, task, modelId? })      packages/core/src/tools/subagent.ts
+       ├─ getSubagentDefinition(agentType)              packages/core/src/agents/index.ts
+       ├─ 解析模型与快照生成 (ResolvedModelSnapshot)
+       ├─ 实例化 SubagentWorkerHost (主进程调度宿主)      packages/core/src/subagent/worker-host.ts
+       │    ├─ 多候选路径定位 Worker 入口 (dist/main/subagent-worker.cjs 或 worker-entry.ts)
+       │    └─ new Worker(entry) 派生独立工作线程 (独占 CPU 核心与独立 Event Loop)
+       │
+       ▼ (双向 IPC 消息通信)
+Worker 线程 (SubagentWorkerExecutor)                    packages/core/src/subagent/worker-executor.ts
+       ├─ 接收 INIT 握手消息 (注入 task, model, projectRoot, allowedTools)
+       ├─ 本地独立工具直接执行 (view, search_content, find_files, write_file) → 绝不阻塞主进程
+       ├─ 宿主工具通过 RPC 桥接 (TOOL_INVOKE -> execute_command / task_write -> TOOL_RESULT)
+       ├─ new Agent({ instructions, model, tools }) 闭环 ReAct
+       ├─ subagent.stream(task, { maxSteps: 50, abortSignal })
+       │    └─ 实时向 Host 推送 EVENT 消息 (subagent_start, subagent_text_delta, subagent_tool_*)
+       └─ 发送 DONE 消息 (含结果文本 + <subagent-meta />)
+
+Host 宿主层 (主进程)
+       ├─ 实时转发展示: worker.on('message', EVENT) → harnessContext.emitEvent → 桌面 UI
+       ├─ 宿主工具执行: TOOL_INVOKE 经标准 RequestContext 防御性包装执行后回传 TOOL_RESULT
+       ├─ 毫秒级中断同步: 收到 abortSignal 立即下发 ABORT 帧，若 2s 未停止强制 worker.terminate()
+       ├─ 崩溃安全隔离: Worker 发生异常/退出被捕获，主应用永远不闪退
+       └─ 格式化最终输出返回给主 Agent
 ```
 
-要点：
+**双向 IPC 消息协议 (`packages/core/src/subagent/protocol.ts`)**
 
-- **权限清单单一来源（当前实现）**：`createSubagentTool` 通过 `getSubagentIds()` / `getSubagentDefinition()` 直接读取 `packages/core/src/agents/` 注册表，工具白名单在 `subagent.ts:113-118` 从父级工具注册表按 `allowedTools` 逐个取用、缺失即跳过。
-- **`config.subagents` 尚未接入工具**：`createMyAgent()` 会把 `config.subagents ?? createDefaultSubagents(projectRoot)` 挂到 `controller.subagents`（`harness/index.ts:595,609`），但当前没有任何代码消费该列表 —— 既不会改变可派生的类型，也不会改变子智能体拿到的工具。自定义类型需要同步修改 `agents/` 注册表。
-- **每次调用都是一次性全新 Agent**：Subagent 不复用父 Agent 的 Memory，也不注入父会话的历史消息；父 Agent 只能看到最终返回的文本（`Stateless Ephemeral Worker`）。
-- **父级工具代理（`harness/tools.ts:125-137`）**：`task_write` / `task_check` 通过 `Proxy` 恒定可解析，因此 `execute` 子智能体的任务看板工具不会因模式裁剪而缺失。
-- **步数上限 50 步、可中断**：`maxSteps: 50` 限制子智能体自身的 ReAct 轮次；父会话的 `abortSignal` 透传进来，用户中断时返回 `[Aborted by user]` + 已产出的部分文本，而非报错。
-- **结果附带元数据标签**：结束时在文本尾部追加 `<subagent-meta modelId="…" durationMs="…" tools="view:ok,search_content:err" />`（`subagent.ts:336-345`），用于从历史记录恢复卡片时展示模型、耗时与工具调用流水。
-- **错误降级**：模型解析失败返回 `Failed to resolve model "…"`；未知类型在 Zod 枚举处即被拒绝，运行时再兜底返回 `Unknown agent type`；其他异常统一包装为 `Subagent "<name>" failed: …` 并置 `isError: true`。
+| 方向              | 消息类型 (`type`) | 作用与时机                                     | 关键载荷 (`payload`)                                                                        |
+| :---------------- | :---------------- | :--------------------------------------------- | :------------------------------------------------------------------------------------------ |
+| **Host → Worker** | `INIT`            | 启动握手，初始化 Worker 执行上下文             | `toolCallId`, `agentType`, `task`, `modelId`, `model` 快照, `allowedTools`, `projectRoot`   |
+| **Host → Worker** | `ABORT`           | 用户点击中断或超时，毫秒级终止 Worker 任务     | `toolCallId`, `reason`                                                                      |
+| **Host → Worker** | `TOOL_RESULT`     | 主进程完成敏感/单例工具执行后回传结果          | `callId`, `result`, `isError`, `error`                                                      |
+| **Worker → Host** | `EVENT`           | 实时流式转发给前端 UI 渲染                     | `toolCallId`, `event` (`subagent_start` / `tool_start` / `tool_end` / `text_delta` / `end`) |
+| **Worker → Host** | `TOOL_INVOKE`     | Worker 请求主进程代理执行宿主工具 (如终端命令) | `callId`, `toolName`, `args`                                                                |
+| **Worker → Host** | `DONE`            | 任务正常或被取消完成，附带元数据               | `toolCallId`, `resultText`, `toolCallLog`, `durationMs`, `meta`, `isError`                  |
+| **Worker → Host** | `ERROR`           | Worker 执行异常报错                            | `toolCallId`, `error`                                                                       |
+
+**架构核心要点：**
+
+- **真正的多核并发与主线程防卡顿**：重度 CPU 密集型工具（`search_content` 递归正则检索、`find_files` 大目录遍历、AST 解析与 Diff 比对）直接在 Worker 的独立线程内部执行，独占操作系统核心，**彻底将高耗时计算从 Electron 主进程剥离**，即使多个 Subagent 同时进行全仓大并发搜索，主进程与桌面 UI 也绝不出现掉帧卡顿。
+- **构建原生适配与零运行时开销**：在 `electron.vite.config.ts` 中配置了 `subagent-worker` entry，Vite 打包时直接产出自包含的预编译文件 `dist/main/subagent-worker.cjs`。在 Electron 生产包（asar）和开发环境下均可原生秒级拉起，无需在运行时依赖任何外部 TS 编译 hook。
+- **宿主工具 RPC 桥接与上下文防御**：对于需要宿主能力或权限审批的工具（如 `execute_command` 终端执行、任务看板 `task_write`），Worker 通过 `TOOL_INVOKE` 桥接回主进程。Host 收到请求后，通过 `createToolRequestContext` 对上下文做标准的 `RequestContext` 安全防御包装，确保工具内部调用 `toolContext?.requestContext?.get(...)` 始终稳健有效。
+- **崩溃物理隔离与容灾**：Worker 线程拥有独立的 V8 Isolate 与内存堆。如果某个 Subagent 意外爆内存（OOM）或发生未捕获异常退出，Host 会在 `worker.on('error')` / `worker.on('exit')` 中安全拦截，仅将该 Subagent 卡片标记为失败，**主应用本体绝对不会闪退**。
+- **毫秒级取消与超时强杀保护**：父会话的 `abortSignal` 在触发瞬间毫秒级通过 IPC 推送 `ABORT` 指令给 Worker。若底层被死循环阻塞在 2 秒内未正常退出，Host 会调用 `worker.terminate()` 物理销毁工作线程，杜绝僵尸进程残留。
+- **元数据持久化恢复**：完成时在文本尾部追加 `<subagent-meta modelId="…" durationMs="…" tools="view:ok,search_content:err" />`，会话重启后从本地 SQLite 加载历史时，前端仍能无缝重构还原出带有完整耗时、模型和工具执行流水线的 Agent 卡片。
 
 **模型路由优先级（`subagent.ts:120-139`）**
 

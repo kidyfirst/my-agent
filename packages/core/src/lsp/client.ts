@@ -3,14 +3,14 @@ import {
 	StreamMessageReader,
 	StreamMessageWriter,
 	createMessageConnection,
-	MessageConnection,
+	type MessageConnection,
 } from "vscode-jsonrpc/node"
 import {
 	Diagnostic,
 	TextDocumentIdentifier,
 	Position,
 } from "vscode-languageserver-protocol"
-import { LSPServerInfo } from "./server"
+import type { LSPServerInfo } from "./server"
 
 /**
  * LSP Client wrapper for JSON-RPC communication

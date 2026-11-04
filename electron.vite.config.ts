@@ -19,9 +19,16 @@ export default defineConfig({
 		build: {
 			outDir: "dist/main",
 			rollupOptions: {
-				input: "apps/desktop/src/electron/main.ts",
+				input: {
+					main: resolve(__dirname, "apps/desktop/src/electron/main.ts"),
+					"subagent-worker": resolve(
+						__dirname,
+						"packages/core/src/subagent/worker-entry.ts",
+					),
+				},
 				external: ["@ast-grep/napi", "node-pty", "playwright-core"],
 				output: {
+					entryFileNames: "[name].cjs",
 					format: "cjs",
 					banner: `(() => {
 	const origEmitWarning = process.emitWarning;

@@ -157,3 +157,13 @@ export {
 	runtimeMetadata,
 	isReplayRunActive,
 } from "./core/recorder/index.js"
+
+// Subagent Worker
+export {
+	SubagentWorkerHost,
+	SubagentWorkerExecutor,
+	type SubagentHostDeps,
+	type SubagentTaskParams,
+	type HostToWorkerMessage,
+	type WorkerToHostMessage,
+} from "./subagent/index.js"

@@ -284,8 +284,11 @@ Usage notes:
 			let capturedOutput = "" // Track output ourselves for abort case
 
 			// Get abort signal and emit function from harness context
-			const harnessCtx = (toolContext?.requestContext?.get("controller") ||
-				toolContext?.requestContext?.get("harness")) as any
+			const reqCtx = toolContext?.requestContext as any
+			const harnessCtx =
+				typeof reqCtx?.get === "function"
+					? reqCtx.get("controller") || reqCtx.get("harness")
+					: reqCtx
 			const abortSignal = harnessCtx?.abortSignal
 			const emitEvent = harnessCtx?.emitEvent
 			const toolCallId = toolContext?.toolCallId

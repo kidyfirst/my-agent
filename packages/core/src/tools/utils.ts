@@ -172,14 +172,15 @@ export function assertPathAllowed(
  * Read `sandboxAllowedPaths` from the MyAgent harness runtime context.
  * Returns an empty array when the context is unavailable (e.g. in tests).
  */
-export function getAllowedPathsFromContext(
-	toolContext:
-		| { requestContext?: { get: (key: string) => unknown } }
-		| undefined,
-): string[] {
-	if (!toolContext?.requestContext) return []
-	const harnessCtx = (toolContext.requestContext.get("controller") ||
-		toolContext.requestContext.get("harness")) as any
+export function getAllowedPathsFromContext(toolContext: unknown): string[] {
+	if (!toolContext || typeof toolContext !== "object") return []
+	const tc = toolContext as any
+	const reqCtx = tc?.requestContext
+	if (!reqCtx) return []
+	const harnessCtx =
+		typeof reqCtx.get === "function"
+			? reqCtx.get("controller") || reqCtx.get("harness")
+			: reqCtx
 	const state = harnessCtx?.state ?? harnessCtx?.getState?.()
 	return state?.sandboxAllowedPaths ?? []
 }

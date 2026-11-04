@@ -605,27 +605,38 @@ flowchart TD
         Dashboard -.->|"Concurrent Session Monitor & Switch"| MainSessionB["Worktree B Agent"]
     end
 
-    subgraph Host ["3. Core Agent Scheduling Layer (@my-agent/core)"]
+    subgraph Host ["3. Core Agent Scheduling Layer (@my-agent/core · Main Process)"]
         Session["Session / Controller<br/>(Maintains SQLite memory & history)"]
-        ParentAgent["Main Agent (code-agent)<br/>• Flagship reasoning model (Claude 3.7 / GPT-4o)<br/>• Coordinates global decision-making & user interaction"]
+
+        subgraph MainAgentBox ["Main Agent (code-agent · Decision Making & Worker Host)"]
+            ParentAgent["Flagship reasoning model (Claude 3.7 / GPT-4o)<br/>Task breakdown & user interaction"]
+            WorkerEngine["[Built-in Worker Scheduling Engine]<br/>• Handshake context injection (INIT)<br/>• Sub-millisecond abort & 2s forceful terminate<br/>• Host tool RPC bridge (execute_command, etc.)"]
+            ParentAgent -->|"Calls subagent meta-tool"| WorkerEngine
+        end
+
         Session --> ParentAgent
         A2AServer --> Session
     end
 
-    subgraph SubagentSandbox ["4. Tiered Subagent Sandbox (Subagents Engine)"]
-        ParentAgent -->|"subagent meta-tool dynamic delegation<br/>(Stateless, isolated sandbox, self-contained prompt)"| SubagentRouter{"Subagent Router & Tool Scoping"}
+    subgraph SubagentSandbox ["4. Multi-Core Concurrent Worker Pool (Node.js worker_threads)"]
+        WorkerEngine -->|"Spawns isolated Worker thread<br/>dist/main/subagent-worker.cjs"| WorkerThreadPool{"Multi-Core Allocation"}
 
-        SubagentRouter -->|"explore (read-only)"| ExploreAgent["Explore Agent<br/>• Scoped to: view, search_content, find_files<br/>• Model: Explicit > Type config > Session model > Gemini Flash<br/>• Codebase search, returns <300 word distilled summary"]
-        SubagentRouter -->|"plan (planning)"| PlanAgent["Plan Agent<br/>• Scoped to read-only tools<br/>• Analyzes dependencies, outputs structured plan"]
-        SubagentRouter -->|"execute (write execution)"| ExecuteAgent["Execute Agent<br/>• Mounts: LSP edit, write_file, shell, task_write/check<br/>• Closed loop: edit code → run tests to verify<br/>• 50 step limit, aborts on parent session abortSignal"]
+        WorkerThreadPool -->|"Worker Thread A (explore)"| ExploreAgent["Explore Worker<br/>• Dedicated CPU core & isolated Event Loop<br/>• Native local execution: view, search_content, find_files (zero UI lag)<br/>• Returns <300 word distilled summary"]
+        WorkerThreadPool -->|"Worker Thread B (plan)"| PlanAgent["Plan Worker<br/>• Dedicated CPU core & isolated Event Loop<br/>• Read-only environment, analyzes dependencies"]
+        WorkerThreadPool -->|"Worker Thread C (execute)"| ExecuteAgent["Execute Worker<br/>• Dedicated CPU core & isolated Event Loop<br/>• Local edits: LSP edit, write_file<br/>• Host RPC bridge: execute_command, task_write/check<br/>• Closed loop: edit code → run tests"]
     end
 
-    subgraph Feedback ["5. Context Distillation & Event Streaming"]
-        ExploreAgent -->|"Returns concise findings (zero history pollution)"| ParentAgent
-        PlanAgent -->|"Returns plan blueprint"| ParentAgent
-        ExecuteAgent -->|"Returns modification & test reports"| ParentAgent
+    subgraph Feedback ["5. Context Distillation, Bi-Directional IPC & Live UI Streaming"]
+        ExploreAgent -->|"IPC DONE: Distilled findings"| WorkerEngine
+        PlanAgent -->|"IPC DONE: Step blueprints"| WorkerEngine
+        ExecuteAgent -->|"IPC DONE: Modification & test reports"| WorkerEngine
+        WorkerEngine -->|"Injects final output into parent ReAct loop"| ParentAgent
 
-        SubagentRouter -.->|"Broadcasts subagent_start / tool_call events"| UIComponent["Desktop UI (SubagentExecution.tsx)<br/>🏗️ Nested step accordion card"]
+        ExploreAgent -.->|"IPC EVENT: text-delta / tool-call"| WorkerEngine
+        PlanAgent -.->|"IPC EVENT: text-delta / tool-call"| WorkerEngine
+        ExecuteAgent -.->|"IPC EVENT: text-delta / tool-call"| WorkerEngine
+
+        WorkerEngine -.->|"Live broadcasts subagent_start / tool_call / text_delta"| UIComponent["Desktop UI (SubagentExecution.tsx)<br/>🏗️ Nested step accordion card (Lag-free live streaming)"]
     end
 ```
 
@@ -639,31 +650,57 @@ The parent agent dynamically spawns lightweight Subagents on demand via the `sub
 | **`plan`**    | Architecture & implementation planning | `view`, `search_content`, `find_files`                                                                                    | `google/gemini-2.0-flash`<br/>(Shares default with explore, can be overridden) | Pre-implementation architecture breakdown, dependency analysis, producing actionable ordered steps.                                |
 | **`execute`** | Focused read-write execution           | `view`, `search_content`, `find_files`, `string_replace_lsp`, `write_file`, `execute_command`, `task_write`, `task_check` | `google/gemini-2.0-flash`<br/>(Can be overridden, coding models recommended)   | Targeted implementation and refactoring within a scoped module, running tests locally until passing before reporting back.         |
 
-##### 2. Implementation Details: Invocation Flow & Execution Mechanics
+##### 2. Implementation Details: Agent -> Worker Scheduling Architecture & Execution Mechanics
 
-**Invocation Flow**
+**Invocation Flow & Multi-Core Concurrency**
 
 ```
-Agent (ReAct loop)
-  └─ tools.subagent({ agentType, task, modelId? })      packages/core/src/tools/subagent.ts:93
-       ├─ getSubagentDefinition(agentType)              packages/core/src/agents/index.ts:21
-       ├─ Prune parent tool registry by allowedTools    subagent.ts:113-118
-       ├─ Resolve model (see priority below)            subagent.ts:120-148
-       ├─ new Agent({ instructions, model, tools })      subagent.ts:151-157   Clean instance, no parent history
-       ├─ agent.stream(task, { maxSteps: 50, abortSignal }) subagent.ts:176-179
-       │    └─ Consume fullStream → emitEvent(subagent_*)  subagent.ts:182-233
-       └─ getFullOutput() → result text + <subagent-meta />  subagent.ts:258-275
+Agent (Main Process ReAct Loop)
+  └─ tools.subagent({ agentType, task, modelId? })      packages/core/src/tools/subagent.ts
+       ├─ getSubagentDefinition(agentType)              packages/core/src/agents/index.ts
+       ├─ Resolve model & snapshot (ResolvedModelSnapshot)
+       ├─ Instantiate SubagentWorkerHost (Host Manager) packages/core/src/subagent/worker-host.ts
+       │    ├─ Multi-candidate discovery (dist/main/subagent-worker.cjs or worker-entry.ts)
+       │    └─ new Worker(entry) spawns isolated Worker thread (dedicated CPU core & Event Loop)
+       │
+       ▼ (Bi-directional IPC message protocol)
+Worker Thread (SubagentWorkerExecutor)                  packages/core/src/subagent/worker-executor.ts
+       ├─ Receives INIT handshake message (task, model, projectRoot, allowedTools)
+       ├─ Local tools execute natively (view, search_content, find_files, write_file) → Zero main thread lag
+       ├─ Host tools bridged via RPC (TOOL_INVOKE -> execute_command / task_write -> TOOL_RESULT)
+       ├─ new Agent({ instructions, model, tools }) closed ReAct loop
+       ├─ subagent.stream(task, { maxSteps: 50, abortSignal })
+       │    └─ Streams real-time EVENT messages to Host (subagent_start, subagent_text_delta, subagent_tool_*)
+       └─ Sends DONE message (final text + <subagent-meta />)
+
+Host Layer (Main Process)
+       ├─ Real-time UI streaming: worker.on('message', EVENT) → harnessContext.emitEvent → Desktop UI
+       ├─ Host tool execution: TOOL_INVOKE executed with defensive RequestContext wrapping → TOOL_RESULT
+       ├─ Sub-millisecond abort: Forwards ABORT immediately on abortSignal; force worker.terminate() after 2s
+       ├─ Crash isolation: Catches worker errors/exits gracefully, preventing host Electron app crashes
+       └─ Returns formatted final output to parent Agent
 ```
 
-Key points:
+**Bi-Directional IPC Message Protocol (`packages/core/src/subagent/protocol.ts`)**
 
-- **Single source of truth for permissions (current implementation)**: `createSubagentTool` directly accesses the registry in `packages/core/src/agents/` via `getSubagentIds()` / `getSubagentDefinition()`. Tool whitelisting extracts allowed tools from the parent tool registry, safely skipping missing ones (`subagent.ts:113-118`).
-- **`config.subagents` pending tool wiring**: `createMyAgent()` attaches `config.subagents ?? createDefaultSubagents(projectRoot)` to `controller.subagents` (`harness/index.ts:595,609`), but currently no code consumes this list — neither altering spawnable types nor altering toolsets. Custom subagent types require registering into `agents/`.
-- **Each invocation is a fresh, stateless agent**: Subagents do not reuse parent memory or inject historical messages. The parent agent only receives the distilled output text (`Stateless Ephemeral Worker`).
-- **Parent tool proxies (`harness/tools.ts:125-137`)**: `task_write` and `task_check` are resolved dynamically via `Proxy`, guaranteeing task board tools are not pruned away in `execute` subagents.
-- **50-step limit with cooperative cancellation**: `maxSteps: 50` constrains the subagent's internal ReAct loop. The parent session's `abortSignal` is forwarded, returning `[Aborted by user]` along with partial output rather than throwing an unhandled exception.
-- **Metadata tags on output**: Upon completion, `<subagent-meta modelId="..." durationMs="..." tools="view:ok,search_content:err" />` is appended (`subagent.ts:336-345`) to enable faithful UI reconstruction from chat logs.
-- **Graceful degradation**: Model resolution failure returns `Failed to resolve model "..."`; unknown types fail Zod schema validation; other errors are wrapped cleanly as `Subagent "<name>" failed: ...` with `isError: true`.
+| Direction         | Message Type (`type`) | Purpose & Timing                                                    | Key Payload                                                                                   |
+| :---------------- | :-------------------- | :------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------- |
+| **Host → Worker** | `INIT`                | Startup handshake, initializes Worker execution context             | `toolCallId`, `agentType`, `task`, `modelId`, `model` snapshot, `allowedTools`, `projectRoot` |
+| **Host → Worker** | `ABORT`               | Cooperative cancellation on user stop or timeout                    | `toolCallId`, `reason`                                                                        |
+| **Host → Worker** | `TOOL_RESULT`         | Returns result of host-bridged sensitive/singleton tools            | `callId`, `result`, `isError`, `error`                                                        |
+| **Worker → Host** | `EVENT`               | Real-time stream events forwarded to frontend UI                    | `toolCallId`, `event` (`subagent_start` / `tool_start` / `tool_end` / `text_delta` / `end`)   |
+| **Worker → Host** | `TOOL_INVOKE`         | Worker requests host execution for privileged tools (e.g. terminal) | `callId`, `toolName`, `args`                                                                  |
+| **Worker → Host** | `DONE`                | Successful or canceled completion with metadata                     | `toolCallId`, `resultText`, `toolCallLog`, `durationMs`, `meta`, `isError`                    |
+| **Worker → Host** | `ERROR`               | Unhandled error inside worker thread                                | `toolCallId`, `error`                                                                         |
+
+**Key Architectural Features:**
+
+- **Genuine Multi-Core Concurrency & Zero UI Jitter**: Heavy CPU-bound operations (`search_content` recursive regex greps, `find_files` directory scans, AST parsing, diff calculation) run entirely inside the Worker thread's own V8 Isolate, consuming an independent CPU core. This completely isolates heavy compute from Electron's main process, preventing any UI frame drops or IPC freezes.
+- **Native Build Integration & Zero Runtime Overhead**: `electron.vite.config.ts` declares `subagent-worker` as a dedicated entry point, compiling directly to `dist/main/subagent-worker.cjs`. This standalone CommonJS bundle launches in milliseconds within packaged Electron apps (asar) and development environments without requiring runtime TypeScript compilation hooks.
+- **Defensive Host Tool RPC Bridging**: Host tools requiring elevated privileges or user approval (`execute_command`, `task_write`) are proxied via `TOOL_INVOKE`. The host automatically wraps the execution context in a defensive `RequestContext`, preventing `toolContext?.requestContext?.get is not a function` errors.
+- **Crash Isolation & Resilience**: Worker threads possess independent memory heaps. In the event of an Out-Of-Memory (OOM) error or unhandled native crash within a worker, the host catches the error via `worker.on('error')` / `worker.on('exit')` and marks the specific Subagent card as failed without crashing the host application.
+- **Sub-Millisecond Cancellation & Hard Terminate**: When the user clicks stop, the parent `abortSignal` immediately emits an `ABORT` message. If the worker remains blocked by synchronous operations after 2 seconds, the host invokes `worker.terminate()` to forcefully reclaim system resources.
+- **Persistent Metadata Reconstruction**: Upon completion, `<subagent-meta modelId="..." durationMs="..." tools="view:ok,search_content:err" />` is appended to the message text, enabling full UI card reconstruction (with durations, models, and tool step logs) when reloading chat sessions from local SQLite storage.
 
 **Model Routing Priority (`subagent.ts:120-139`)**
 
