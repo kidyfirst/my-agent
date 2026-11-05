@@ -4,6 +4,128 @@
 
 ---
 
+## [v0.1.5] - 2026-11-05
+
+### 🗂️ 右侧栏全面 Tab 化 (Tabbed Right Sidebar)
+
+- **五个面板并列成 tab**：Files / Review / Terminal / Browser / Overview 收进同一条 tab 条，支持拖拽调宽；每个会话独立记忆自己开着哪些 tab、是否可见、是否最大化，切回来就是离开时的样子。
+- **最大化与隐藏**：右上角新增两个图标——最大化用 `flex-basis` 插值动画向左铺满会话区（`⇧⌘M` 同效），再点还原；隐藏按钮位于面板右缘，面板收起后由会话窗口右侧的按钮接回，两处互斥不重叠。
+- **Overview 下拉菜单脱离裁剪**：菜单改为 portal 到 `body` + `position: fixed`，不再被 38px 高、带 `overflow: hidden` 的标题栏切掉。
+
+### 🌐 内嵌浏览器面板 (Embedded Browser Panel)
+
+- **webview 多标签**：Browser tab 内自带标签条，agent 导航时自动接管跟随页或新开一页，用户手动打开的页面不会被 agent 覆盖。
+- **快照卡改在面板内打开**：computer use 快照卡右上角按钮不再唤起系统浏览器，而是把 URL 送到右侧 Browser 面板；隐藏的 webview 用 `visibility` 保活，重新显示不会白屏。
+
+### 🖱️ Computer Use 重写为纯函数工具 (Text-first Computer Use)
+
+- **所有 provider 都能调用**：放弃只被部分厂商识别的 provider 定义式 computer tool，改造成普通 function tool，DeepSeek 等模型同样可以驱动浏览器，且重新走统一的审批与 `tool_start` / `tool_end` 事件。
+- **`screenshot` 返回文本快照**：遍历 DOM 取出最多 120 个可交互元素（编号 + 中心点坐标 + 可见文本），而不是把 base64 图片塞进 tool result 里烧 token。
+- **动作帧另行推送**：每次动作后把 JPEG 帧镜像到桌面端预览卡（400ms 节流、无订阅者不拍、异常不影响工具执行）。
+
+### ⌨️ 快捷键与标题栏提示 (Shortcuts & Tooltips)
+
+- **自定义快捷键气泡**：左侧栏 `⌘B`、右侧面板 `⇧⌘B`、会话搜索 `⌘K`、命令面板 `⇧⌘P`、Overview `⌥⌘O`，hover 即显示「动作 + 键位」；同步写入 Electron 菜单 accelerator，避免菜单抢占后收不到按键。
+- **光标语义修正**：会话标题只在点击真能切回对话时才显示手型，会话已在前台时是普通箭头。
+
+### 🧩 其它打磨 (Polish)
+
+- Terminal 收敛为单 shell，去掉整条 header 与 tab；移除 xterm 6 自带的 SmoothScrollableElement 滚动条。
+- diff 头部改用统一的 `Open in…` 下拉，不再各自实现一套。
+- 文件与会话 tab 不再换行，超长省略并在 hover 时给出完整路径。
+- Subagent 迁移到多核 worker thread 模型，重文件与检索类工具离线执行，主进程不再掉帧。
+
+---
+
+## [v0.1.4] - 2026-11-03
+
+### 🏗️ Monorepo 架构重构 (Monorepo Refactor)
+
+- 代码库拆分为 `packages/core`（调度引擎与工具）、`packages/a2a`（A2A 协议）、`packages/cli`（守护进程）与 `apps/desktop`（Electron 客户端），移除遗留的根 `src/`，各端共享同一套核心。
+
+### 🔐 工具授权重设计 (Tool Approval Redesign)
+
+- 授权请求从对话框改为内联卡片，支持一次性 / 会话内 / 项目级多档作用域；审批记录落 SQLite 审计表，可回溯。
+- Electron 由 40 升级至 45，随之上调原生能力与安全基线。
+
+### 🤖 多 Agent 与 Subagent (Multi-Agent)
+
+- `subagent` 工具接入动态工具集与 harness，按角色派发独立上下文与工具子集。
+- 执行卡重做：应用重启后仍能从持久化的 `<subagent-meta>` 标签还原工具调用历史、模型与耗时。
+
+### 🎛️ 运行期纠偏 (Steering)
+
+- 工具审批期间与任务运行期间都可插入 steering prompt，不必中断再重开一轮。
+
+### 🩺 流式看门狗 (Stream Stall Watchdog)
+
+- 连续 120s 无增量即判定为死流并显式失败，避免「服务繁忙」这类只建连不响应的服务把任务挂死；工具执行期间自动停表，不会误杀长时间运行的 subagent。
+
+### 🐛 修复与体验 (Fixes & UX)
+
+- 任务结束后未清除 `isStreaming`，导致时间戳与反馈按钮消失。
+- 审批卡中的长命令改为中间截断，作用域后缀始终可见。
+- thinking 滑块旋钮垂直居中，激活填充延伸到旋钮右缘。
+- DeepSeek 图片 part 被序列化成 `[object Object]`、base64 data URL 格式错误。
+- A2A 项目操作与桌面会话切换、侧边栏刷新联动。
+- 聊天区新增 sticky header 渐隐、底部渐隐与「回到最新」按钮。
+
+---
+
+## [v0.1.3] - 2026-11-02
+
+### ↩️ 任务回滚 (Task Rollback)
+
+- 任务开始时对工作区打 git tree 快照作为基线，中断后可在提示条上直接回滚：新增文件删除，被改动或删除的文件还原到基线内容；基线状态持久化到 `active-baselines.json`，重启后仍可回滚。
+
+### 🧠 多线程执行稳定性 (Multi-thread Stability)
+
+- 控制器引入按线程的运行表与串行队列，`abort` 支持只终止指定线程；侧边栏会话行显示运行中与「等待工具授权」徽标，多个线程并行时状态不再互相覆盖。
+
+### 🛡️ 退出保护 (Window Close Safety)
+
+- 有任务正在执行时关闭窗口或退出应用，会先弹确认框，可选「继续等待」或「终止任务并退出」；后者先 abort 所有运行中的 harness 再退出。
+
+### 🌐 Provider 列表健壮性 (Provider Catalog Robustness)
+
+- models.dev 与 Netlify AI Gateway 的模型目录拉取加 10s 超时与结构容错，网络异常时降级为空目录，而不是抛错阻塞启动。
+
+### 🐛 修复 (Fixes)
+
+- 执行上下文不再泄漏到模型自行构造的 tool 参数里。
+- 提示词补充：URL 之后的标点应放在链接之外。
+
+---
+
+## [v0.1.2] - 2026-10-30
+
+### 🧭 三种执行模式 (Execution Modes)
+
+- 新增 ReAct / Plan & Solve / Fast 三档执行模式，统一跑在可组合的 graph 调度器上；Fast 模式用只读工具子集换取更短的往返，每个线程各自维护模式与记忆。
+
+### ⏺️ 会话录制与离线回放 (Session Recording & Replay)
+
+- 完整记录一次会话的事件流，可在没有模型、没有网络的情况下回放，用于复现问题与调试；录制器支持重复回放与逐段跳读。
+
+### 👥 侧边栏多项目会话 (Multi-project Sessions)
+
+- 同一项目下并行多个会话，worktree 支持重命名；新增全局搜索，跨项目检索历史会话。
+
+### 💬 社区与反馈 (Community & Feedback)
+
+- 侧边栏社区卡片：Star、赞助、分享三个入口。
+- 每条回复下方新增 copy / helpful / bad-response 反馈条，bad-response 可附说明，反馈计数持久化。
+
+### 🔌 平台能力 (Platform)
+
+- 内置 MCP server 配置与热重载、静默执行模式（quiet exec，git 探测失败不再往终端刷 `fatal: not a git repository`）、结构化日志处理器与数据库迁移框架。
+
+### 📚 文档与发布 (Docs & Release)
+
+- README 提供中英双语版本与赞助入口，发布脚本自动把版本号与下载矩阵同步到 GitHub Pages 站点。
+
+---
+
 ## [v0.1.1] - 2026-10-27
 
 ### 🚀 多模态视觉与消息体验升级 (Multimodal Vision & Chat UX)
