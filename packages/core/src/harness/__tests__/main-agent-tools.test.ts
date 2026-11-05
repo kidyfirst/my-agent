@@ -43,12 +43,14 @@ describe("main agent toolset", () => {
 	it("exposes plan submission and planning file tools in plan mode while disabling code editing tools", async () => {
 		const tools = await getTools("plan")
 		expect(tools).toContain("view")
-		expect(tools).toContain("execute_command")
 		expect(tools).toContain("submit_plan")
 		expect(tools).toContain("write_file")
 		expect(tools).not.toContain("string_replace_lsp")
 		expect(tools).not.toContain("ast_smart_edit")
 		expect(tools).not.toContain("subagent")
+		// Plan mode promises not to change the workspace, and an arbitrary shell
+		// can commit and push just as easily as it can read `git status`.
+		expect(tools).not.toContain("execute_command")
 	})
 
 	it("keeps read-only tools in fast mode and drops every write path", async () => {

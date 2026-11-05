@@ -36,10 +36,16 @@ export const READ_TOOL_NAMES = [
 	"view",
 	"search_content",
 	"find_files",
-	"execute_command",
 	"request_sandbox_access",
 	"assets_fetch",
 ] as const
+
+/**
+ * `execute_command` runs an arbitrary shell, so it is not read-only: the same
+ * tool that inspects the workspace can also write to it. Writing modes get it
+ * explicitly; Plan and Fast modes, which promise not to change anything, do not.
+ */
+export const EXEC_TOOL_NAMES = ["execute_command"] as const
 
 export const WRITE_TOOL_NAMES = [
 	"write_file",
@@ -83,7 +89,12 @@ export function describeToolNames(
 	if (modeId === ExecutionMode.FAST) {
 		return [...FAST_TOOL_NAMES]
 	}
-	const names = [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES, "submit_plan"]
+	const names = [
+		...READ_TOOL_NAMES,
+		...EXEC_TOOL_NAMES,
+		...WRITE_TOOL_NAMES,
+		"submit_plan",
+	]
 	if (options?.browserTools) names.push(...BROWSER_TOOL_NAMES)
 	return names
 }
