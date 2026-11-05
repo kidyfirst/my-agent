@@ -147,9 +147,15 @@ jobs:
         run: |
           ls -la release-artifacts/
 
+      - name: Generate release notes from CHANGELOG.md
+        # generate_release_notes only emits a compare link, and docs/changelog.html
+        # renders whatever body the API returns — so the notes live in git.
+        run: node scripts/release-notes.js "${{ github.ref_name }}" .release-notes.md
+
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
+          body_path: .release-notes.md
           files: |
             release-artifacts/*.dmg
             release-artifacts/*.zip
@@ -157,7 +163,6 @@ jobs:
             release-artifacts/*.AppImage
             release-artifacts/*.deb
             release-artifacts/latest*.yml
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:

@@ -1,7 +1,12 @@
 /**
  * My Agent - Changelog Dynamic Enhancer
- * Fetches GitHub Releases history and augments the changelog timeline.
- * Gracefully falls back to pre-rendered HTML if offline or rate limited.
+ *
+ * The timeline is pre-rendered in changelog.html with hand-written notes. This
+ * script only fills the gaps: it fetches GitHub Releases so a version published
+ * after the page was last edited still shows up. For tags that already have a
+ * pre-rendered card the static one wins — release bodies come from
+ * generate_release_notes and degrade to a bare "Full Changelog" link, while the
+ * hand-written copy in git never does.
  */
 
 ;(function () {
@@ -19,6 +24,17 @@
 			.replace(/'/g, "&#039;")
 	}
 
+	/** Escape first, then re-introduce the few inline constructs we support. */
+	function inline(text) {
+		return escapeHtml(text)
+			.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+			.replace(/`([^`]+)`/g, "<code>$1</code>")
+			.replace(
+				/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+				'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+			)
+	}
+
 	function markdownToHtml(md) {
 		if (!md) return ""
 		const lines = md.split("\n")
@@ -28,6 +44,16 @@
 		for (let line of lines) {
 			line = line.trim()
 			if (!line) {
+				if (inList) {
+					html += "</ul>"
+					inList = false
+				}
+				continue
+			}
+
+			if (line === "---" || line === "***") {
+				// Horizontal rule used to separate the notes from the compare link.
+				// The card already has its own spacing, a literal <hr> adds noise.
 				if (inList) {
 					html += "</ul>"
 					inList = false
@@ -52,20 +78,14 @@
 					html += '<ul class="release-list">'
 					inList = true
 				}
-				let text = escapeHtml(line.slice(2))
-				// Parse **bold**
-				text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-				// Parse `code`
-				text = text.replace(/`([^`]+)`/g, "<code>$1</code>")
+				let text = inline(line.slice(2))
 				html += `<li>${text}</li>`
 			} else {
 				if (inList) {
 					html += "</ul>"
 					inList = false
 				}
-				let text = escapeHtml(line)
-				text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-				text = text.replace(/`([^`]+)`/g, "<code>$1</code>")
+				const text = inline(line)
 				html += `<p style="color:var(--text-secondary);margin-bottom:8px;">${text}</p>`
 			}
 		}
@@ -152,19 +172,65 @@
     `
 	}
 
+	/**
+	 * Index the pre-rendered cards by tag, in document order, so the newest
+	 * version can be recognised without a second source of truth.
+	 */
+	function readStaticCards(container) {
+		const cards = new Map()
+		container.querySelectorAll(".timeline-item").forEach((item) => {
+			const tag = item.querySelector(".release-tag")
+			if (!tag) return
+			const key = tag.textContent.trim()
+			if (key) cards.set(key, item)
+		})
+		return cards
+	}
+
+	/** Move the Latest badge to whichever card is actually newest. */
+	function markLatest(card) {
+		card.querySelectorAll(".badge-latest").forEach((badge) => badge.remove())
+		const header = card.querySelector(".release-header")
+		if (!header) return
+		const badge = document.createElement("span")
+		badge.className = "badge-latest"
+		badge.textContent = "Latest"
+		header.appendChild(badge)
+	}
+
 	async function init() {
 		const container = document.getElementById("dynamic-timeline")
 		if (!container) return
 
+		const staticCards = readStaticCards(container)
 		const releases = await fetchReleases()
-		if (releases && releases.length > 0) {
-			// If we have live GitHub releases, render them smoothly
-			let html = ""
-			releases.forEach((rel, index) => {
-				html += renderReleaseItem(rel, index === 0)
-			})
-			container.innerHTML = html
-		}
+		if (!releases || releases.length === 0) return
+
+		const fragment = document.createDocumentFragment()
+		releases.forEach((release, index) => {
+			const existing = staticCards.get(release.tag_name)
+			if (existing) {
+				if (index === 0) markLatest(existing)
+				else {
+					const badge = existing.querySelector(".badge-latest")
+					if (badge) badge.remove()
+				}
+				// Keep the hand-written notes and their measured asset sizes.
+				fragment.appendChild(existing)
+				return
+			}
+			const host = document.createElement("div")
+			host.innerHTML = renderReleaseItem(release, index === 0)
+			if (host.firstElementChild) fragment.appendChild(host.firstElementChild)
+		})
+
+		// A rate-limited response can be shorter than the page, or a version may
+		// predate the first release in the window — never drop those cards.
+		staticCards.forEach((item) => {
+			if (!item.isConnected) fragment.appendChild(item)
+		})
+
+		container.replaceChildren(fragment)
 	}
 
 	if (document.readyState === "loading") {
