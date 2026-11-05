@@ -3,6 +3,8 @@ export interface WindowToggleIconProps {
 	open: boolean
 	size?: number
 	className?: string
+	/** Thin strokes + a translucent fill instead of a solid dark block. */
+	soft?: boolean
 }
 
 /**
@@ -15,7 +17,9 @@ export function WindowToggleIcon({
 	open,
 	size = 16,
 	className,
+	soft = false,
 }: WindowToggleIconProps) {
+	const stroke = soft ? "1" : "1.3"
 	return (
 		<svg
 			width={size}
@@ -34,8 +38,9 @@ export function WindowToggleIcon({
 							: "M 10.5 2.5 H 12 A 2.5 2.5 0 0 1 14.5 5 V 11 A 2.5 2.5 0 0 1 12 13.5 H 10.5 Z"
 					}
 					fill="currentColor"
+					fillOpacity={soft ? "0.35" : "1"}
 					stroke="currentColor"
-					strokeWidth="1.3"
+					strokeWidth={stroke}
 					strokeLinejoin="round"
 				/>
 			)}
@@ -48,7 +53,7 @@ export function WindowToggleIcon({
 				height="11"
 				rx="2.5"
 				stroke="currentColor"
-				strokeWidth="1.3"
+				strokeWidth={stroke}
 			/>
 
 			{/* Vertical divider line */}
@@ -58,7 +63,7 @@ export function WindowToggleIcon({
 				x2={side === "left" ? "5.5" : "10.5"}
 				y2="13.5"
 				stroke="currentColor"
-				strokeWidth="1.3"
+				strokeWidth={stroke}
 			/>
 		</svg>
 	)

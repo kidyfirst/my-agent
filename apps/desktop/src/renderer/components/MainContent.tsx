@@ -28,6 +28,8 @@ interface MainContentProps {
 	onSelectMode?: (modeId: string) => void
 	onOpenGraphViewer?: () => void
 	onOpenModelSelector?: () => void
+	/** Show a page in the sidebar's browser tab (browser-preview card). */
+	onOpenBrowserPanel?: (url: string) => void
 	permissionMode: PermissionMode
 	isRecording?: boolean
 	onToggleRecording?: () => void
@@ -262,11 +264,7 @@ export function MainContent(props: MainContentProps) {
 			/>
 		)
 	}
-	if (
-		project.enrichedProjects.length === 0 &&
-		tabs.openThreadTabs.length === 0 &&
-		tabs.activeTab === "chat"
-	) {
+	if (project.enrichedProjects.length === 0 && tabs.activeTab === "chat") {
 		return (
 			<EmptyProjectScreen
 				onOpenFolder={project.handleOpenFolder}
@@ -296,13 +294,14 @@ export function MainContent(props: MainContentProps) {
 					minWidth: 0,
 				}}
 			>
-                <ChatView
-                    threadId={props.activeThreadKey}
-                    isLoadingThread={
-                        chat.loadingThreadId !== null &&
-                        chat.loadingThreadId === props.activeThreadKey
-                    }
-                    messages={chat.messages}
+				<ChatView
+					threadId={props.activeThreadKey}
+					worktreePath={props.project.projectInfo?.rootPath ?? null}
+					isLoadingThread={
+						chat.loadingThreadId !== null &&
+						chat.loadingThreadId === props.activeThreadKey
+					}
+					messages={chat.messages}
 					tools={chat.tools}
 					subagents={chat.subagents}
 					isAgentActive={chat.isAgentActive}
@@ -310,6 +309,7 @@ export function MainContent(props: MainContentProps) {
 					streamingMessageId={chat.streamingMessageId}
 					todos={props.tasks}
 					onOpenDiff={props.tabs.handleDiffClick}
+					onOpenBrowserPanel={props.onOpenBrowserPanel}
 					isReplaySession={props.isReplaySession}
 					isActivelyReplaying={props.isReplaying}
 					replaySource={props.replaySource}
@@ -370,8 +370,7 @@ export function MainContent(props: MainContentProps) {
 				) : activeTab.startsWith("diff:") ? (
 					<DiffEditor
 						filePath={activeTab.slice(5)}
-						onClose={() => tabs.handleCloseTab(activeTab)}
-						onOpenFile={tabs.handleFileClick}
+						projectPath={props.project.projectInfo?.rootPath ?? null}
 					/>
 				) : (
 					<FileEditor

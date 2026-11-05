@@ -19,8 +19,11 @@ import {
 } from "../types/chat"
 import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
 import { shouldPinToBottom } from "../utils/chatScroll"
+import { ComputerUsePreview } from "./ComputerUsePreview"
 export interface ChatViewProps {
 	threadId?: string | null
+	/** Root of the project this transcript belongs to; scopes browser previews. */
+	worktreePath?: string | null
 	/** Transcript for `threadId` is still being fetched; show a wait state. */
 	isLoadingThread?: boolean
 	messages: Message[]
@@ -46,6 +49,8 @@ export interface ChatViewProps {
 		activeForm: string
 	}>
 	onOpenDiff?: (path: string) => void
+	/** Show a page in the sidebar's browser tab (browser-preview card). */
+	onOpenBrowserPanel?: (url: string) => void
 	isReplaySession?: boolean
 	isActivelyReplaying?: boolean
 	replaySource?: string
@@ -254,6 +259,7 @@ export function decideDuplicateUser(
 }
 export function ChatView({
 	threadId,
+	worktreePath,
 	isLoadingThread = false,
 	messages,
 	tools,
@@ -263,6 +269,7 @@ export function ChatView({
 	streamingMessageId,
 	todos,
 	onOpenDiff,
+	onOpenBrowserPanel,
 	isReplaySession,
 	isActivelyReplaying,
 	replaySource,
@@ -271,6 +278,9 @@ export function ChatView({
 	reverting,
 	reverted,
 }: ChatViewProps) {
+	// The conversation pane is `position: relative`: the browser preview card
+	// is absolutely positioned inside it (see ComputerUsePreview), so the card
+	// follows the pane instead of the viewport.
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const contentRef = useRef<HTMLDivElement>(null)
 	const isAutoScroll = useRef(true)
@@ -1417,6 +1427,13 @@ export function ChatView({
 					<polyline points="19 12 12 19 5 12" />
 				</svg>
 			</button>
+
+			{/* Live mirror of the headless browser the agent is driving. */}
+			<ComputerUsePreview
+				threadId={threadId}
+				worktreePath={worktreePath}
+				onOpenInPanel={onOpenBrowserPanel}
+			/>
 		</div>
 	)
 }

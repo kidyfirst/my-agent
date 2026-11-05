@@ -43,7 +43,6 @@ describe("Thread Approval Switching in MainContent", () => {
 		tabs: {
 			activeTab: "chat",
 			openFiles: [],
-			openThreadTabs: ["thread:thread-A"],
 			handleCloseTab: vi.fn(),
 			handleFileClick: vi.fn(),
 			handleDiffClick: vi.fn(),

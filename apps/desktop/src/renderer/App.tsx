@@ -1,10 +1,36 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import {
+	useState,
+	useCallback,
+	useMemo,
+	useEffect,
+	useRef,
+	type Dispatch,
+	type SetStateAction,
+} from "react"
 import { flushSync } from "react-dom"
 import { Sidebar } from "./components/Sidebar"
 import { AppModals } from "./components/AppModals"
+import type { OverviewAction } from "./utils/overviewMenu"
 import { MainContent } from "./components/MainContent"
 import type { CommandItem } from "./components/CommandPalette"
-import { RightSidebar, type RightSidebarTab } from "./components/RightSidebar"
+import {
+	RightSidebar,
+	type RightSidebarPanel,
+	type RightSidebarTab,
+} from "./components/RightSidebar"
+import {
+	closeRightSidebarTab,
+	createRightSidebarTabs,
+	openRightSidebarTab,
+	overviewActionToTab,
+	type RightSidebarTabsState,
+} from "./utils/rightSidebarTabs"
+import {
+	defaultRightPanelState,
+	recallRightPanel,
+	rememberRightPanel,
+	type RightPanelState,
+} from "./utils/rightPanelMemory"
 import { TabBar } from "./components/TabBar"
 import type {
 	TokenUsage,
@@ -84,6 +110,21 @@ export function App() {
 	/** `initializeApp` has finished, so the project list is populated. */
 	const [booted, setBooted] = useState(false)
 	const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+	/**
+	 * "project / conversation" the title bar should show while a session that
+	 * lives in another project is being opened.
+	 *
+	 * A cross-project switch has to build that project's harness before the new
+	 * project info and thread list exist, so the derived title would otherwise
+	 * sit on the old conversation for a second. This carries the clicked row's
+	 * names until the real state catches up.
+	 */
+	const [pendingSessionTitle, setPendingSessionTitle] = useState<{
+		projectPath: string
+		threadId: string
+		projectName: string
+		conversationName: string
+	} | null>(null)
 	const currentThreadIdRef = useRef<string | null>(null)
 	useEffect(() => {
 		currentThreadIdRef.current = currentThreadId
@@ -92,6 +133,8 @@ export function App() {
 	const inFlightThreadRef = useRef<string | null>(null)
 	/** Thread whose transcript is already on screen, so a repeat load is a no-op. */
 	const lastLoadedThreadRef = useRef<string | null>(null)
+	/** Session switch request currently in flight to prevent race conditions. */
+	const inFlightSwitchRef = useRef<string | null>(null)
 	const [runningThreadId, setRunningThreadId] = useState<string | null>(null)
 	/**
 	 * The thread whose run the user stopped, if it happened in this session.
@@ -131,8 +174,122 @@ export function App() {
 	// Drag-resizable like the right panel (100–300px). Release below 150px hides it.
 	const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
 	const [rightSidebarVisible, setRightSidebarVisible] = useState(true)
-	const [rightSidebarTab, setRightSidebarTab] =
-		useState<RightSidebarTab>("files")
+	// Bumped by ⌘K so the sidebar opens its search modal. The modal lives in
+	// Sidebar (it needs the session lists), so the key only pokes a counter.
+	const [searchOpenSeq, setSearchOpenSeq] = useState(0)
+	const handleOpenSearch = useCallback(() => setSearchOpenSeq((n) => n + 1), [])
+	// Maximized: the panel gives up its width and fills the window, so the
+	// conversation pane is hidden while this is on.
+	const [rightSidebarMaximized, setRightSidebarMaximized] = useState(false)
+	// Bumped to hand the keyboard to the terminal whenever a tab, menu row,
+	// shortcut or command selects it.
+	const [terminalFocusSignal, setTerminalFocusSignal] = useState(0)
+	// The sidebar is a tabbed container: Overview is always there, the rest are
+	// opened from either Overview menu and stay open until closed.
+	const [rightSidebarTabs, setRightSidebarTabs] =
+		useState<RightSidebarTabsState>(createRightSidebarTabs)
+	// Shortcuts, the command palette and harness events all use the original
+	// "set the active tab" API. Keep that signature, but make every destination
+	// it points at an actual tab so the strip and the panes never disagree.
+	// Every entry point lands here, which is also the one place that can focus
+	// the shell when the destination is Terminal.
+	const activeTabRef = useRef<RightSidebarTab>("menu")
+	activeTabRef.current = rightSidebarTabs.active
+	const setRightSidebarTab = useCallback<
+		Dispatch<SetStateAction<RightSidebarTab>>
+	>((next) => {
+		const tab = typeof next === "function" ? next(activeTabRef.current) : next
+		if (tab === "terminal") setTerminalFocusSignal((count) => count + 1)
+		setRightSidebarTabs((state) => openRightSidebarTab(state, tab))
+	}, [])
+	const handleCloseRightSidebarTab = useCallback((tab: RightSidebarPanel) => {
+		setRightSidebarTabs((state) => closeRightSidebarTab(state, tab))
+	}, [])
+
+	// Slide the panel away: the conversation takes its space back. A hidden
+	// panel is never maximized, so reopening lands on the normal split.
+	const handleHideRightSidebar = useCallback(() => {
+		setRightSidebarMaximized(false)
+		setRightSidebarVisible(false)
+	}, [])
+
+	// Grow the panel over the conversation, or give the space back. Defined
+	// this early because the keyboard shortcut needs it.
+	const handleToggleRightSidebarMaximized = useCallback(() => {
+		setRightSidebarVisible(true)
+		setRightSidebarMaximized((maximized) => !maximized)
+	}, [])
+
+	// A hidden panel is never maximized, whichever route closed it — the hide
+	// button, the ⇧⌘B shortcut or the View menu. Reopening lands on the split.
+	useEffect(() => {
+		if (!rightSidebarVisible) setRightSidebarMaximized(false)
+	}, [rightSidebarVisible])
+
+	// The panel belongs to the conversation, not to the app: a session
+	// remembers whether it had a panel open and which tabs were in it. Leave a
+	// session → its state is put away; come back → it is put back.
+	const rightPanelMemory = useRef(new Map<string, RightPanelState>())
+	const rightPanelSnapshot = useRef<RightPanelState>({
+		visible: rightSidebarVisible,
+		tabs: rightSidebarTabs,
+	})
+	rightPanelSnapshot.current = {
+		visible: rightSidebarVisible,
+		tabs: rightSidebarTabs,
+	}
+	const panelThreadKey = currentThreadId || "default"
+	const panelThreadKeyRef = useRef(panelThreadKey)
+	// The session the app boots into adopts the default layout instead of
+	// restoring "no panel": a fresh launch must not look like a closed panel.
+	const adoptedFirstSession = useRef(false)
+
+	useEffect(() => {
+		const previous = panelThreadKeyRef.current
+		if (previous === panelThreadKey) return
+		panelThreadKeyRef.current = panelThreadKey
+
+		if (!adoptedFirstSession.current) {
+			adoptedFirstSession.current = true
+			rememberRightPanel(
+				rightPanelMemory.current,
+				panelThreadKey,
+				rightPanelSnapshot.current,
+			)
+			return
+		}
+
+		rememberRightPanel(
+			rightPanelMemory.current,
+			previous,
+			rightPanelSnapshot.current,
+		)
+		// A session that never had a panel gets none: switching to it should
+		// reveal its conversation, not a panel it never opened.
+		const saved =
+			recallRightPanel(rightPanelMemory.current, panelThreadKey) ??
+			defaultRightPanelState()
+		setRightSidebarTabs(saved.tabs)
+		setRightSidebarVisible(saved.visible)
+	}, [panelThreadKey])
+	// A page another surface asked the sidebar browser to show. `seq` lets the
+	// same url be requested twice (two clicks on the same preview card).
+	const [browserPanelRequest, setBrowserPanelRequest] = useState<{
+		url: string
+		seq: number
+	} | null>(null)
+	const openBrowserPanel = useCallback(
+		(url: string) => {
+			if (!url) return
+			setRightSidebarVisible(true)
+			setRightSidebarTab("browser")
+			setBrowserPanelRequest((previous) => ({
+				url,
+				seq: (previous?.seq ?? 0) + 1,
+			}))
+		},
+		[setRightSidebarTab],
+	)
 
 	// A collapsing drag leaves a unusable width behind; reopening must not
 	// restore that sliver, it starts from the default width again.
@@ -229,11 +386,10 @@ export function App() {
 				lastLoadedThreadRef.current = tid
 			} catch {
 				// Thread may not exist yet
+				dispatch({ type: "SET_MESSAGES", messages: [], threadId: tid })
 			} finally {
 				inFlightThreadRef.current = null
-				if (isSwitch) {
-					dispatch({ type: "END_THREAD_LOAD", threadId: tid })
-				}
+				dispatch({ type: "END_THREAD_LOAD", threadId: tid })
 			}
 		},
 		[currentThreadId, dispatch],
@@ -350,7 +506,6 @@ export function App() {
 
 	// Project manager
 	const project = useProjectManager(dispatch, {
-		setOpenThreadTabs: tabs.setOpenThreadTabs,
 		setOpenFiles: tabs.setOpenFiles,
 		setActiveTab: tabs.setActiveTab,
 		setThreads,
@@ -366,12 +521,14 @@ export function App() {
 		? hasGitRepo(project.projectInfo)
 		: true
 
-	// Leaving a repo for a plain folder must not strand the sidebar on Git.
+	// Leaving a repo for a plain folder must not strand the sidebar on Git:
+	// drop the Review tab entirely instead of leaving a dead entry in the strip.
+	// Closing it already moves the selection to a neighbour (or the landing
+	// list when it was the last one), so no extra reset is needed here.
 	useEffect(() => {
-		if (!gitEnabled) {
-			setRightSidebarTab((tab) => (tab === "git" ? "files" : tab))
-		}
-	}, [gitEnabled])
+		if (gitEnabled) return
+		handleCloseRightSidebarTab("git")
+	}, [gitEnabled, handleCloseRightSidebarTab])
 
 	const handleToggleRecording = useCallback(
 		async (threadId?: string, projectPath?: string) => {
@@ -547,6 +704,8 @@ export function App() {
 		handleCloseTab: tabs.handleCloseTab,
 		handleSwitchProject: project.handleSwitchProject,
 		onToggleSettings: dialogs.handleToggleSettings,
+		onOpenSearch: handleOpenSearch,
+		onToggleRightSidebarMaximized: handleToggleRightSidebarMaximized,
 	})
 
 	// Initialize app & subscribe to harness events
@@ -616,7 +775,6 @@ export function App() {
 
 				setCurrentThreadId(targetThreadId)
 				if (targetThreadId) {
-					tabs.setOpenThreadTabs([targetThreadId])
 					tabs.setActiveTab(`thread:${targetThreadId}`)
 					if (proj?.rootPath) {
 						localStorage.setItem(
@@ -683,14 +841,12 @@ export function App() {
 						"default"
 					applyPermissionModeIPC(tPerm, targetThreadId)
 				} else {
-					tabs.setOpenThreadTabs([])
 					tabs.setActiveTab("chat")
 				}
 			} else {
 				setCurrentThreadId(null)
 				setThreads([])
 				setThreadsPath(null)
-				tabs.setOpenThreadTabs([])
 				tabs.setActiveTab("chat")
 				dispatch({ type: "CLEAR" })
 			}
@@ -940,9 +1096,6 @@ export function App() {
 			threadModel.setThreadMode(newThreadId, targetMode)
 			threadModel.setThreadThinking(newThreadId, targetThinking)
 			setCurrentThreadId(newThreadId)
-			tabs.setOpenThreadTabs((prev) =>
-				prev.includes(newThreadId) ? prev : [...prev, newThreadId],
-			)
 			tabs.setActiveTab(`thread:${newThreadId}`)
 			await window.api.invoke({
 				type: "switchModel",
@@ -1027,7 +1180,6 @@ export function App() {
 		setOMProgress,
 		setOMModelIds,
 		setThreads,
-		setOpenThreadTabs: tabs.setOpenThreadTabs,
 		setActiveTab: tabs.setActiveTab,
 		setTasks,
 		setPendingApproval: dialogs.setPendingApproval,
@@ -1366,6 +1518,50 @@ export function App() {
 		dialogs.setPendingApproval,
 	])
 
+	// Keep document / window title synced to "projectName / conversationName".
+	// While a cross-project session is opening, the clicked row's names win —
+	// otherwise the title keeps naming the conversation the user just left.
+	useEffect(() => {
+		if (pendingSessionTitle) {
+			document.title = `${pendingSessionTitle.projectName} / ${pendingSessionTitle.conversationName}`
+			return
+		}
+		const projName =
+			project.projectInfo?.name ||
+			(project.projectInfo?.rootPath
+				? project.projectInfo.rootPath.split("/").filter(Boolean).pop()
+				: "") ||
+			""
+		const currentThread = threads.find((t) => t.id === currentThreadId)
+		const conversationName = currentThread?.title || "New Thread"
+		const title = projName
+			? `${projName} / ${conversationName}`
+			: conversationName
+		document.title = title
+	}, [
+		pendingSessionTitle,
+		project.projectInfo?.name,
+		project.projectInfo?.rootPath,
+		threads,
+		currentThreadId,
+	])
+
+	// Drop the optimistic title once the real project and thread are in place
+	// (or after a grace period, so a failed switch cannot pin it forever).
+	useEffect(() => {
+		if (!pendingSessionTitle) return
+		const rootPath = project.projectInfo?.rootPath
+		const arrived =
+			rootPath === pendingSessionTitle.projectPath &&
+			threads.some((t) => t.id === pendingSessionTitle.threadId)
+		if (arrived) {
+			setPendingSessionTitle(null)
+			return
+		}
+		const timer = setTimeout(() => setPendingSessionTitle(null), 10_000)
+		return () => clearTimeout(timer)
+	}, [pendingSessionTitle, project.projectInfo?.rootPath, threads])
+
 	const {
 		handleResumeQueue,
 		handleQueue,
@@ -1422,14 +1618,56 @@ export function App() {
 	 */
 	const handleOpenSession = useCallback(
 		async (projectPath: string, threadId: string) => {
+			const switchKey = `${projectPath}:${threadId}`
+			if (inFlightSwitchRef.current === switchKey) return
+
 			if (projectPath && projectPath !== project.projectInfo?.rootPath) {
-				await project.handleSwitchProject(projectPath)
+				inFlightSwitchRef.current = switchKey
+				// Optimistically update the UI to avoid lag/freeze:
+				// Highlight thread, show loading state, and update title immediately
+				setCurrentThreadId(threadId)
+				tabs.setActiveTab(`thread:${threadId}`)
+				dispatch({ type: "BEGIN_THREAD_LOAD", threadId })
+
+				// Name the target session now: building that project's harness
+				// takes a moment, and the title bar must not keep showing the
+				// project/conversation the user just left.
+				const pendingProject = project.enrichedProjects.find(
+					(p) => p.rootPath === projectPath,
+				)
+				setPendingSessionTitle({
+					projectPath,
+					threadId,
+					projectName:
+						pendingProject?.name ||
+						projectPath.split("/").filter(Boolean).pop() ||
+						"",
+					conversationName:
+						threadsByPath[projectPath]?.find((t) => t.id === threadId)?.title ||
+						"New Thread",
+				})
+
+				try {
+					await project.handleSwitchProject(projectPath, threadId)
+				} catch (err) {
+					console.error("Failed to switch project session:", err)
+					dispatch({ type: "END_THREAD_LOAD", threadId })
+				} finally {
+					inFlightSwitchRef.current = null
+				}
+				return
 			}
+
+			if (threadId === currentThreadId) return
 			await handleSwitchThread(threadId)
 		},
 		[
 			project.projectInfo?.rootPath,
+			project.enrichedProjects,
 			project.handleSwitchProject,
+			threadsByPath,
+			currentThreadId,
+			tabs.setActiveTab,
 			handleSwitchThread,
 		],
 	)
@@ -1569,7 +1807,7 @@ export function App() {
 	const commandPaletteItems = useMemo((): CommandItem[] => {
 		return buildCommandItems({
 			close: () => dialogs.setShowCommandPalette(false),
-			openThreadTabs: tabs.openThreadTabs,
+			currentThreadId,
 			openFiles: tabs.openFiles,
 			threads,
 			enrichedProjects: project.enrichedProjects,
@@ -1586,6 +1824,7 @@ export function App() {
 			handleNewThread,
 			handleOpenFolder: project.handleOpenFolder,
 			handleShowCloneModal: project.handleShowCloneModal,
+			onOpenSearch: handleOpenSearch,
 			handleBrowserOpen: tabs.handleBrowserOpen,
 			handleToggleThinking,
 			handleSelectMode,
@@ -1602,11 +1841,12 @@ export function App() {
 			handleStartReplay,
 		})
 	}, [
-		tabs.openThreadTabs,
+		currentThreadId,
 		tabs.openFiles,
 		threads,
 		project.enrichedProjects,
 		gitEnabled,
+		setRightSidebarTab,
 		modeId,
 		thinkingLevel,
 		currentThreadId,
@@ -1617,6 +1857,7 @@ export function App() {
 		handleNewThread,
 		handleToggleThinking,
 		handleSelectMode,
+		handleOpenSearch,
 	])
 
 	// The chat column keeps its minimum: the right splitter stops as soon as it
@@ -1624,10 +1865,39 @@ export function App() {
 	const centerMinWidth = sidebarVisible
 		? CENTER_MIN_WIDTH
 		: CENTER_MIN_WIDTH_NO_SIDEBAR
+	// Maximized only counts while the panel is actually on screen.
+	const rightPanelMaximized = rightSidebarVisible && rightSidebarMaximized
+
+	// A file/diff/browser tab opens in the center column, which the maximized
+	// panel is covering. Opening one means "show me this", so the panel gives
+	// the space back instead of hiding what was just asked for.
+	useEffect(() => {
+		if (!rightSidebarMaximized) return
+		const tab = tabs.activeTab
+		if (tab === "chat" || tab.startsWith("thread:")) return
+		setRightSidebarMaximized(false)
+	}, [tabs.activeTab, rightSidebarMaximized])
 	const rightLayoutReserve = rightPanelLayoutReserve(
 		sidebarVisible,
 		sidebarWidth,
 	)
+
+	// Both Overview menus hand their rows to the shell: Terminal (like any
+	// other destination) becomes its own tab in the right sidebar.
+	const handleOverviewSelect = useCallback(
+		(action: OverviewAction) => {
+			setRightSidebarVisible(true)
+			setRightSidebarTab(overviewActionToTab(action))
+		},
+		[setRightSidebarTab],
+	)
+
+	// Opening brings back whatever was last open; with nothing opened yet that
+	// is the landing list. Closing only hides it, so nothing is lost.
+	const handleToggleRightSidebar = useCallback(() => {
+		setRightSidebarMaximized(false)
+		setRightSidebarVisible((visible) => !visible)
+	}, [])
 
 	return (
 		<div
@@ -1653,6 +1923,7 @@ export function App() {
 				onWidthChange={setSidebarWidth}
 				onCollapse={() => setSidebarVisible(false)}
 				onToggleSidebar={() => setSidebarVisible((v) => !v)}
+				searchOpenSeq={searchOpenSeq}
 				enrichedProjects={project.enrichedProjects}
 				activeProjectPath={project.projectInfo?.rootPath ?? null}
 				isAgentActive={chat.isAgentActive}
@@ -1700,96 +1971,133 @@ export function App() {
 				onDownloadUpdate={handleDownloadUpdate}
 			/>
 
-			{/* Center panel (middle chat box + editors) */}
+			{/* Center panel (middle chat box + editors). Maximizing the right
+			    panel takes this column's space: it stops growing and yields to
+			    a panel that grows into it, so "fill the window" stays a layout
+			    fact rather than a width calculation — and it animates, exactly
+			    like the panel sliding in and out. */}
 			<div
+				data-testid="center-panel"
+				// A zero-width column is still focusable: without this, typing
+				// after maximizing would land in a composer nobody can see.
+				inert={rightPanelMaximized}
+				aria-hidden={rightPanelMaximized}
 				style={{
-					flex: 1,
+					flexGrow: rightPanelMaximized ? 0 : 1,
+					flexShrink: 1,
+					flexBasis: 0,
 					display: "flex",
 					flexDirection: "column",
 					overflow: "hidden",
-					minWidth: centerMinWidth,
+					// The column may go all the way to zero; the wrapper inside
+					// keeps its own floor and simply gets clipped, so the
+					// transcript never reflows mid-animation.
+					minWidth: 0,
+					transition: "flex-grow 0.22s ease",
 				}}
 			>
-				{/* Tab bar */}
-				<TabBar
-					activeTab={tabs.activeTab}
-					openThreadTabs={tabs.openThreadTabs}
-					openFiles={tabs.openFiles}
-					dirtyFiles={tabs.dirtyFiles}
-					threads={threads}
-					sidebarVisible={sidebarVisible}
-					rightSidebarVisible={rightSidebarVisible}
-					gitBranch={project.projectInfo?.gitBranch ?? undefined}
-					hasGitRepo={gitEnabled}
-					prStatus={project.prStatus}
-					isAgentActive={chat.isAgentActive}
-					onSelectTab={tabs.setActiveTab}
-					onCloseTab={tabs.handleCloseTab}
-					onSwitchThread={handleSwitchThread}
-					onNewThread={handleNewThread}
-					onToggleSidebar={() => setSidebarVisible((v) => !v)}
-					onToggleRightSidebar={() => setRightSidebarVisible((v) => !v)}
-					onCreatePR={() =>
-						handleSend(
-							"Create a pull request for this branch. Push if needed first.",
-						)
-					}
-					projectRootPath={project.projectInfo?.rootPath ?? null}
-					replayingThreads={replayingThreads}
-				/>
+				<div
+					style={{
+						flex: 1,
+						minWidth: centerMinWidth,
+						display: "flex",
+						flexDirection: "column",
+						overflow: "hidden",
+					}}
+				>
+					{/* Tab bar */}
+					<TabBar
+						activeTab={tabs.activeTab}
+						currentThreadId={currentThreadId}
+						openFiles={tabs.openFiles}
+						dirtyFiles={tabs.dirtyFiles}
+						threads={threads}
+						sidebarVisible={sidebarVisible}
+						rightSidebarVisible={rightSidebarVisible}
+						gitBranch={project.projectInfo?.gitBranch ?? undefined}
+						hasGitRepo={gitEnabled}
+						prStatus={project.prStatus}
+						isAgentActive={chat.isAgentActive}
+						onSelectTab={tabs.setActiveTab}
+						onCloseTab={tabs.handleCloseTab}
+						onSwitchThread={handleSwitchThread}
+						onToggleSidebar={() => setSidebarVisible((v) => !v)}
+						onToggleRightSidebar={handleToggleRightSidebar}
+						onOverviewSelect={handleOverviewSelect}
+						onCreatePR={() =>
+							handleSend(
+								"Create a pull request for this branch. Push if needed first.",
+							)
+						}
+						projectRootPath={project.projectInfo?.rootPath ?? null}
+						projectName={project.projectInfo?.name}
+						titleOverride={
+							pendingSessionTitle
+								? {
+										projectName: pendingSessionTitle.projectName,
+										conversationName: pendingSessionTitle.conversationName,
+									}
+								: undefined
+						}
+						replayingThreads={replayingThreads}
+					/>
 
-				<MainContent
-					auth={auth}
-					project={project}
-					tabs={tabs}
-					chat={chat}
-					tasks={tasks}
-					activeThreadKey={currentThreadId || "default"}
-					currentModelId={currentThreadModelId}
-					thinkingLevel={currentThreadThinkingLevel}
-					onSelectThinkingLevel={handleSelectThinkingLevel}
-					modeId={currentThreadModeId}
-					onSelectMode={handleSelectMode}
-					onOpenGraphViewer={dialogs.handleOpenGraphViewer}
-					onOpenModelSelector={dialogs.handleOpenModelSelector}
-					permissionMode={currentThreadPermission}
-					isRecording={
-						currentThreadId
-							? recordingThreads.has(currentThreadId)
-							: project.projectInfo?.rootPath
-								? recordingProjects.has(project.projectInfo.rootPath)
-								: false
-					}
-					onToggleRecording={handleToggleRecording}
-					isReplaying={
-						currentThreadId
-							? replayingThreads.has(currentThreadId)
-							: project.projectInfo?.rootPath
-								? replayingProjects.has(project.projectInfo.rootPath)
-								: false
-					}
-					onStopReplay={handleStopReplay}
-					isReplaySession={isCurrentThreadReplaySession}
-					replaySource={currentThreadReplaySource}
-					interrupted={interruptedThreadKey === (currentThreadId || "default")}
-					onRevert={handleRevertTask}
-					reverting={revertingTask}
-					reverted={revertedTask}
-					onSend={handleSend}
-					onQueue={handleQueue}
-					onAbort={handleAbort}
-					onBuiltinCommand={handleBuiltinCommand}
-					onSelectModel={handleSelectThreadModel}
-					onSelectPermissionMode={handleSelectThreadPermission}
-					onResumeQueue={handleResumeQueue}
-					onSteerQueued={handleSteerQueued}
-					onDeleteQueued={handleDeleteQueued}
-					onReorderQueue={handleReorderQueue}
-					onClearQueue={handleClearQueue}
-					threadsWithApproval={threadsWithApproval}
-					pendingApproval={dialogs.pendingApproval}
-					onRespondApproval={handleRespondApproval}
-				/>
+					<MainContent
+						auth={auth}
+						project={project}
+						tabs={tabs}
+						chat={chat}
+						tasks={tasks}
+						activeThreadKey={currentThreadId || "default"}
+						currentModelId={currentThreadModelId}
+						thinkingLevel={currentThreadThinkingLevel}
+						onSelectThinkingLevel={handleSelectThinkingLevel}
+						modeId={currentThreadModeId}
+						onSelectMode={handleSelectMode}
+						onOpenGraphViewer={dialogs.handleOpenGraphViewer}
+						onOpenModelSelector={dialogs.handleOpenModelSelector}
+						onOpenBrowserPanel={openBrowserPanel}
+						permissionMode={currentThreadPermission}
+						isRecording={
+							currentThreadId
+								? recordingThreads.has(currentThreadId)
+								: project.projectInfo?.rootPath
+									? recordingProjects.has(project.projectInfo.rootPath)
+									: false
+						}
+						onToggleRecording={handleToggleRecording}
+						isReplaying={
+							currentThreadId
+								? replayingThreads.has(currentThreadId)
+								: project.projectInfo?.rootPath
+									? replayingProjects.has(project.projectInfo.rootPath)
+									: false
+						}
+						onStopReplay={handleStopReplay}
+						isReplaySession={isCurrentThreadReplaySession}
+						replaySource={currentThreadReplaySource}
+						interrupted={
+							interruptedThreadKey === (currentThreadId || "default")
+						}
+						onRevert={handleRevertTask}
+						reverting={revertingTask}
+						reverted={revertedTask}
+						onSend={handleSend}
+						onQueue={handleQueue}
+						onAbort={handleAbort}
+						onBuiltinCommand={handleBuiltinCommand}
+						onSelectModel={handleSelectThreadModel}
+						onSelectPermissionMode={handleSelectThreadPermission}
+						onResumeQueue={handleResumeQueue}
+						onSteerQueued={handleSteerQueued}
+						onDeleteQueued={handleDeleteQueued}
+						onReorderQueue={handleReorderQueue}
+						onClearQueue={handleClearQueue}
+						threadsWithApproval={threadsWithApproval}
+						pendingApproval={dialogs.pendingApproval}
+						onRespondApproval={handleRespondApproval}
+					/>
+				</div>
 			</div>
 
 			{/* Right sidebar. Mounted only while a project is open; hiding it
@@ -1797,10 +2105,14 @@ export function App() {
 			{project.enrichedProjects.length > 0 && (
 				<RightSidebar
 					visible={rightSidebarVisible}
-					onCollapse={() => setRightSidebarVisible(false)}
+					onCollapse={handleHideRightSidebar}
+					maximized={rightPanelMaximized}
+					onToggleMaximize={handleToggleRightSidebarMaximized}
 					layoutReserve={rightLayoutReserve}
-					activeTab={rightSidebarTab}
+					activeTab={rightSidebarTabs.active}
+					openTabs={rightSidebarTabs.open}
 					onTabChange={setRightSidebarTab}
+					onCloseTab={handleCloseRightSidebarTab}
 					projectName={project.projectInfo?.name ?? ""}
 					projectPath={project.projectInfo?.rootPath ?? null}
 					gitBranch={project.projectInfo?.gitBranch}
@@ -1815,6 +2127,9 @@ export function App() {
 					}
 					loading={project.projectSwitching}
 					onOpenBrowser={tabs.handleBrowserOpen}
+					browserOpenRequest={browserPanelRequest}
+					onSelectMenuItem={handleOverviewSelect}
+					terminalFocusSignal={terminalFocusSignal}
 					currentThreadId={currentThreadId}
 					threadTitle={
 						threads.find((t) => t.id === currentThreadId)?.title ||

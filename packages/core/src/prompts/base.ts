@@ -86,6 +86,19 @@ export function buildBasePrompt(ctx: PromptContext): string {
 - **Clean up dead code.** If something is unused, delete it completely. No backwards-compatibility shims, no renaming to \`_unused\`, no \`// removed\` comments.
 - **Be careful with security.** Don't introduce command injection, XSS, SQL injection, or other vulnerabilities. If you notice insecure code you wrote, fix it immediately.
 `
+	/**
+	 * Browser control is a desktop-host capability. It only appears when the
+	 * authoritative toolset actually contains `computer`, so CLI runs never
+	 * describe a tool the model cannot call.
+	 */
+	const browserToolsSection = `
+**navigate-browser** / **computer** — Operate a headless Chromium browser
+- Use these when the task needs a live webpage: reading a page that requires JS, filling a form, clicking through a site, or checking how a deployed app behaves.
+- Call \`navigate-browser\` with the URL first. It returns a text snapshot of the page (visible text + numbered interactive elements). There is NO image: read the text and the element ids.
+- Interact with \`computer\`: \`screenshot\` refreshes the snapshot, \`left_click\` with \`element: <id>\` (or \`coordinate: [x, y]\`) clicks, \`type\` writes into the focused field, \`key\` presses keys, \`scroll\` moves the page.
+- Element ids change after every page update. Always take a fresh \`screenshot\` before clicking again.
+- These tools are for web pages only. For local files and commands use \`view\` / \`execute_command\`.
+`
 	const toolsetSection = hasTools
 		? `
 # Runtime Toolset (authoritative)
@@ -296,7 +309,7 @@ You have access to the following tools. Use the RIGHT tool for the job:
 **ast_smart_edit** — Structural edit by AST query
 - Use for precise refactors (rename a symbol, replace a function body) where text matching is fragile.
 - Pass a structural selector plus the replacement; the tool validates the result parses.
-`
+${ctx.toolNames?.includes("computer") ? browserToolsSection : ""}`
 		: hasTools
 			? readOnlySection
 			: `

@@ -48,8 +48,16 @@ describe("RightSidebar collapse", () => {
 	})
 
 	it("keeps the panel mounted across visibility changes", () => {
-		// A hidden panel still contains its tab strip, so the terminal inside it
+		// A hidden panel still contains its content, so the terminal inside it
 		// is not torn down (and re-spawned) just because the panel is closed.
 		expect(render({ visible: false })).toContain("Files")
+	})
+
+	it("shows a tab strip with the active destination, no back button", () => {
+		const html = render({ activeTab: "files" })
+		expect(html).toContain('data-testid="right-sidebar-tabs"')
+		expect(html).toContain('data-testid="right-sidebar-tab-files"')
+		expect(html).toContain('data-testid="right-sidebar-title"')
+		expect(html).not.toContain('aria-label="Back to Overview"')
 	})
 })

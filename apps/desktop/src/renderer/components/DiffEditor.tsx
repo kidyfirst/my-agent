@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react"
 import { DiffView } from "./DiffView"
+import { OpenInDropdown } from "./OpenInDropdown"
 
 interface DiffEditorProps {
 	filePath: string
-	onClose: () => void
-	onOpenFile: (filePath: string) => void
+	/** Project root: the "Open in..." menu hands it to Finder/VS Code/Cursor. */
+	projectPath?: string | null
 }
 
-export function DiffEditor({ filePath, onClose, onOpenFile }: DiffEditorProps) {
+export function DiffEditor({ filePath, projectPath }: DiffEditorProps) {
 	const [diff, setDiff] = useState<string | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -89,21 +90,9 @@ export function DiffEditor({ filePath, onClose, onOpenFile }: DiffEditorProps) {
 				>
 					{viewMode === "inline" ? "Side-by-Side" : "Inline"}
 				</button>
-				<button
-					onClick={() => onOpenFile(filePath)}
-					style={{
-						fontSize: 11,
-						color: "var(--accent)",
-						cursor: "pointer",
-						padding: "2px 8px",
-						borderRadius: 3,
-						border: "1px solid var(--accent)",
-						background: "transparent",
-						fontWeight: 500,
-					}}
-				>
-					Open File
-				</button>
+				{/* Hand the project (not the diff) to an external editor: viewing a
+				    change is the moment you want to jump into the real file. */}
+				<OpenInDropdown projectPath={projectPath ?? null} />
 			</div>
 
 			{loading && (

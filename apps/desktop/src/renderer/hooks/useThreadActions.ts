@@ -1,4 +1,4 @@
-import { useCallback } from "react"
+import { useCallback, useRef } from "react"
 import type { Dispatch } from "react"
 import type { ChatAction } from "../types/chat"
 import type { ThreadInfo } from "../types/ipc"
@@ -32,7 +32,6 @@ export interface ThreadActionsOptions {
 	setThreads: Dispatch<React.SetStateAction<ThreadInfo[]>>
 	tabs: {
 		activeTab: string
-		setOpenThreadTabs: (updater: (prev: string[]) => string[]) => void
 		setActiveTab: (tab: string) => void
 	}
 	dialogs: {
@@ -88,6 +87,12 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 		handleStartReplay,
 	} = opts
 
+	/**
+	 * Monotonic id of the latest switch. Background syncs from an older switch
+	 * must not overwrite the model/permission of the thread the user is on now.
+	 */
+	const switchSeqRef = useRef(0)
+
 	const handleNewThread = useCallback(async () => {
 		const targetModel = modelId
 		const targetMode = modeId || "react"
@@ -114,7 +119,6 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 		threadModel.setThreadMode?.(thread.id, targetMode)
 		threadModel.setThreadThinking?.(thread.id, targetThinking)
 		setCurrentThreadId(thread.id)
-		tabs.setOpenThreadTabs((prev) => [...prev, thread.id])
 		tabs.setActiveTab(`thread:${thread.id}`)
 		if (projectRootPath) {
 			localStorage.setItem(`myagent-last-thread-${projectRootPath}`, thread.id)
@@ -139,7 +143,6 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 		permissionsByThread,
 		threadModel,
 		setCurrentThreadId,
-		tabs.setOpenThreadTabs,
 		tabs.setActiveTab,
 		applyPermissionMode,
 		projectRootPath,
@@ -149,82 +152,89 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 		async (threadId: string) => {
 			if (threadId === currentThreadId) return
 
-			await window.api.invoke({ type: "switchThread", threadId })
+			// 1. Flip the UI before touching IPC. The title, the active tab, the
+			//    permission badge and the agent indicator all key off this id, so
+			//    the switch reads as instant instead of waiting for the harness.
 			setCurrentThreadId(threadId)
-			tabs.setOpenThreadTabs((prev) =>
-				prev.includes(threadId) ? prev : [...prev, threadId],
-			)
 			tabs.setActiveTab(`thread:${threadId}`)
 			if (projectRootPath) {
 				localStorage.setItem(`myagent-last-thread-${projectRootPath}`, threadId)
 			}
+			const optimisticRunning = opts.runningThreads?.has(threadId) ?? false
+			dispatch({ type: "SET_AGENT_ACTIVE", active: optimisticRunning })
+			opts.setRunningThreadId?.(optimisticRunning ? threadId : null)
+			opts.setPendingApproval?.(opts.threadsWithApproval?.get(threadId) || null)
 
-			// Synchronize agent active state for the target thread
-			let isRunning = opts.runningThreads
-				? opts.runningThreads.has(threadId)
-				: false
-			if (!isRunning) {
-				try {
-					isRunning = Boolean(
-						await window.api.invoke({
-							type: "isRunning",
+			// 2. The transcript and the harness switch are independent — the IPC
+			//    handler resolves messages by threadId — so they run side by side
+			//    instead of queueing behind each other.
+			const switching = window.api
+				.invoke({ type: "switchThread", threadId })
+				.then(() => true)
+				.catch(() => false)
+			const loading = opts.loadMessages?.(threadId).catch(() => {})
+
+			// 3. Thread-scoped runtime only matters for the *next* turn. Syncing
+			//    it in the background keeps six IPC round-trips off the switch's
+			//    critical path; awaiting them is what made the first switch stall.
+			const seq = ++switchSeqRef.current
+			void switching.then((switched) => {
+				if (!switched || seq !== switchSeqRef.current) return
+
+				const threadModelId = modelsByThread[threadId] || modelId
+				if (threadModelId) {
+					setModelId(threadModelId)
+					window.api
+						.invoke({
+							type: "switchModel",
+							modelId: threadModelId,
 							threadId,
-						}),
-					)
-				} catch {}
-			}
-			dispatch({ type: "SET_AGENT_ACTIVE", active: isRunning })
-			opts.setRunningThreadId?.(isRunning ? threadId : null)
+							scope: "thread",
+						})
+						.catch(() => {})
+				}
 
-			// Restore pending approval if target thread is waiting for one
-			const pending = opts.threadsWithApproval?.get(threadId)
-			if (opts.setPendingApproval) {
-				opts.setPendingApproval(pending || null)
-			}
+				const threadModeId = modesByThread[threadId] || modeId || "react"
+				if (threadModeId && setModeId) {
+					setModeId(threadModeId)
+					window.api
+						.invoke({ type: "switchMode", modeId: threadModeId, threadId })
+						.catch(() => {})
+				}
 
-			// Load the target thread's messages (persisted + live assistant message if running)
-			if (opts.loadMessages) {
-				await opts.loadMessages(threadId)
-			}
+				const threadThinking =
+					thinkingByThread[threadId] || thinkingLevel || "off"
+				if (threadThinking) {
+					setThinkingLevel(threadThinking)
+					window.api
+						.invoke({
+							type: "setThinkingLevel",
+							level: threadThinking,
+							threadId,
+						})
+						.catch(() => {})
+				}
 
-			// 1. Apply thread-scoped model
-			const threadModelId = modelsByThread[threadId] || modelId
-			if (threadModelId) {
-				setModelId(threadModelId)
-				await window.api.invoke({
-					type: "switchModel",
-					modelId: threadModelId,
+				void applyPermissionMode(
+					permissionsByThread[threadId] || "default",
 					threadId,
-					scope: "thread",
-				})
-			}
+				).catch(() => {})
 
-			// 2. Apply thread-scoped mode
-			const threadModeId = modesByThread[threadId] || modeId || "react"
-			if (threadModeId && setModeId) {
-				setModeId(threadModeId)
-				await window.api.invoke({
-					type: "switchMode",
-					modeId: threadModeId,
-					threadId,
-				})
-			}
+				// The optimistic value is usually right; correct it once the
+				// main process answers, as long as the user is still here.
+				if (!optimisticRunning) {
+					window.api
+						.invoke({ type: "isRunning", threadId })
+						.then((running) => {
+							if (!running || seq !== switchSeqRef.current) return
+							dispatch({ type: "SET_AGENT_ACTIVE", active: true })
+							opts.setRunningThreadId?.(threadId)
+						})
+						.catch(() => {})
+				}
+			})
 
-			// 3. Apply thread-scoped thinking level
-			const threadThinking =
-				thinkingByThread[threadId] || thinkingLevel || "off"
-			if (threadThinking) {
-				setThinkingLevel(threadThinking)
-				await window.api.invoke({
-					type: "setThinkingLevel",
-					level: threadThinking,
-					threadId,
-				})
-			}
-
-			// 4. Apply thread-scoped permission
-			const threadPerm = permissionsByThread[threadId] || "default"
-			await applyPermissionMode(threadPerm, threadId)
+			await loading
 		},
 		[
 			dispatch,
@@ -233,7 +243,6 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 			setModelId,
 			setModeId,
 			setThinkingLevel,
-			tabs.setOpenThreadTabs,
 			tabs.setActiveTab,
 			modelsByThread,
 			modesByThread,
@@ -255,7 +264,6 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 	const handleDeleteThread = useCallback(
 		async (threadId: string) => {
 			setThreads((prev) => prev.filter((t) => t.id !== threadId))
-			tabs.setOpenThreadTabs((prev) => prev.filter((id) => id !== threadId))
 			dispatch({ type: "CLEAR_THREAD_QUEUE", threadId })
 			threadModel.removeThread(threadId)
 			if (tabs.activeTab === `thread:${threadId}`) {
@@ -281,7 +289,6 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 			dispatch,
 			threadModel,
 			tabs.activeTab,
-			tabs.setOpenThreadTabs,
 			tabs.setActiveTab,
 			currentThreadId,
 			setCurrentThreadId,

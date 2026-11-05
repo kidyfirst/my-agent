@@ -18,7 +18,6 @@ export type ProjectManager = ReturnType<typeof useProjectManager>
 export function useProjectManager(
 	dispatch: React.Dispatch<ChatAction>,
 	tabSetters: {
-		setOpenThreadTabs: React.Dispatch<React.SetStateAction<string[]>>
 		setOpenFiles: React.Dispatch<React.SetStateAction<string[]>>
 		setActiveTab: React.Dispatch<React.SetStateAction<string>>
 		setThreads: React.Dispatch<React.SetStateAction<any[]>>
@@ -213,25 +212,40 @@ export function useProjectManager(
 		return () => clearInterval(interval)
 	}, [enrichedProjects])
 
-	const handleSwitchProject = useCallback(async (switchPath: string) => {
-		setUnreadWorktrees((prev) => {
-			if (!prev.has(switchPath)) return prev
-			const next = new Set(prev)
-			next.delete(switchPath)
-			return next
-		})
-		if (switchPath === projectInfoRef.current?.rootPath) return
-		setActiveWorktrees((prev) => {
-			const next = new Set(prev)
-			next.delete(switchPath)
-			return next
-		})
-		setProjectSwitching(true)
-		try {
-			localStorage.setItem("myagent-last-project", switchPath)
-		} catch {}
-		await window.api.invoke({ type: "switchProject", path: switchPath })
-	}, [])
+	const handleSwitchProject = useCallback(
+		async (switchPath: string, targetThreadId?: string) => {
+			setUnreadWorktrees((prev) => {
+				if (!prev.has(switchPath)) return prev
+				const next = new Set(prev)
+				next.delete(switchPath)
+				return next
+			})
+			if (switchPath === projectInfoRef.current?.rootPath) return
+			setActiveWorktrees((prev) => {
+				const next = new Set(prev)
+				next.delete(switchPath)
+				return next
+			})
+			setProjectSwitching(true)
+			try {
+				localStorage.setItem("myagent-last-project", switchPath)
+				if (targetThreadId) {
+					localStorage.setItem(
+						`myagent-last-thread-${switchPath}`,
+						targetThreadId,
+					)
+				}
+				await window.api.invoke({
+					type: "switchProject",
+					path: switchPath,
+					targetThreadId,
+				})
+			} finally {
+				setProjectSwitching(false)
+			}
+		},
+		[],
+	)
 
 	const handleOpenFolder = useCallback(async () => {
 		try {
@@ -347,7 +361,6 @@ export function useProjectManager(
 					dispatch({ type: "CLEAR" })
 					tabSetters.setCurrentThreadId?.(null)
 					tabSetters.setThreads([])
-					tabSetters.setOpenThreadTabs([])
 					tabSetters.setActiveTab("chat")
 					tabSetters.setOpenFiles([])
 					setActiveWorktrees(new Set())

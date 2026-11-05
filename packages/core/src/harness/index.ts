@@ -83,7 +83,7 @@ import {
 } from "./model-resolver.js"
 import { getDynamicWorkspace } from "./workspace.js"
 import { createDynamicTools } from "./tools.js"
-import { getDynamicInstructions } from "./instructions.js"
+import { createDynamicInstructions } from "./instructions.js"
 import { createDefaultSubagents } from "./subagents.js"
 import {
 	resolveDefaultModel,
@@ -369,6 +369,13 @@ export interface MyAgentConfig<TState = HarnessState> {
 	extraTools?:
 		| Record<string, unknown>
 		| ((ctx: { requestContext: RequestContext }) => Record<string, unknown>)
+	/**
+	 * Hosts that inject `navigate-browser` / `computer` set this to true so the
+	 * system prompt advertises them. Defaults to false for CLI/embedded hosts,
+	 * which have no browser manager. The user can still disable them at runtime
+	 * via `state.browserToolsEnabled`.
+	 */
+	browserTools?: boolean
 	/** Custom storage config instead of auto-detected default */
 	storage?: StorageConfig | SQLiteStore
 	/** Initial state overrides (yolo, thinkingLevel, etc.) */
@@ -529,15 +536,19 @@ export async function createMyAgent(
 	// must not wait on the network.
 	if (mcpManager) void mcpManager.init().catch(() => {})
 
+	const browserToolOptions = {
+		browserToolsAvailable: config?.browserTools === true,
+	}
 	const codeAgent = new Agent({
 		id: "code-agent",
 		name: "Code Agent",
-		instructions: getDynamicInstructions,
+		instructions: createDynamicInstructions(browserToolOptions),
 		model: createDynamicModelGetter(resolveModel, authStorage),
 		tools: createDynamicTools(
 			mcpManager,
 			config?.extraTools as Record<string, unknown>,
 			resolveModel,
+			browserToolOptions,
 		),
 	})
 

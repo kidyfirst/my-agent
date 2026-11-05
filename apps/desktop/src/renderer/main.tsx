@@ -71,6 +71,7 @@ for (const type of ["dragover", "drop"] as const) {
 }
 
 const root = createRoot(document.getElementById("root")!)
+
 root.render(
 	<ErrorBoundary>
 		<App />

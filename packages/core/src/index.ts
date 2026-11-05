@@ -76,7 +76,10 @@ export {
 
 // Tools, Browser & MCP
 export * from "./tools/index.js"
-export { PlaywrightBrowserManager } from "./browser/playwright-manager.js"
+export {
+	PlaywrightBrowserManager,
+	type BrowserPreviewFrame,
+} from "./browser/playwright-manager.js"
 export { MCPManager } from "./mcp/manager.js"
 export {
 	builtinServersNeedingSetup,

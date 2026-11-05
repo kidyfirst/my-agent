@@ -30,6 +30,8 @@ export const stateSchema = z.object({
 		})
 		.default({ categories: {}, tools: {} }),
 	smartEditing: z.boolean().default(true),
+	/** Desktop-only: expose navigate-browser / computer to the model. */
+	browserToolsEnabled: z.boolean().default(true),
 	notifications: z.enum(["bell", "system", "both", "off"]).default("off"),
 	tasks: z
 		.array(

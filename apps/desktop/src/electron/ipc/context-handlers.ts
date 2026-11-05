@@ -43,8 +43,15 @@ export function getContextHandlers(): Record<string, IpcCommandHandler> {
 					workingDir: projectRoot,
 					// Mirror the live turn: the preview has to show the same toolset
 					// the model receives, MCP tools included (and, in Fast mode, only
-					// the ones the read-only filter keeps).
-					toolNames: describeToolNames(modeId),
+					// the ones the read-only filter keeps). Browser tools follow the
+					// same state flag as createDynamicTools.
+					toolNames: describeToolNames(modeId, {
+						browserTools:
+							(state as Record<string, unknown>)?.browserToolsEnabled !==
+								false &&
+							modeId !== "fast" &&
+							modeId !== "plan",
+					}),
 					mcpToolNames,
 					mcpSetup: builtinServersNeedingSetup().map((server) => ({
 						name: server.name,

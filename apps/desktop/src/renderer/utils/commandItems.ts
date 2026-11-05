@@ -4,7 +4,7 @@ import { ExecutionMode } from "../types/ipc"
 
 interface BuildCommandItemsArgs {
 	close: () => void
-	openThreadTabs: string[]
+	currentThreadId?: string | null
 	openFiles: string[]
 	threads: ThreadInfo[]
 	enrichedProjects: { name: string; rootPath: string; gitBranch?: string }[]
@@ -22,6 +22,8 @@ interface BuildCommandItemsArgs {
 	handleNewThread: () => void
 	handleOpenFolder: () => void
 	handleShowCloneModal: () => void
+	/** Opens the sidebar's conversation search — the palette's own ⌘K. */
+	onOpenSearch?: () => void
 	handleBrowserOpen: (url: string) => void
 	handleToggleThinking?: () => void
 	handleSelectMode?: (modeId: string) => void
@@ -90,6 +92,16 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 		},
 	})
 	items.push({
+		id: "focus-terminal",
+		label: "Focus Terminal",
+		group: "Navigation",
+		action: () => {
+			args.setRightSidebarVisible(true)
+			args.setRightSidebarTab("terminal")
+			close()
+		},
+	})
+	items.push({
 		id: "focus-context",
 		label: "Focus Context Panel",
 		group: "Navigation",
@@ -122,6 +134,16 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 				args.handleStartReplay()
 			}
 			close()
+		},
+	})
+	items.push({
+		id: "search-sessions",
+		label: "Search Conversations",
+		group: "Actions",
+		shortcut: "\u2318K",
+		action: () => {
+			close()
+			args.onOpenSearch?.()
 		},
 	})
 	items.push({
@@ -185,8 +207,9 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 		id: "toggle-right-sidebar",
 		label: "Toggle Right Sidebar",
 		group: "Actions",
-		shortcut: "\u2318`",
+		shortcut: "\u21e7\u2318B",
 		action: () => {
+			args.setRightSidebarTab("menu")
 			args.setRightSidebarVisibleUpdater((v) => !v)
 			close()
 		},
@@ -251,14 +274,14 @@ export function buildCommandItems(args: BuildCommandItemsArgs): CommandItem[] {
 		},
 	})
 
-	for (const threadId of args.openThreadTabs) {
-		const thread = args.threads.find((t) => t.id === threadId)
+	if (args.currentThreadId) {
+		const thread = args.threads.find((t) => t.id === args.currentThreadId)
 		items.push({
-			id: `tab-thread-${threadId}`,
+			id: `tab-thread-${args.currentThreadId}`,
 			label: thread?.title || "New Thread",
 			group: "Open Tabs",
 			action: () => {
-				args.setActiveTab(`thread:${threadId}`)
+				args.setActiveTab(`thread:${args.currentThreadId}`)
 				close()
 			},
 		})

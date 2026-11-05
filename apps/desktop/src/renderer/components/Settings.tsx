@@ -66,6 +66,7 @@ export function Settings({
 					"light",
 				notifications: (st?.notifications as NotificationMode) ?? "off",
 				smartEditing: (st?.smartEditing as boolean) ?? true,
+				browserToolsEnabled: (st?.browserToolsEnabled as boolean) ?? true,
 				thinkingLevel: (st?.thinkingLevel as ThinkingLevel) ?? "off",
 				observerModelId:
 					(st?.observerModelId as string) ||

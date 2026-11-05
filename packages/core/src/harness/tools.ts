@@ -23,6 +23,7 @@ import {
 	createWebExtractTool,
 	hasTavilyKey,
 } from "../tools/web-search.js"
+import { BROWSER_TOOL_NAMES } from "../tools/computer-use.js"
 import type { MCPManager } from "../mcp/manager.js"
 
 /**
@@ -62,15 +63,32 @@ export const FAST_TOOL_NAMES = [
 	"request_sandbox_access",
 ] as const
 
-/** Tool names registered for a given mode, in the order they are described. */
-export function describeToolNames(modeId?: string): string[] {
+/**
+ * Tool names registered for a given mode, in the order they are described.
+ *
+ * Browser tools are opt-in: only hosts that actually inject a browser manager
+ * (the desktop app) may advertise them. Plan and Fast modes stay read-only and
+ * never get them, since clicking a webpage is a side effect outside the
+ * workspace.
+ */
+export function describeToolNames(
+	modeId?: string,
+	options?: { browserTools?: boolean },
+): string[] {
 	if (modeId === ExecutionMode.PLAN) {
 		return [...PLAN_TOOL_NAMES]
 	}
 	if (modeId === ExecutionMode.FAST) {
 		return [...FAST_TOOL_NAMES]
 	}
-	return [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES, "submit_plan"]
+	const names = [...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES, "submit_plan"]
+	if (options?.browserTools) names.push(...BROWSER_TOOL_NAMES)
+	return names
+}
+
+/** Hosts that ship a Playwright browser manager set this to true. */
+export interface BrowserToolOptions {
+	browserToolsAvailable?: boolean
 }
 
 export function createDynamicTools(
@@ -79,6 +97,7 @@ export function createDynamicTools(
 		| Record<string, any>
 		| ((ctx: { requestContext: RequestContext }) => Record<string, any>),
 	resolveModel?: (modelId: string) => any,
+	options?: BrowserToolOptions,
 ) {
 	let lastSignature = ""
 	return function getDynamicTools({
@@ -197,12 +216,24 @@ export function createDynamicTools(
 			Object.assign(tools, mcpTools)
 		}
 
+		const browserEnabled =
+			options?.browserToolsAvailable === true &&
+			state?.browserToolsEnabled !== false &&
+			modeId !== ExecutionMode.PLAN &&
+			modeId !== ExecutionMode.FAST
+
 		if (extraTools) {
 			const resolved =
 				typeof extraTools === "function"
 					? extraTools({ requestContext })
 					: extraTools
 			for (const [name, tool] of Object.entries(resolved)) {
+				if (
+					!browserEnabled &&
+					(BROWSER_TOOL_NAMES as readonly string[]).includes(name)
+				) {
+					continue
+				}
 				if (!(name in tools)) {
 					tools[name] = tool
 				}

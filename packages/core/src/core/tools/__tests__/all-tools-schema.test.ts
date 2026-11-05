@@ -11,6 +11,7 @@ import { createViewTool } from "../../../tools/file-view.js"
 import { createWriteFileTool } from "../../../tools/write.js"
 import { createExecuteCommandTool } from "../../../tools/shell.js"
 import { createNavigateBrowserTool } from "../../../tools/navigate-browser.js"
+import { createComputerUseTool } from "../../../tools/computer-use.js"
 
 const usage = {
 	inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -36,6 +37,7 @@ describe("built-in tool schemas", () => {
 			write_file: createWriteFileTool(root),
 			execute_command: createExecuteCommandTool(root),
 			navigate_browser: createNavigateBrowserTool(root),
+			computer: createComputerUseTool(root),
 		}
 
 		let captured: any

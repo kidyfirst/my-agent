@@ -33,7 +33,6 @@ export interface HarnessCallbacks {
 		React.SetStateAction<{ observer: string; reflector: string }>
 	>
 	setThreads: React.Dispatch<React.SetStateAction<ThreadInfo[]>>
-	setOpenThreadTabs: React.Dispatch<React.SetStateAction<string[]>>
 	setActiveTab: React.Dispatch<React.SetStateAction<string>>
 	setTasks: React.Dispatch<
 		React.SetStateAction<
@@ -419,8 +418,11 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					cb.setPendingApproval?.(pending || null)
 					if (!isSameThread) {
 						cb.loadMessages(tId)
+						// The list itself only changes when threads are created,
+						// renamed or deleted (each has its own event). Re-reading it
+						// on the echo of our own switch just re-rendered the sidebar.
+						cb.loadThreads()
 					}
-					cb.loadThreads()
 					window.api
 						.invoke({ type: "getTokenUsage" })
 						.then((usage) => {
@@ -439,9 +441,6 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					const newThreadId = (event.thread as any)?.id
 					if (newThreadId) {
 						cb.setCurrentThreadId(newThreadId)
-						cb.setOpenThreadTabs((prev) =>
-							prev.includes(newThreadId) ? prev : [...prev, newThreadId],
-						)
 						cb.setActiveTab(`thread:${newThreadId}`)
 					}
 					cb.loadThreads()
@@ -451,9 +450,6 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					const deletedId = (event as any).threadId
 					if (deletedId) {
 						cb.setThreads((prev) => prev.filter((t) => t.id !== deletedId))
-						cb.setOpenThreadTabs((prev) =>
-							prev.filter((id) => id !== deletedId),
-						)
 					}
 					cb.loadThreads()
 					break
@@ -575,12 +571,17 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 				case "shortcut": {
 					const action = (event as { action?: string }).action
 					if (action === "new_thread") cb.handleNewThread()
-					else if (action === "toggle_terminal")
+					else if (action === "toggle_terminal") {
+						// Terminal is its own tab now; toggling shows/hides the
+						// sidebar with that tab selected.
+						cb.setRightSidebarTab("terminal")
 						cb.setRightSidebarVisible((v) => !v)
-					else if (action === "toggle_sidebar") cb.setSidebarVisible((v) => !v)
-					else if (action === "toggle_right_sidebar")
+					} else if (action === "toggle_sidebar")
+						cb.setSidebarVisible((v) => !v)
+					else if (action === "toggle_right_sidebar") {
+						cb.setRightSidebarTab("menu")
 						cb.setRightSidebarVisible((v) => !v)
-					else if (action === "focus_git") {
+					} else if (action === "focus_git") {
 						cb.setRightSidebarVisible(true)
 						cb.setRightSidebarTab("git")
 					} else if (action === "open_project") cb.handleOpenFolder()
@@ -687,7 +688,6 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						.catch(() => {})
 					if (resumeThreadId) {
 						cb.setCurrentThreadId(resumeThreadId)
-						cb.setOpenThreadTabs([resumeThreadId])
 						cb.setActiveTab(`thread:${resumeThreadId}`)
 						if (proj?.rootPath) {
 							localStorage.setItem(
@@ -715,7 +715,6 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 									threadId: recent.id,
 								})
 								cb.setCurrentThreadId(recent.id)
-								cb.setOpenThreadTabs([recent.id])
 								cb.setActiveTab(`thread:${recent.id}`)
 								if (proj?.rootPath) {
 									localStorage.setItem(
@@ -738,7 +737,6 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 								cb.setRunningThreadId?.(null)
 								cb.setPendingApproval?.(null)
 								cb.setThreads([])
-								cb.setOpenThreadTabs([])
 								cb.setActiveTab("chat")
 							}
 						})

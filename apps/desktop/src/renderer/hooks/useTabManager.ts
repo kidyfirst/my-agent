@@ -5,7 +5,6 @@ export type TabManager = ReturnType<typeof useTabManager>
 
 export function useTabManager(currentThreadId: string | null) {
 	const [openFiles, setOpenFiles] = useState<string[]>([])
-	const [openThreadTabs, setOpenThreadTabs] = useState<string[]>([])
 	const [activeTab, setActiveTabState] = useState<string>("chat")
 	const [settingsSection, setSettingsSection] = useState<string | undefined>(
 		undefined,
@@ -64,42 +63,29 @@ export function useTabManager(currentThreadId: string | null) {
 	}, [])
 
 	const forceCloseTab = useCallback((tabId: string) => {
-		if (!tabId.startsWith("thread:")) {
-			setDirtyFiles((prev) => {
-				if (!prev.has(tabId)) return prev
-				const next = new Set(prev)
-				next.delete(tabId)
-				return next
-			})
+		if (tabId.startsWith("thread:") || tabId === "chat") {
+			return
 		}
-		if (tabId.startsWith("thread:")) {
-			const threadId = tabId.slice(7)
-			setOpenThreadTabs((prev) => {
-				const next = prev.filter((id) => id !== threadId)
-				setActiveTab((current) => {
-					if (current !== tabId) return current
-					if (next.length > 0) {
-						const closedIdx = prev.indexOf(threadId)
-						return `thread:${next[Math.min(closedIdx, next.length - 1)]}`
-					}
-					return "chat"
-				})
-				return next
+		setDirtyFiles((prev) => {
+			if (!prev.has(tabId)) return prev
+			const next = new Set(prev)
+			next.delete(tabId)
+			return next
+		})
+		setOpenFiles((prev) => {
+			const next = prev.filter((f) => f !== tabId)
+			setActiveTab((current) => {
+				if (current !== tabId) return current
+				if (next.length > 0) {
+					const closedIdx = prev.indexOf(tabId)
+					return next[Math.min(closedIdx, next.length - 1)]
+				}
+				return currentThreadIdRef.current
+					? `thread:${currentThreadIdRef.current}`
+					: "chat"
 			})
-		} else {
-			setOpenFiles((prev) => {
-				const next = prev.filter((f) => f !== tabId)
-				setActiveTab((current) => {
-					if (current !== tabId) return current
-					if (next.length > 0) {
-						const closedIdx = prev.indexOf(tabId)
-						return next[Math.min(closedIdx, next.length - 1)]
-					}
-					return "chat"
-				})
-				return next
-			})
-		}
+			return next
+		})
 	}, [])
 
 	const handleCloseTab = useCallback(
@@ -143,9 +129,6 @@ export function useTabManager(currentThreadId: string | null) {
 	// "chat" would leave no tab looking active.
 	const handleCloseOverlayTab = useCallback(() => {
 		if (currentThreadId) {
-			setOpenThreadTabs((prev) =>
-				prev.includes(currentThreadId) ? prev : [...prev, currentThreadId],
-			)
 			setActiveTab("thread:" + currentThreadId)
 			return
 		}
@@ -155,8 +138,6 @@ export function useTabManager(currentThreadId: string | null) {
 	return {
 		openFiles,
 		setOpenFiles,
-		openThreadTabs,
-		setOpenThreadTabs,
 		activeTab,
 		setActiveTab,
 		settingsSection,

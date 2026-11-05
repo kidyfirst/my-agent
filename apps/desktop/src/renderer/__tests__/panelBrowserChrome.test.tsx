@@ -1,0 +1,26 @@
+import { describe, expect, it } from "vitest"
+import { renderToStaticMarkup } from "react-dom/server"
+import { PanelBrowser } from "../components/PanelBrowser"
+
+const html = renderToStaticMarkup(<PanelBrowser worktreePath="/repo/demo" />)
+
+describe("PanelBrowser chrome", () => {
+	it("keeps the tab strip draggable but lets its chips take clicks", () => {
+		// A `-webkit-app-region: drag` parent swallows mouse events, so every
+		// control living inside it must opt out — otherwise clicking a tab does
+		// nothing and the browser looks stuck on one page.
+		expect(html).toMatch(/class="titlebar-drag"/)
+		expect(html).toMatch(/class="titlebar-no-drag"[^>]*max-width:150px/)
+	})
+
+	it("labels a blank tab and gives it a close target", () => {
+		expect(html).toContain(">New tab<")
+		expect(html).toContain('aria-label="Close New tab"')
+	})
+
+	it("offers an address bar and a new-tab button", () => {
+		expect(html).toContain('aria-label="Address"')
+		expect(html).toContain('aria-label="New browser tab"')
+		expect(html).toContain('data-testid="panel-browser-views"')
+	})
+})

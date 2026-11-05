@@ -586,13 +586,34 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 		},
 		switchProject: async (command, ctx) => {
 			const newPath = command.path as string
+			const targetThreadId =
+				typeof command.targetThreadId === "string" && command.targetThreadId
+					? command.targetThreadId
+					: undefined
 
 			if (ctx.sessions.has(newPath)) {
 				// Fast path: session already exists
 				ctx.setActiveSessionPath(newPath)
 				if (ctx.mainWindow) ctx.bridgeAllEvents(ctx.mainWindow)
 
-				const cachedState = ctx.sessions.get(newPath)!.harness.getState?.() as
+				const cachedSession = ctx.sessions.get(newPath)!
+				let currentThreadId = cachedSession.harness.getCurrentThreadId()
+				if (targetThreadId && targetThreadId !== currentThreadId) {
+					try {
+						await cachedSession.harness.switchThread({
+							threadId: targetThreadId,
+						})
+						currentThreadId = targetThreadId
+					} catch (e) {
+						console.warn(
+							"[switchProject] Failed to switch to targetThreadId:",
+							targetThreadId,
+							e,
+						)
+					}
+				}
+
+				const cachedState = cachedSession.harness.getState?.() as
 					| { projectName?: string; gitBranch?: string }
 					| undefined
 				const fastProject = {
@@ -601,9 +622,6 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 					gitBranch: cachedState?.gitBranch,
 					isWorktree: true,
 				}
-				const currentThreadId = ctx.sessions
-					.get(newPath)!
-					.harness.getCurrentThreadId()
 				safeSend(ctx.mainWindow, "harness:event", {
 					type: "project_changed",
 					project: fastProject,
@@ -639,10 +657,29 @@ export function getProjectHandlers(): Record<string, IpcCommandHandler> {
 				newSession.authStorage,
 			)
 			await newSession.harness.loadOMProgress?.().catch(() => {})
-			if (newSession.mcpManager?.hasServers())
-				await newSession.mcpManager.init()
+			// Warm MCP servers in background without blocking the switch response
+			if (newSession.mcpManager?.hasServers()) {
+				void newSession.mcpManager.init().catch((err) => {
+					console.warn("[switchProject] MCP init failed:", err)
+				})
+			}
 
-			const currentThreadId = newSession.harness.getCurrentThreadId()
+			let currentThreadId = newSession.harness.getCurrentThreadId()
+			if (targetThreadId && targetThreadId !== currentThreadId) {
+				try {
+					await newSession.harness.switchThread({
+						threadId: targetThreadId,
+					})
+					currentThreadId = targetThreadId
+				} catch (e) {
+					console.warn(
+						"[switchProject] Failed to switch to targetThreadId:",
+						targetThreadId,
+						e,
+					)
+				}
+			}
+
 			safeSend(ctx.mainWindow, "harness:event", {
 				type: "project_changed",
 				project: {

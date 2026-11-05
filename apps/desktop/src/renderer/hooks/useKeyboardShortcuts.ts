@@ -14,6 +14,10 @@ interface UseKeyboardShortcutsArgs {
 	setRightSidebarTab: React.Dispatch<React.SetStateAction<RightSidebarTab>>
 	setActiveTab: React.Dispatch<React.SetStateAction<string>>
 	setShowQuickFileOpen: React.Dispatch<React.SetStateAction<boolean>>
+	/** ⌘K — hand the keyboard to the conversation search. */
+	onOpenSearch?: () => void
+	/** Fill the window with the right panel, or give the space back. */
+	onToggleRightSidebarMaximized?: () => void
 	handleOpenFolder: () => void
 	handleCloseTab: (tabId: string) => void
 	handleSwitchProject: (path: string) => void
@@ -34,26 +38,52 @@ export function useKeyboardShortcuts({
 	handleCloseTab,
 	handleSwitchProject,
 	onToggleSettings,
+	onOpenSearch,
+	onToggleRightSidebarMaximized,
 }: UseKeyboardShortcutsArgs) {
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			const isMod = e.metaKey || e.ctrlKey
-			if (isMod && e.key === "k") {
+			// ⌘K — search sessions. The command palette moved to ⇧⌘P: searching
+			// conversations is what people reach for this chord for.
+			if (isMod && !e.shiftKey && e.key.toLowerCase() === "k") {
+				e.preventDefault()
+				if (onOpenSearch) onOpenSearch()
+				else setShowCommandPalette((v) => !v)
+				return
+			}
+			if (isMod && e.shiftKey && e.key.toLowerCase() === "p") {
 				e.preventDefault()
 				setShowCommandPalette((v) => !v)
 				return
 			}
 			if (isMod && e.key === "`") {
 				e.preventDefault()
+				// Opening lands on the Overview list, same as the title-bar toggle.
+				setRightSidebarTab("menu")
 				setRightSidebarVisible((v) => !v)
 			}
-			if (isMod && e.key === "b") {
+			// ⌘B / ⇧⌘B — the pair for the two side panels, same as Cursor.
+			if (isMod && !e.shiftKey && e.key.toLowerCase() === "b") {
 				e.preventDefault()
 				setSidebarVisible((v) => !v)
+				return
+			}
+			if (isMod && e.shiftKey && e.key.toLowerCase() === "b") {
+				e.preventDefault()
+				setRightSidebarTab("menu")
+				setRightSidebarVisible((v) => !v)
+				return
 			}
 			if (isMod && e.shiftKey && e.key === "E") {
 				e.preventDefault()
+				setRightSidebarTab("menu")
 				setRightSidebarVisible((v) => !v)
+			}
+			// ⇧⌘M — same gesture as VS Code's maximize panel.
+			if (isMod && e.shiftKey && e.key.toLowerCase() === "m") {
+				e.preventDefault()
+				onToggleRightSidebarMaximized?.()
 			}
 			if (isMod && e.shiftKey && e.key === "G") {
 				// Git panel only exists for git-backed projects.
@@ -62,7 +92,14 @@ export function useKeyboardShortcuts({
 				setRightSidebarVisible(true)
 				setRightSidebarTab("git")
 			}
-			if (isMod && e.key === "o") {
+			// ⌥⌘O — the right panel's landing list, by name.
+			if (isMod && e.altKey && e.key.toLowerCase() === "o") {
+				e.preventDefault()
+				setRightSidebarTab("menu")
+				setRightSidebarVisible((v) => !v)
+				return
+			}
+			if (isMod && !e.altKey && e.key === "o") {
 				e.preventDefault()
 				handleOpenFolder()
 			}
@@ -107,5 +144,11 @@ export function useKeyboardShortcuts({
 		}
 		window.addEventListener("keydown", handleKeyDown)
 		return () => window.removeEventListener("keydown", handleKeyDown)
-	}, [activeTab, enrichedProjects, projectInfo])
+	}, [
+		activeTab,
+		enrichedProjects,
+		projectInfo,
+		onToggleRightSidebarMaximized,
+		onOpenSearch,
+	])
 }

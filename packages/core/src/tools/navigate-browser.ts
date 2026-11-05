@@ -1,34 +1,37 @@
 import { createTool } from "../core/index.js"
 import { z } from "zod"
 import type { PlaywrightBrowserManager } from "../browser/playwright-manager.js"
+import { formatPageSnapshot } from "../browser/page-snapshot.js"
 
 export function createNavigateBrowserTool(
 	browserManager: PlaywrightBrowserManager,
 ) {
 	return createTool({
 		id: "navigate-browser",
-		description:
-			"Navigate the headless browser to a URL. Use this before using the computer tool to interact with a webpage. The browser persists across tool calls so you can navigate, then use the computer tool to screenshot and interact with the page.",
+		description: [
+			"Open a URL in the persistent headless Chromium browser and return a text",
+			"snapshot of the page (visible text plus numbered interactive elements).",
+			"Use `computer` afterwards to click, type and scroll. The browser keeps its",
+			"state across calls, so navigate once and then interact with `computer`.",
+		].join(" "),
 		inputSchema: z.object({
-			url: z.string().describe("The URL to navigate to"),
+			url: z.string().describe("The URL to navigate to (http/https)"),
 		}),
-		outputSchema: z.object({
-			title: z.string(),
-			url: z.string(),
-			isError: z.boolean(),
-		}),
+		outputSchema: z.string(),
 		execute: async ({ url }) => {
 			try {
 				await browserManager.navigate(url)
-				const page = await browserManager.getPage()
-				const title = await page.title()
-				return { title, url: page.url(), isError: false }
+				const snapshot = await browserManager.snapshot()
+				// A plain string becomes `{ type: "text" }` in the model message;
+				// an object would be JSON.stringify-ed with escaped newlines.
+				return formatPageSnapshot(snapshot)
 			} catch (error) {
-				return {
-					title: "",
-					url,
-					isError: true,
-				}
+				const message = error instanceof Error ? error.message : String(error)
+				return `Navigation to ${url} failed: ${message}`
+			} finally {
+				// A navigation is the most interesting moment to mirror: publish
+				// immediately instead of waiting out the throttle window.
+				void browserManager.publishPreview({ force: true })
 			}
 		},
 	})

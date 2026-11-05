@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { ProjectList } from "./ProjectList"
 import { GlobalSearchModal } from "./GlobalSearchModal"
+import { ShortcutTooltip } from "./ShortcutTooltip"
 import { WindowToggleIcon } from "./WindowToggleIcon"
 import { LogIcon } from "./LogIcon"
 import { CommunityBanner } from "./sidebar/CommunityBanner"
@@ -91,6 +92,11 @@ interface SidebarProps {
 	isAgentsActive: boolean
 	activeAgentCount: number
 	onToggleSidebar?: () => void
+	/**
+	 * Bumped by the ⌘K shortcut. The search modal lives here (it needs the
+	 * thread and project lists this panel owns), so the key only nudges it open.
+	 */
+	searchOpenSeq?: number
 	updateInfo?: UpdateInfo | null
 	downloadProgress?: {
 		percent: number
@@ -180,11 +186,18 @@ export function Sidebar({
 	isAgentsActive,
 	activeAgentCount,
 	onToggleSidebar,
+	searchOpenSeq,
 	updateInfo,
 	downloadProgress,
 	onDownloadUpdate,
 }: SidebarProps) {
 	const [searchModalOpen, setSearchModalOpen] = useState(false)
+
+	// ⌘K — the panel owns the modal, the shortcut hook only bumps a counter.
+	useEffect(() => {
+		if (!searchOpenSeq) return
+		setSearchModalOpen(true)
+	}, [searchOpenSeq])
 
 	// Width reached by the current drag, so mouse-up can decide whether the
 	// sidebar should collapse without waiting for another render.
@@ -262,36 +275,40 @@ export function Sidebar({
 				}}
 			>
 				{sidebarVisible && onToggleSidebar && (
-					<button
-						type="button"
+					<ShortcutTooltip
+						label="Toggle Sidebar"
+						shortcut="⌘B"
 						className="titlebar-no-drag"
-						onClick={onToggleSidebar}
-						title="Toggle Sidebar (Cmd+B)"
-						style={{
-							position: "absolute",
-							top: 5,
-							left: 78,
-							height: 28,
-							width: 28,
-							borderRadius: 6,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							color: "var(--text)",
-							background: "none",
-							border: "none",
-							cursor: "pointer",
-							transition: "background-color 0.15s, opacity 0.15s",
-						}}
-						onMouseEnter={(e) => {
-							e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-						}}
-						onMouseLeave={(e) => {
-							e.currentTarget.style.backgroundColor = "transparent"
-						}}
+						style={{ position: "absolute", top: 5, left: 78, zIndex: 10 }}
 					>
-						<WindowToggleIcon side="left" open={true} />
-					</button>
+						<button
+							type="button"
+							className="titlebar-no-drag"
+							onClick={onToggleSidebar}
+							aria-label="Toggle Sidebar"
+							style={{
+								height: 28,
+								width: 28,
+								borderRadius: 6,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								color: "var(--muted)",
+								background: "none",
+								border: "none",
+								cursor: "pointer",
+								transition: "background-color 0.15s, opacity 0.15s",
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.backgroundColor = "transparent"
+							}}
+						>
+							<WindowToggleIcon side="left" open={true} soft />
+						</button>
+					</ShortcutTooltip>
 				)}
 
 				{/* Search — top right of the panel */}
@@ -306,35 +323,42 @@ export function Sidebar({
 						alignItems: "center",
 					}}
 				>
-					<button
-						type="button"
-						onClick={() => setSearchModalOpen(true)}
-						title="Search projects and sessions"
-						aria-label="Search projects and sessions"
-						style={{
-							width: 26,
-							height: 26,
-							display: "inline-flex",
-							alignItems: "center",
-							justifyContent: "center",
-							padding: 0,
-							borderRadius: 4,
-							background: "transparent",
-							color: "var(--muted)",
-							cursor: "pointer",
-							transition: "background-color 0.15s, color 0.15s",
-						}}
-						onMouseEnter={(e) => {
-							e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-							e.currentTarget.style.color = "var(--text)"
-						}}
-						onMouseLeave={(e) => {
-							e.currentTarget.style.backgroundColor = "transparent"
-							e.currentTarget.style.color = "var(--muted)"
-						}}
+					<ShortcutTooltip
+						label="Search Conversations"
+						shortcut="⌘K"
+						align="end"
+						className="titlebar-no-drag"
 					>
-						<SearchIcon />
-					</button>
+						<button
+							type="button"
+							onClick={() => setSearchModalOpen(true)}
+							aria-label="Search projects and sessions"
+							style={{
+								width: 26,
+								height: 26,
+								display: "inline-flex",
+								alignItems: "center",
+								justifyContent: "center",
+								padding: 0,
+								borderRadius: 4,
+								background: "transparent",
+								color: "var(--muted)",
+								border: "none",
+								cursor: "pointer",
+								transition: "background-color 0.15s, color 0.15s",
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.backgroundColor = "var(--bg-hover)"
+								e.currentTarget.style.color = "var(--text)"
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.backgroundColor = "transparent"
+								e.currentTarget.style.color = "var(--muted)"
+							}}
+						>
+							<SearchIcon />
+						</button>
+					</ShortcutTooltip>
 				</div>
 			</div>
 

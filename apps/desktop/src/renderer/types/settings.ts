@@ -5,6 +5,8 @@ export interface SettingsState {
 	theme?: "light" | "dark" | "system"
 	notifications: NotificationMode
 	smartEditing: boolean
+	/** Expose the headless-browser tools (navigate-browser / computer). */
+	browserToolsEnabled: boolean
 	thinkingLevel: ThinkingLevel
 	observerModelId: string
 	reflectorModelId: string

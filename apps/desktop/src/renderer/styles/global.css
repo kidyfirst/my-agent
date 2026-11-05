@@ -335,6 +335,24 @@ body,
 	height: 0 !important;
 }
 
+/* The terminal scrolls by wheel and keyboard, so it needs no scrollbar — and
+   xterm 6 draws its own (VS Code's smooth scroller), not the native one, which
+   is why the rule targets both layers. A slider under the last columns of a
+   monospace grid is just lost space. */
+.xterm .xterm-viewport {
+	scrollbar-width: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+	display: none;
+	width: 0;
+	height: 0;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar {
+	display: none !important;
+}
+
 /* Selection */
 ::selection {
 	background: var(--accent);
@@ -447,4 +465,48 @@ textarea::placeholder {
 /* Hide React Flow attribution watermark */
 .react-flow__attribution {
 	display: none !important;
+}
+
+/* Shortcut tooltip — the title-bar controls name their action and the keys
+   that do the same thing. Replaces the native title bubble, which cannot draw
+   a key cap and takes a second to appear. */
+.shortcut-tooltip {
+	position: fixed;
+	z-index: 4000;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 7px 12px;
+	border-radius: 10px;
+	/* A white card over the near-white title bar, one step up in the dark
+	   theme where the title bar is already the darker surface. */
+	background: var(--bg);
+	border: 1px solid var(--border-muted);
+	box-shadow: var(--shadow-popover);
+	color: var(--text);
+	font-size: 13px;
+	line-height: 1.25;
+	white-space: nowrap;
+	pointer-events: none;
+	animation: shortcut-tooltip-in 0.12s ease-out;
+}
+
+[data-theme="dark"] .shortcut-tooltip,
+body.dark-theme .shortcut-tooltip {
+	background: var(--bg-elevated);
+}
+
+.shortcut-tooltip__keys {
+	color: var(--muted);
+	font-size: 12.5px;
+	letter-spacing: 0.04em;
+}
+
+@keyframes shortcut-tooltip-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
 }

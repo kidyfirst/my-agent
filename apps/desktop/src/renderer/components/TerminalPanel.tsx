@@ -1,18 +1,7 @@
-import { useEffect, useRef, useCallback, useState } from "react"
+import { useEffect, useRef } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import { WebLinksAddon } from "@xterm/addon-web-links"
-
-interface TerminalInstance {
-	id: string
-	term: Terminal
-	fitAddon: FitAddon
-	sessionId: string | null
-	unsub: (() => void) | null
-	exited: boolean
-	opened: boolean
-	starting: boolean
-}
 
 const DARK_THEME = {
 	background: "#09090b",
@@ -68,20 +57,37 @@ function getTerminalTheme() {
 }
 
 interface TerminalPanelProps {
-	height: number
 	projectPath?: string | null
 	onOpenBrowser?: (url: string) => void
+	/** Bumped when the shell sends the user here (overview menu → Terminal). */
+	focusSignal?: number
 }
 
-let termCounter = 0
+/** One shell, one view: the panel's own tab in the sidebar *is* the tab. */
+interface TerminalSession {
+	term: Terminal
+	fitAddon: FitAddon
+	sessionId: string | null
+	unsub: (() => void) | null
+	started: boolean
+	disposed: boolean
+	retryTimer: ReturnType<typeof setTimeout> | null
+}
 
+/**
+ * The right sidebar's terminal.
+ *
+ * It used to carry a tab bar of its own (TERMINAL | Terminal 1 | +), which
+ * duplicated the sidebar tab strip above it and ate a row of the shell. The
+ * shell now owns the whole pane; a worktree has a shell, not a set of them.
+ */
 export function TerminalPanel({
-	height,
 	projectPath,
 	onOpenBrowser,
+	focusSignal,
 }: TerminalPanelProps) {
 	const containerRef = useRef<HTMLDivElement>(null)
-	const instancesRef = useRef<Map<string, TerminalInstance>>(new Map())
+	const sessionRef = useRef<TerminalSession | null>(null)
 	const onOpenBrowserRef = useRef(onOpenBrowser)
 	onOpenBrowserRef.current = onOpenBrowser
 	// The shell must start in the active project, otherwise it inherits whatever
@@ -89,35 +95,14 @@ export function TerminalPanel({
 	// keeps showing a git branch in the prompt for a plain-folder project).
 	const projectPathRef = useRef(projectPath)
 	projectPathRef.current = projectPath
-	const [tabs, setTabs] = useState<string[]>(() => {
-		const id = `term-${++termCounter}`
-		return [id]
-	})
-	const [activeTab, setActiveTab] = useState<string>(tabs[0])
-	const [titles, setTitles] = useState<Record<string, string>>({})
-	const [editingTabId, setEditingTabId] = useState<string | null>(null)
-	const [editingTitle, setEditingTitle] = useState("")
 
-	// Update active terminals when theme changes
+	// Switching worktrees restarts the shell: `projectPath` is the effect's
+	// only dependency, so a new path tears the old PTY down before spawning one
+	// that starts in the new directory.
 	useEffect(() => {
-		const updateThemes = () => {
-			const theme = getTerminalTheme()
-			for (const inst of instancesRef.current.values()) {
-				inst.term.options.theme = theme
-			}
-		}
-		const observer = new MutationObserver(updateThemes)
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ["data-theme"],
-		})
-		return () => observer.disconnect()
-	}, [])
-
-	// Create a TerminalInstance object (xterm + addons, no DOM yet)
-	const ensureInstance = useCallback((id: string): TerminalInstance => {
-		const existing = instancesRef.current.get(id)
-		if (existing) return existing
+		const container = containerRef.current
+		if (!container || !projectPath) return
+		while (container.firstChild) container.removeChild(container.firstChild)
 
 		const term = new Terminal({
 			fontSize: 12,
@@ -125,7 +110,6 @@ export function TerminalPanel({
 			cursorBlink: true,
 			theme: getTerminalTheme(),
 		})
-
 		const fitAddon = new FitAddon()
 		term.loadAddon(fitAddon)
 		term.loadAddon(
@@ -138,250 +122,163 @@ export function TerminalPanel({
 			}),
 		)
 
-		const instance: TerminalInstance = {
-			id,
+		const session: TerminalSession = {
 			term,
 			fitAddon,
 			sessionId: null,
 			unsub: null,
-			exited: false,
-			opened: false,
-			starting: false,
+			started: false,
+			disposed: false,
+			retryTimer: null,
 		}
+		sessionRef.current = session
 
-		instancesRef.current.set(id, instance)
-		return instance
-	}, [])
+		term.open(container)
 
-	// Start a PTY session for an instance (idempotent, retries if IPC not ready)
-	const startPty = useCallback((inst: TerminalInstance, retries = 0) => {
-		console.log("[terminal] startPty called", {
-			id: inst.id,
-			hasSession: !!inst.sessionId,
-			exited: inst.exited,
-			starting: inst.starting,
-			retries,
-		})
-		if (inst.sessionId || inst.exited || inst.starting) return
-		inst.starting = true
-
-		const dims = inst.fitAddon.proposeDimensions()
-		console.log("[terminal] invoking ptyCreate", { dims })
-		window.api
-			.invoke({
-				type: "ptyCreate",
-				cols: dims?.cols ?? 80,
-				rows: dims?.rows ?? 24,
-				cwd: projectPathRef.current ?? undefined,
-			})
-			.then((result) => {
-				console.log("[terminal] ptyCreate result:", result)
-				const { sessionId } = result as { sessionId: string }
-				inst.sessionId = sessionId
-				inst.starting = false
-
-				inst.term.onData((data) => {
-					if (inst.sessionId) {
-						window.api.invoke({
-							type: "ptyWrite",
-							sessionId: inst.sessionId,
-							data,
-						})
-					}
-				})
-
-				const unsub = window.api.onEvent((raw: unknown) => {
-					const ev = raw as {
-						type: string
-						sessionId?: string
-						data?: string
-						exitCode?: number
-					}
-					if (
-						ev.type === "pty_output" &&
-						ev.sessionId === inst.sessionId &&
-						ev.data
-					) {
-						inst.term.write(ev.data)
-					} else if (
-						ev.type === "pty_exit" &&
-						ev.sessionId === inst.sessionId
-					) {
-						inst.term.writeln(
-							`\r\n\x1b[2m[Process exited with code ${ev.exitCode ?? 0}]\x1b[0m`,
-						)
-						inst.sessionId = null
-						inst.exited = true
-					}
-				})
-				inst.unsub = unsub
-			})
-			.catch((err: unknown) => {
-				console.error("[terminal] ptyCreate failed:", err)
-				inst.starting = false
-				// Only retry if it looks like IPC isn't ready yet (not a spawn error)
-				const msg = String(err)
-				if (
-					retries < 10 &&
-					(msg.includes("No handler") || msg.includes("not registered"))
-				) {
-					setTimeout(() => startPty(inst, retries + 1), 500)
-				} else {
-					inst.term.writeln(`\r\n\x1b[31m[Terminal error: ${msg}]\x1b[0m`)
-				}
-			})
-	}, [])
-
-	const addTerminal = useCallback(() => {
-		const id = `term-${++termCounter}`
-		setTabs((prev) => [...prev, id])
-		setActiveTab(id)
-	}, [])
-
-	const closeTerminal = useCallback((id: string) => {
-		const instance = instancesRef.current.get(id)
-		if (instance) {
-			if (instance.sessionId) {
-				window.api.invoke({
-					type: "ptyDestroy",
-					sessionId: instance.sessionId,
-				})
-			}
-			instance.unsub?.()
-			instance.term.dispose()
-			instancesRef.current.delete(id)
-		}
-
-		setTabs((prev) => {
-			const next = prev.filter((t) => t !== id)
-			if (next.length === 0) {
-				const newId = `term-${++termCounter}`
-				setActiveTab(newId)
-				return [newId]
-			}
-			setActiveTab((current) =>
-				current === id ? next[next.length - 1] : current,
-			)
-			return next
-		})
-		setTitles((prev) => {
-			if (!prev[id]) return prev
-			const next = { ...prev }
-			delete next[id]
-			return next
-		})
-	}, [])
-
-	// Mount/switch: open xterm into DOM, start PTY, focus
-	useEffect(() => {
-		const container = containerRef.current
-		console.log("[terminal] mount effect", {
-			hasContainer: !!container,
-			activeTab,
-			containerSize: container
-				? `${container.offsetWidth}x${container.offsetHeight}`
-				: "n/a",
-		})
-		if (!container || !activeTab) return
-
-		const instance = ensureInstance(activeTab)
-
-		// Clear container
-		while (container.firstChild) {
-			container.removeChild(container.firstChild)
-		}
-
-		// Open xterm into DOM or re-attach
-		if (!instance.opened) {
-			instance.term.open(container)
-			instance.opened = true
-		} else if (instance.term.element) {
-			container.appendChild(instance.term.element)
-		}
-
-		// Fit + start PTY
-		const raf = requestAnimationFrame(() => {
+		// xterm only knows its size once open, and the panel is resized by a
+		// splitter and hidden/shown by the sidebar — so fit and tell the PTY
+		// about it every time the box changes.
+		const fit = () => {
+			if (session.disposed) return
+			if (container.clientWidth < 40 || container.clientHeight < 40) return
 			try {
-				instance.fitAddon.fit()
-			} catch {
-				// ignore
-			}
-			startPty(instance)
-		})
-
-		return () => cancelAnimationFrame(raf)
-	}, [activeTab, ensureInstance, startPty])
-
-	// Re-fit on height change
-	useEffect(() => {
-		if (!activeTab) return
-		const instance = instancesRef.current.get(activeTab)
-		if (!instance) return
-
-		const timer = setTimeout(() => {
-			try {
-				instance.fitAddon.fit()
+				fitAddon.fit()
 			} catch {
 				return
 			}
-			const dims = instance.fitAddon.proposeDimensions()
-			if (dims && instance.sessionId) {
+			const dims = fitAddon.proposeDimensions()
+			if (dims && session.sessionId) {
 				window.api.invoke({
 					type: "ptyResize",
-					sessionId: instance.sessionId,
+					sessionId: session.sessionId,
 					cols: dims.cols,
 					rows: dims.rows,
 				})
 			}
-		}, 50)
-		return () => clearTimeout(timer)
-	}, [height, activeTab])
-
-	// Reset terminals when project path changes (e.g. switching worktrees)
-	const prevProjectPath = useRef(projectPath)
-	useEffect(() => {
-		if (prevProjectPath.current === projectPath) return
-		prevProjectPath.current = projectPath
-
-		// Tear down all existing terminal instances
-		for (const instance of instancesRef.current.values()) {
-			if (instance.sessionId) {
-				window.api.invoke({ type: "ptyDestroy", sessionId: instance.sessionId })
-			}
-			instance.unsub?.()
-			instance.term.dispose()
 		}
-		instancesRef.current.clear()
+		fit()
 
-		// Create a fresh terminal tab
-		const newId = `term-${++termCounter}`
-		setTabs([newId])
-		setActiveTab(newId)
+		const startPty = (retries = 0) => {
+			if (session.disposed || session.started) return
+			session.started = true
+			const dims = fitAddon.proposeDimensions()
+			window.api
+				.invoke({
+					type: "ptyCreate",
+					cols: dims?.cols ?? 80,
+					rows: dims?.rows ?? 24,
+					cwd: projectPathRef.current ?? undefined,
+				})
+				.then((result) => {
+					if (session.disposed) {
+						// The panel restarted while the PTY was spawning.
+						const { sessionId } = result as { sessionId: string }
+						window.api.invoke({ type: "ptyDestroy", sessionId })
+						return
+					}
+					const { sessionId } = result as { sessionId: string }
+					session.sessionId = sessionId
+					session.unsub = window.api.onEvent((raw: unknown) => {
+						const event = raw as {
+							type: string
+							sessionId?: string
+							data?: string
+							exitCode?: number
+						}
+						if (event.sessionId !== session.sessionId) return
+						if (event.type === "pty_output" && event.data) {
+							term.write(event.data)
+						} else if (event.type === "pty_exit") {
+							term.writeln(
+								`\r\n\x1b[2m[Process exited with code ${event.exitCode ?? 0}]\x1b[0m`,
+							)
+							session.sessionId = null
+						}
+					})
+				})
+				.catch((error: unknown) => {
+					session.started = false
+					const message = String(error)
+					// Only retry when the IPC handler is not up yet, not on a
+					// spawn failure the user has to see.
+					if (
+						retries < 10 &&
+						(message.includes("No handler") ||
+							message.includes("not registered"))
+					) {
+						session.retryTimer = setTimeout(() => startPty(retries + 1), 500)
+					} else {
+						term.writeln(`\r\n\x1b[31m[Terminal error: ${message}]\x1b[0m`)
+					}
+				})
+		}
+		startPty()
+
+		const onData = term.onData((data) => {
+			if (!session.sessionId) return
+			window.api.invoke({
+				type: "ptyWrite",
+				sessionId: session.sessionId,
+				data,
+			})
+		})
+
+		let observer: ResizeObserver | undefined
+		if (typeof ResizeObserver !== "undefined") {
+			observer = new ResizeObserver(() => fit())
+			observer.observe(container)
+		}
+
+		return () => {
+			session.disposed = true
+			if (session.retryTimer) clearTimeout(session.retryTimer)
+			observer?.disconnect()
+			onData.dispose()
+			if (session.sessionId) {
+				window.api.invoke({
+					type: "ptyDestroy",
+					sessionId: session.sessionId,
+				})
+			}
+			session.unsub?.()
+			term.dispose()
+			sessionRef.current = null
+		}
 	}, [projectPath])
 
-	// Cleanup all on unmount
+	// Landing here from an overview menu has to actually focus the shell: a
+	// terminal that swallows the next keystroke looks broken.
 	useEffect(() => {
-		return () => {
-			for (const instance of instancesRef.current.values()) {
-				if (instance.sessionId) {
-					window.api.invoke({
-						type: "ptyDestroy",
-						sessionId: instance.sessionId,
-					})
-				}
-				instance.unsub?.()
-				instance.term.dispose()
-			}
-			instancesRef.current.clear()
+		if (!focusSignal) return
+		const session = sessionRef.current
+		if (!session) return
+		try {
+			session.fitAddon.fit()
+		} catch {
+			// The panel may still be sliding in, so it has no usable size yet.
 		}
+		session.term.focus()
+	}, [focusSignal])
+
+	useEffect(() => {
+		const observer = new MutationObserver(() => {
+			const theme = getTerminalTheme()
+			const session = sessionRef.current
+			if (session) session.term.options.theme = theme
+		})
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["data-theme"],
+		})
+		return () => observer.disconnect()
 	}, [])
 
 	if (!projectPath) {
 		return (
 			<div
 				style={{
-					height,
-					flexShrink: 0,
+					flex: "1 1 0",
+					minHeight: 0,
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "center",
@@ -397,243 +294,16 @@ export function TerminalPanel({
 
 	return (
 		<div
+			ref={containerRef}
+			data-testid="terminal-panel"
+			onClick={() => sessionRef.current?.term.focus()}
 			style={{
-				height,
-				flexShrink: 0,
-				display: "flex",
-				flexDirection: "column",
+				flex: "1 1 0",
+				minHeight: 0,
 				overflow: "hidden",
+				padding: "4px 0 4px 4px",
 				background: "var(--bg)",
 			}}
-		>
-			{/* Terminal tab bar */}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "stretch",
-					borderTop: "1px solid var(--border-muted)",
-					borderBottom: "1px solid var(--border-muted)",
-					background: "var(--bg-surface)",
-					flexShrink: 0,
-					height: 28,
-					overflow: "hidden",
-				}}
-			>
-				<span
-					style={{
-						fontSize: 10,
-						fontWeight: 600,
-						color: "var(--muted)",
-						padding: "0 10px",
-						textTransform: "uppercase",
-						letterSpacing: "0.5px",
-						flexShrink: 0,
-						display: "flex",
-						alignItems: "center",
-						borderRight: "1px solid var(--border-muted)",
-						userSelect: "none",
-					}}
-				>
-					Terminal
-				</span>
-
-				<div
-					style={{
-						display: "flex",
-						alignItems: "stretch",
-						flex: 1,
-						overflowX: "auto",
-						overflowY: "hidden",
-						scrollbarWidth: "none",
-					}}
-				>
-					{tabs.map((id, i) => {
-						const isActive = activeTab === id
-						const isEditing = editingTabId === id
-						const title = titles[id] || `Terminal ${i + 1}`
-						return (
-							<div
-								key={id}
-								onClick={() => {
-									if (!isEditing) setActiveTab(id)
-								}}
-								onDoubleClick={(e) => {
-									e.stopPropagation()
-									setEditingTabId(id)
-									setEditingTitle(title)
-								}}
-								title="Double click to rename"
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 6,
-									padding: "0 8px 0 10px",
-									fontSize: 11,
-									fontWeight: 500,
-									color: isActive ? "var(--text)" : "var(--muted)",
-									background: isActive ? "var(--bg)" : "transparent",
-									borderBottom: isActive
-										? "2px solid var(--accent)"
-										: "2px solid transparent",
-									borderRight: "1px solid var(--border-muted)",
-									cursor: "pointer",
-									flexShrink: 0,
-									height: "100%",
-									userSelect: "none",
-									transition: "background-color 0.15s, color 0.15s",
-								}}
-								onMouseEnter={(e) => {
-									if (!isActive) {
-										e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-										e.currentTarget.style.color = "var(--text)"
-									}
-								}}
-								onMouseLeave={(e) => {
-									if (!isActive) {
-										e.currentTarget.style.backgroundColor = "transparent"
-										e.currentTarget.style.color = "var(--muted)"
-									}
-								}}
-							>
-								{isEditing ? (
-									<input
-										autoFocus
-										value={editingTitle}
-										onChange={(e) => setEditingTitle(e.target.value)}
-										onFocus={(e) => e.currentTarget.select()}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") {
-												const trimmed = editingTitle.trim()
-												if (trimmed) {
-													setTitles((prev) => ({ ...prev, [id]: trimmed }))
-												}
-												setEditingTabId(null)
-											} else if (e.key === "Escape") {
-												setEditingTabId(null)
-											}
-										}}
-										onBlur={() => {
-											const trimmed = editingTitle.trim()
-											if (trimmed) {
-												setTitles((prev) => ({ ...prev, [id]: trimmed }))
-											}
-											setEditingTabId(null)
-										}}
-										onClick={(e) => e.stopPropagation()}
-										style={{
-											fontSize: 11,
-											height: 18,
-											padding: "0 4px",
-											borderRadius: 3,
-											border: "1px solid var(--accent)",
-											background: "var(--bg)",
-											color: "var(--text)",
-											outline: "none",
-											width: 80,
-										}}
-									/>
-								) : (
-									<span>{title}</span>
-								)}
-
-								{tabs.length > 1 && (
-									<button
-										type="button"
-										onClick={(e) => {
-											e.stopPropagation()
-											closeTerminal(id)
-										}}
-										style={{
-											background: "transparent",
-											border: "none",
-											color: "var(--dim)",
-											cursor: "pointer",
-											fontSize: 12,
-											padding: "1px 2px",
-											lineHeight: 1,
-											borderRadius: 3,
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											transition: "color 0.1s, background-color 0.1s",
-										}}
-										onMouseEnter={(e) => {
-											e.currentTarget.style.color = "var(--error)"
-											e.currentTarget.style.backgroundColor =
-												"rgba(239, 68, 68, 0.1)"
-										}}
-										onMouseLeave={(e) => {
-											e.currentTarget.style.color = "var(--dim)"
-											e.currentTarget.style.backgroundColor = "transparent"
-										}}
-										title="Close terminal"
-									>
-										&times;
-									</button>
-								)}
-							</div>
-						)
-					})}
-				</div>
-
-				{/* Add terminal button */}
-				<button
-					type="button"
-					onClick={addTerminal}
-					style={{
-						background: "transparent",
-						border: "none",
-						borderLeft: "1px solid var(--border-muted)",
-						color: "var(--muted)",
-						cursor: "pointer",
-						fontSize: 13,
-						padding: "0 10px",
-						display: "flex",
-						alignItems: "center",
-						justifyContent: "center",
-						height: "100%",
-						flexShrink: 0,
-						transition: "color 0.15s, background-color 0.15s",
-					}}
-					onMouseEnter={(e) => {
-						e.currentTarget.style.color = "var(--text)"
-						e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-					}}
-					onMouseLeave={(e) => {
-						e.currentTarget.style.color = "var(--muted)"
-						e.currentTarget.style.backgroundColor = "transparent"
-					}}
-					title="New terminal"
-				>
-					<svg
-						width="12"
-						height="12"
-						viewBox="0 0 16 16"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="1.8"
-						strokeLinecap="round"
-					>
-						<line x1="8" y1="2" x2="8" y2="14" />
-						<line x1="2" y1="8" x2="14" y2="8" />
-					</svg>
-				</button>
-			</div>
-
-			{/* Terminal content */}
-			<div
-				ref={containerRef}
-				onClick={() => {
-					if (activeTab) {
-						instancesRef.current.get(activeTab)?.term.focus()
-					}
-				}}
-				style={{
-					flex: 1,
-					overflow: "hidden",
-					padding: "4px 0 4px 4px",
-				}}
-			/>
-		</div>
+		/>
 	)
 }

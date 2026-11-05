@@ -3,6 +3,7 @@ import * as os from "os"
 import * as fs from "fs"
 import type { IpcCommandHandler, HandlerContext } from "./types.js"
 import { safeSend } from "../helpers.js"
+import { getBrowserPreview as readBrowserPreview } from "../browser-preview.js"
 import {
 	normalizeControllerMessage,
 	sessionRecordingManager,
@@ -221,6 +222,16 @@ async function writeThreadMetadata(
 
 export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 	return {
+		// A browser preview window opened mid-run has missed every broadcast so
+		// far; hand it the newest cached frame instead of an empty screen.
+		getBrowserPreview: async (command, ctx) => {
+			const worktreePath =
+				(command.worktreePath as string) ||
+				ctx.activeSessionPath ||
+				ctx.getActiveSession()?.projectRoot
+			if (!worktreePath) return null
+			return readBrowserPreview(worktreePath)
+		},
 		sendMessage: async (command, ctx) => {
 			const s = ctx.getActiveSession()
 			const h = s.harness

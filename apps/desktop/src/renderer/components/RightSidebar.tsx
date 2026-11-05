@@ -2,14 +2,19 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import { FileTree } from "./FileTree"
 import { GitPanel } from "./GitPanel"
 import { ContextPanel } from "./ContextPanel"
+import { PanelBrowser } from "./PanelBrowser"
+import { RightSidebarMenu } from "./RightSidebarMenu"
+import { RightSidebarTabStrip } from "./RightSidebarTabStrip"
 import { TerminalPanel } from "./TerminalPanel"
-import { ResizeHandle } from "./ResizeHandle"
 import type { TokenUsage, Message } from "../types/ipc"
 import type { ToolState } from "../types/chat"
+import type { OverviewAction } from "../utils/overviewMenu"
 import {
-	resolveRightSidebarTab,
-	rightSidebarTabs,
+	resolveRightSidebarTabs,
+	visibleRightSidebarTabs,
+	type RightSidebarPanel,
 	type RightSidebarTab,
+	type RightSidebarTabsState,
 } from "../utils/rightSidebarTabs"
 import {
 	RIGHT_SIDEBAR_DEFAULT_WIDTH,
@@ -20,19 +25,28 @@ import {
 	shouldCollapseRightSidebar,
 } from "../utils/rightSidebarResize"
 
-export type { RightSidebarTab }
+export type { RightSidebarTab, RightSidebarPanel }
 
 interface RightSidebarProps {
 	visible: boolean
 	/** Called when a drag ends narrow enough that the panel should hide. */
 	onCollapse?: () => void
 	/**
+	 * Filling the window: the panel gives up its width and grows into every
+	 * pixel the conversation pane used to occupy.
+	 */
+	maximized?: boolean
+	onToggleMaximize?: () => void
+	/**
 	 * Space the left sidebar + chat panel need, so the splitter stops once the
 	 * chat column reaches its minimum instead of squeezing it.
 	 */
 	layoutReserve?: number
 	activeTab: RightSidebarTab
+	/** Destinations already opened as tabs, in display order. */
+	openTabs?: RightSidebarPanel[]
 	onTabChange: (tab: RightSidebarTab) => void
+	onCloseTab?: (tab: RightSidebarPanel) => void
 	projectName: string
 	projectPath?: string | null
 	gitBranch?: string
@@ -44,6 +58,18 @@ interface RightSidebarProps {
 	activeDiffPath?: string | null
 	loading?: boolean
 	onOpenBrowser?: (url: string) => void
+	/**
+	 * A page another surface asked the embedded browser to show (the
+	 * browser-preview card's open button). The shell decides when.
+	 */
+	browserOpenRequest?: { url: string; seq: number } | null
+	/**
+	 * Rows of the landing menu are app-level actions (open the browser panel,
+	 * focus the terminal, …), so the shell decides what each one means.
+	 */
+	onSelectMenuItem?: (action: OverviewAction) => void
+	/** Bumped by the shell when something asked for the terminal. */
+	terminalFocusSignal?: number
 	// Session context props
 	currentThreadId?: string | null
 	threadTitle?: string
@@ -61,12 +87,46 @@ interface RightSidebarProps {
 	}>
 }
 
+/**
+ * Every destination gets a permanently mounted pane. Hiding with `display`
+ * instead of unmounting is what keeps PTY sessions, webviews, scroll offsets
+ * and tree state intact when the user switches tabs.
+ */
+function Pane({
+	active,
+	children,
+	testId,
+}: {
+	active: boolean
+	children: React.ReactNode
+	testId?: string
+}) {
+	return (
+		<div
+			data-testid={testId}
+			style={{
+				flex: 1,
+				minHeight: 0,
+				display: active ? "flex" : "none",
+				flexDirection: "column",
+				overflow: "hidden",
+			}}
+		>
+			{children}
+		</div>
+	)
+}
+
 export function RightSidebar({
 	visible,
 	onCollapse,
+	maximized = false,
+	onToggleMaximize,
 	layoutReserve = RIGHT_SIDEBAR_MIN_LAYOUT_WIDTH,
 	activeTab,
+	openTabs = [],
 	onTabChange,
+	onCloseTab,
 	projectName,
 	projectPath,
 	gitBranch,
@@ -77,6 +137,9 @@ export function RightSidebar({
 	activeDiffPath,
 	loading,
 	onOpenBrowser,
+	browserOpenRequest,
+	onSelectMenuItem,
+	terminalFocusSignal,
 	currentThreadId,
 	threadTitle,
 	currentThreadModelId,
@@ -88,7 +151,6 @@ export function RightSidebar({
 	openFiles,
 	tasks,
 }: RightSidebarProps) {
-	const [terminalHeight, setTerminalHeight] = useState(350)
 	// The panel keeps its own width, always clamped so the chat panel and the
 	// left sidebar keep their space.
 	const [width, setWidth] = useState(() => {
@@ -132,10 +194,6 @@ export function RightSidebar({
 		return () => window.removeEventListener("resize", clamp)
 	}, [layoutReserve])
 
-	const handleTerminalResize = useCallback((deltaY: number) => {
-		setTerminalHeight((h) => Math.max(100, Math.min(600, h + deltaY)))
-	}, [])
-
 	const onDragStart = useCallback(
 		(e: React.MouseEvent) => {
 			e.preventDefault()
@@ -175,20 +233,32 @@ export function RightSidebar({
 		[width, onCollapse, layoutReserve],
 	)
 
-	// The panel stays mounted while hidden so it can slide out (and so the
-	// terminal inside it is not torn down and re-spawned on every toggle).
 	const isCollapsing = shouldCollapseRightSidebar(width)
 
+	const state: RightSidebarTabsState = { open: openTabs, active: activeTab }
+	const tabs = visibleRightSidebarTabs(state, hasGitRepo)
 	// A stale "git" selection (or a project switch from repo to plain folder)
-	// falls back to Files instead of rendering an empty panel.
-	const shownTab = resolveRightSidebarTab(activeTab, hasGitRepo)
+	// falls back to the landing list instead of rendering an empty panel.
+	const shownTab = resolveRightSidebarTabs(state, hasGitRepo)
+	// A pane is created once its tab exists and then stays mounted, so switching
+	// tabs never resets a file tree or reloads a webview. The terminal is the
+	// exception: it owns a PTY that already exists at startup and must never be
+	// torn down by a tab switch, so it is always mounted.
+	const hasPane = (tab: RightSidebarPanel) => tabs.includes(tab)
 
 	return (
 		<div
 			style={{
 				// border-box so the 4px splitter stays inside `width`.
 				boxSizing: "border-box",
-				width,
+				// Maximized: the panel stops claiming a fixed width and grows
+				// into whatever the conversation column gives up. Both ends of
+				// that swap are lengths, so the browser can interpolate them —
+				// the panel widens while the chat column narrows, which is the
+				// same motion as the panel sliding in and out.
+				width: maximized && visible ? undefined : width,
+				flexBasis: maximized && visible ? 0 : width,
+				flexGrow: maximized && visible ? 1 : 0,
 				// Hidden panels slide out to the right by their own width instead
 				// of unmounting — the chat panel grows into the freed space.
 				marginRight: visible ? 0 : -width,
@@ -201,28 +271,31 @@ export function RightSidebar({
 				opacity: isCollapsing ? 0.55 : 1,
 				transition: isDragging
 					? "none"
-					: "margin-right 0.22s ease, opacity 0.15s ease",
+					: "margin-right 0.22s ease, opacity 0.15s ease, flex-grow 0.22s ease, flex-basis 0.22s ease",
 			}}
 		>
-			{/* Drag handle on left edge */}
-			<div
-				data-right-sidebar-resize-handle=""
-				onMouseDown={onDragStart}
-				title="Drag to resize · release below 150px to hide"
-				style={{
-					width: RIGHT_SIDEBAR_RESIZE_HANDLE_WIDTH,
-					cursor: "col-resize",
-					background: "var(--border-muted)",
-					flexShrink: 0,
-					transition: "background 0.15s",
-				}}
-				onMouseEnter={(e) => {
-					e.currentTarget.style.background = "var(--accent)"
-				}}
-				onMouseLeave={(e) => {
-					e.currentTarget.style.background = "var(--border-muted)"
-				}}
-			/>
+			{/* Drag handle on left edge. Pointless while the panel is as wide as
+			    the window, so it steps aside and gives the pixels to content. */}
+			{!maximized && (
+				<div
+					data-right-sidebar-resize-handle=""
+					onMouseDown={onDragStart}
+					title="Drag to resize · release below 150px to hide"
+					style={{
+						width: RIGHT_SIDEBAR_RESIZE_HANDLE_WIDTH,
+						cursor: "col-resize",
+						background: "var(--border-muted)",
+						flexShrink: 0,
+						transition: "background 0.15s",
+					}}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.background = "var(--accent)"
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.background = "var(--border-muted)"
+					}}
+				/>
+			)}
 
 			{/* Sidebar content */}
 			<div
@@ -235,75 +308,93 @@ export function RightSidebar({
 					minWidth: 0,
 				}}
 			>
-				{/* Tab strip */}
-				<div
-					className="titlebar-drag"
-					style={{
-						height: 38,
-						boxSizing: "border-box",
-						display: "flex",
-						alignItems: "stretch",
-						borderBottom: "1px solid var(--border-muted)",
-						background: "var(--bg-surface)",
-						flexShrink: 0,
-					}}
-				>
-					{rightSidebarTabs(hasGitRepo).map((tab) => {
-						const isActive = shownTab === tab.id
-						return (
-							<button
-								key={tab.id}
-								className="titlebar-no-drag"
-								onClick={() => onTabChange(tab.id)}
-								style={{
-									flex: 1,
-									height: "100%",
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "center",
-									fontSize: 11,
-									fontWeight: 500,
-									color: isActive ? "var(--text)" : "var(--muted)",
-									background: isActive ? "var(--bg)" : "transparent",
-									borderBottom: isActive
-										? "2px solid var(--accent)"
-										: "2px solid transparent",
-									cursor: "pointer",
-									borderTop: "none",
-									borderLeft: "none",
-									borderRight: "none",
-									padding: 0,
-									transition: "color 0.15s, background-color 0.15s",
-								}}
-								onMouseEnter={(e) => {
-									if (!isActive) {
-										e.currentTarget.style.color = "var(--text)"
-										e.currentTarget.style.backgroundColor = "var(--bg-hover)"
-									}
-								}}
-								onMouseLeave={(e) => {
-									if (!isActive) {
-										e.currentTarget.style.color = "var(--muted)"
-										e.currentTarget.style.backgroundColor = "transparent"
-									}
-								}}
-							>
-								{tab.label}
-							</button>
-						)
-					})}
-				</div>
-
-				{/* Tab content + Terminal with loading overlay */}
+				{/* Overview is a header, not a tab: it stays at the far left and
+				    the strip lists only real destinations next to it. */}
+				<RightSidebarTabStrip
+					tabs={tabs}
+					activeTab={shownTab}
+					onTabChange={onTabChange}
+					onCloseTab={onCloseTab}
+					maximized={maximized}
+					onToggleMaximize={onToggleMaximize}
+					onHide={onCollapse}
+				/>
 				<div
 					style={{
 						flex: 1,
+						minHeight: 0,
 						display: "flex",
 						flexDirection: "column",
-						overflow: "hidden",
 						position: "relative",
+						overflow: "hidden",
 					}}
 				>
+					<Pane active={shownTab === "menu"} testId="right-sidebar-menu-pane">
+						<RightSidebarMenu
+							hasGitRepo={hasGitRepo}
+							onSelect={(action) => onSelectMenuItem?.(action)}
+						/>
+					</Pane>
+
+					{hasPane("files") && (
+						<Pane active={shownTab === "files"}>
+							<FileTree
+								projectName={projectName}
+								projectPath={projectPath}
+								onFileClick={onFileClick}
+								activeFilePath={activeFilePath}
+							/>
+						</Pane>
+					)}
+
+					{hasGitRepo && hasPane("git") && (
+						<Pane active={shownTab === "git"}>
+							<GitPanel
+								onFileClick={onDiffClick}
+								activeFilePath={activeDiffPath}
+							/>
+						</Pane>
+					)}
+
+					{hasPane("context") && (
+						<Pane active={shownTab === "context"}>
+							<ContextPanel
+								onFileClick={onFileClick}
+								projectName={projectName}
+								projectPath={projectPath}
+								gitBranch={gitBranch}
+								currentThreadId={currentThreadId}
+								threadTitle={threadTitle}
+								currentThreadModelId={currentThreadModelId}
+								currentThreadPermission={currentThreadPermission}
+								modeId={modeId}
+								tokenUsage={tokenUsage}
+								messages={messages}
+								tools={tools}
+								openFiles={openFiles}
+								tasks={tasks}
+							/>
+						</Pane>
+					)}
+
+					{/* Terminal fills its own tab — no bottom dock, no splitter. */}
+					<Pane active={shownTab === "terminal"}>
+						<TerminalPanel
+							projectPath={projectPath}
+							onOpenBrowser={onOpenBrowser}
+							focusSignal={terminalFocusSignal}
+						/>
+					</Pane>
+
+					{hasPane("browser") && (
+						<Pane active={shownTab === "browser"}>
+							<PanelBrowser
+								worktreePath={projectPath ?? null}
+								openRequest={browserOpenRequest}
+							/>
+						</Pane>
+					)}
+
 					{/* Loading overlay */}
 					{loading && (
 						<div
@@ -339,58 +430,6 @@ export function RightSidebar({
 							`}</style>
 						</div>
 					)}
-
-					{/* Tab content */}
-					<div
-						style={{
-							flex: 1,
-							overflow: "hidden",
-							display: "flex",
-							flexDirection: "column" as const,
-							minHeight: 0,
-						}}
-					>
-						{shownTab === "files" && (
-							<FileTree
-								projectName={projectName}
-								projectPath={projectPath}
-								onFileClick={onFileClick}
-								activeFilePath={activeFilePath}
-							/>
-						)}
-						{shownTab === "git" && hasGitRepo && (
-							<GitPanel
-								onFileClick={onDiffClick}
-								activeFilePath={activeDiffPath}
-							/>
-						)}
-						{shownTab === "context" && (
-							<ContextPanel
-								onFileClick={onFileClick}
-								projectName={projectName}
-								projectPath={projectPath}
-								gitBranch={gitBranch}
-								currentThreadId={currentThreadId}
-								threadTitle={threadTitle}
-								currentThreadModelId={currentThreadModelId}
-								currentThreadPermission={currentThreadPermission}
-								modeId={modeId}
-								tokenUsage={tokenUsage}
-								messages={messages}
-								tools={tools}
-								openFiles={openFiles}
-								tasks={tasks}
-							/>
-						)}
-					</div>
-
-					{/* Terminal pinned to bottom */}
-					<ResizeHandle onResize={handleTerminalResize} />
-					<TerminalPanel
-						height={terminalHeight}
-						projectPath={projectPath}
-						onOpenBrowser={onOpenBrowser}
-					/>
 				</div>
 			</div>
 		</div>

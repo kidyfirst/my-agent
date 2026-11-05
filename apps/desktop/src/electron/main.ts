@@ -68,6 +68,11 @@ import {
 	getA2AServerInstance,
 } from "./ipc/a2a-handlers.js"
 import { initLogging, setLogStreaming, shutdownLogging } from "./logging.js"
+import {
+	clearBrowserPreview,
+	noteBrowsingThread,
+	publishBrowserPreview,
+} from "./browser-preview.js"
 
 // Suppress benign AI SDK warning banners
 ;(globalThis as any).AI_SDK_LOG_WARNINGS = false
@@ -148,12 +153,18 @@ async function createHarness(projectPath: string) {
 	const startedAt = Date.now()
 	log.info("session", "creating harness", { project: projectPath })
 	const browserManager = new PlaywrightBrowserManager()
+	// Mirror every browser action into the UI. The listener is cheap and the
+	// manager skips screenshots entirely while nobody is listening.
+	browserManager.subscribePreview(publishBrowserPreview(projectPath))
 	const navigateBrowserTool = createNavigateBrowserTool(browserManager)
 	const computerUseTool = createComputerUseTool(browserManager)
 
 	const { harness, mcpManager, hookManager, resolveModel, storageWarning } =
 		await createMyAgent({
 			cwd: projectPath,
+			// Advertise the browser tools in the system prompt. Without this the
+			// model is told it may only call the listed tools and never tries them.
+			browserTools: true,
 			extraTools: {
 				"navigate-browser": navigateBrowserTool,
 				computer: computerUseTool,
@@ -182,6 +193,8 @@ async function createHarness(projectPath: string) {
 		if (event.type === "thread_changed") {
 			// Close browser when switching threads — browser state is conversation-specific
 			browserManager.close().catch(() => {})
+			// The preview belongs to the thread we just left.
+			clearBrowserPreview(projectPath)
 			hookManager?.setSessionId(event.threadId)
 			harness.loadOMProgress?.().catch(() => {})
 		} else if (event.type === "thread_created") {
@@ -189,6 +202,7 @@ async function createHarness(projectPath: string) {
 			harness.loadOMProgress?.().catch(() => {})
 		} else if (event.type === "thread_deleted") {
 			browserManager.close().catch(() => {})
+			clearBrowserPreview(projectPath)
 			hookManager?.setSessionId("")
 		} else if (event.type === "agent_end") {
 			harness.loadOMProgress?.().catch(() => {})
@@ -420,6 +434,15 @@ function bridgeAllEvents(window: BrowserWindow) {
 			// so record it before the UI gets a chance to swallow it.
 			logHarnessEvent(sessionPath, event)
 
+			// Browser frames are published outside the event stream (they come from
+			// the tool), so remember which thread is running to tag them with.
+			if (typeof (event as { threadId?: unknown }).threadId === "string") {
+				noteBrowsingThread(
+					sessionPath,
+					(event as { threadId: string }).threadId,
+				)
+			}
+
 			const serialized = { ...event } as Record<string, unknown>
 			if (event.type === "error" && event.error instanceof Error) {
 				serialized.error = {
@@ -572,6 +595,7 @@ function cleanupSession(sessionPath: string) {
 	session.ptySessions.clear()
 	session.mcpManager?.disconnect().catch(() => {})
 	session.browserManager?.close().catch(() => {})
+	clearBrowserPreview(sessionPath)
 	sessions.delete(sessionPath)
 	sessionTimings.delete(sessionPath)
 }
@@ -605,6 +629,9 @@ function createWindow() {
 			nodeIntegration: false,
 			contextIsolation: true,
 			sandbox: false,
+			// The right sidebar hosts a real browser as a `<webview>` guest; the
+			// embedder has to opt in for the tag to exist at all.
+			webviewTag: true,
 		},
 	})
 
@@ -690,6 +717,20 @@ function createWindow() {
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
 		openLink(url)
 		return { action: "deny" }
+	})
+
+	// A web page in the sidebar browser must not be able to reach Node or the
+	// app's preload, and its popups belong to the user's browser.
+	mainWindow.webContents.on("will-attach-webview", (_event, webPreferences) => {
+		delete webPreferences.preload
+		webPreferences.nodeIntegration = false
+		webPreferences.contextIsolation = true
+	})
+	mainWindow.webContents.on("did-attach-webview", (_event, guest) => {
+		guest.setWindowOpenHandler(({ url }) => {
+			openLink(url)
+			return { action: "deny" }
+		})
 	})
 
 	// Renderer console output never reaches the main process on its own. Record
@@ -849,8 +890,31 @@ function setupMenu() {
 					},
 				},
 				{
+					label: "Toggle Side Panel",
+					accelerator: "CmdOrCtrl+Shift+B",
+					click: () => {
+						safeSend(mainWindow, "harness:event", {
+							type: "shortcut",
+							action: "toggle_right_sidebar",
+						})
+					},
+				},
+				{
+					label: "Toggle Overview Panel",
+					accelerator: "CmdOrCtrl+Alt+O",
+					click: () => {
+						safeSend(mainWindow, "harness:event", {
+							type: "shortcut",
+							action: "toggle_right_sidebar",
+						})
+					},
+				},
+				{
+					// The old Explorer chord still works; it reaches the renderer
+					// directly now that no menu item claims it.
 					label: "Toggle Explorer",
 					accelerator: "CmdOrCtrl+Shift+E",
+					visible: false,
 					click: () => {
 						safeSend(mainWindow, "harness:event", {
 							type: "shortcut",

@@ -82,6 +82,10 @@ export type HarnessEventType =
 	| "agent_step_limit"
 	| "logging_config_changed"
 	| "log_entries"
+	/** A JPEG frame from the headless browser the agent is driving. */
+	| "browser_preview"
+	/** The browser closed (thread switch, session teardown). */
+	| "browser_preview_closed"
 
 export interface HarnessEventPayload {
 	type: HarnessEventType
