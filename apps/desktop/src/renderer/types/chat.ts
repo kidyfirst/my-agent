@@ -176,8 +176,10 @@ export interface AttachedFile {
 	type: "image" | "file"
 	name: string
 	mimeType: string
-	data: string // base64 for images, text content for files
-	preview: string // data URL for images, empty for files
+	data?: string // base64 for images, text content for files
+	preview?: string // data URL for images, empty for files
+	url?: string
+	assetId?: string
 	size?: number
 	path?: string
 	relativePath?: string

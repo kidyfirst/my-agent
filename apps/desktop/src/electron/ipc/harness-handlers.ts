@@ -356,21 +356,9 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				})
 				.catch((err: unknown) => {
 					console.error("sendMessage error:", err)
-					const errMsg = err instanceof Error ? err.message : String(err)
-					safeSend(ctx.mainWindow, "harness:event", {
-						type: "error",
-						error: { message: errMsg },
-						worktreePath: ctx.activeSessionPath,
-					})
-					safeSend(ctx.mainWindow, "harness:event", {
-						type: "agent_end",
-						reason: "error",
-						threadId:
-							(command.threadId as string) ||
-							h.getCurrentThreadId() ||
-							undefined,
-						worktreePath: ctx.activeSessionPath,
-					})
+					// Note: h.sendMessage (AgentController) already handles and emits
+					// "error" and "agent_end" events to ctx.mainWindow via the event bus.
+					// Emitting duplicate events here causes error messages to appear twice in the UI.
 				})
 			return
 		},

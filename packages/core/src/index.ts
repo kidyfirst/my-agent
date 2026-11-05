@@ -124,6 +124,12 @@ export {
 
 // Project, Worktree & System Utilities
 export {
+	AssetManager,
+	type AssetMetadata,
+	type SaveAssetOptions,
+} from "./assets/index.js"
+export { createAssetsFetchTool } from "./tools/assets-fetch.js"
+export {
 	loadRecentProjects,
 	saveRecentProject,
 	saveRecentProjectLastThread,

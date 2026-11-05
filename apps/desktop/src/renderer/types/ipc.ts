@@ -146,11 +146,14 @@ export interface MessageContent {
 export interface AttachedFile {
 	name: string
 	type: "image" | "file"
-	data: string
+	data?: string
 	preview?: string
+	url?: string
+	assetId?: string
 	mimeType?: string
 	path?: string
 	relativePath?: string
+	size?: number
 }
 
 export interface Message {

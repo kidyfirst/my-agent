@@ -15,6 +15,7 @@ import { createGlobTool } from "../tools/glob.js"
 import { createWriteFileTool } from "../tools/write.js"
 import { createExecuteCommandTool } from "../tools/shell.js"
 import { createSubmitPlanTool } from "../tools/submit-plan.js"
+import { createAssetsFetchTool } from "../tools/assets-fetch.js"
 import { stringReplaceLspTool } from "../tools/string-replace-lsp.js"
 import { astSmartEditTool } from "../tools/ast-smart-edit.js"
 import { createSubagentTool } from "../tools/subagent.js"
@@ -37,6 +38,7 @@ export const READ_TOOL_NAMES = [
 	"find_files",
 	"execute_command",
 	"request_sandbox_access",
+	"assets_fetch",
 ] as const
 
 export const WRITE_TOOL_NAMES = [
@@ -165,6 +167,7 @@ export function createDynamicTools(
 			ast_smart_edit: () => astSmartEditTool,
 			submit_plan: () => createSubmitPlanTool(projectRoot),
 			request_sandbox_access: () => requestSandboxAccessTool,
+			assets_fetch: () => createAssetsFetchTool(projectRoot),
 			subagent: () => {
 				const effectiveResolver =
 					resolveModel ??

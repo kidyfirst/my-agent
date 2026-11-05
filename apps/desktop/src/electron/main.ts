@@ -26,12 +26,14 @@ import {
 	nativeImage,
 	nativeTheme,
 	session,
+	protocol,
+	net,
 } from "electron"
 import * as path from "path"
 import * as os from "os"
 import * as fs from "fs"
 
-import { fileURLToPath } from "url"
+import { fileURLToPath, pathToFileURL } from "url"
 import * as pty from "node-pty"
 
 import {
@@ -46,6 +48,7 @@ import {
 	saveRecentProject,
 	loadRecentProjects,
 	logger,
+	AssetManager,
 } from "@my-agent/core"
 
 // Extracted modules
@@ -960,7 +963,40 @@ if (systemProxy) {
 }
 app.commandLine.appendSwitch("log-level", "3")
 
+protocol.registerSchemesAsPrivileged([
+	{
+		scheme: "myagent-asset",
+		privileges: {
+			standard: true,
+			secure: true,
+			supportFetchAPI: true,
+			corsEnabled: true,
+			stream: true,
+		},
+	},
+])
+
 app.whenReady().then(async () => {
+	protocol.handle("myagent-asset", async (request) => {
+		try {
+			const parsed = new URL(request.url)
+			const assetId = (parsed.hostname + parsed.pathname).replace(/^\/+/, "")
+			const resolvedPath = AssetManager.resolveAssetPath(
+				assetId,
+				activeSessionPath || undefined,
+			)
+			if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+				return new Response("Asset not found", { status: 404 })
+			}
+			return net.fetch(pathToFileURL(resolvedPath).toString())
+		} catch (err: any) {
+			console.error("[myagent-asset protocol] Failed to load asset:", err)
+			return new Response("Asset error: " + (err?.message || String(err)), {
+				status: 500,
+			})
+		}
+	})
+
 	app.setName(appName)
 	if (systemProxy) {
 		session.defaultSession.setProxy({ proxyRules: systemProxy }).catch(() => {})

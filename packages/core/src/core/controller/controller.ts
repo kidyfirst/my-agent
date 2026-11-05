@@ -19,6 +19,7 @@ import {
 	DEFAULT_EXECUTION_MODE,
 	type GraphExecutionContext,
 } from "../graph/index.js"
+import { AssetManager } from "../../assets/manager.js"
 import { setRuntimeCategoryPolicy } from "../../permissions.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
@@ -1271,6 +1272,10 @@ export class Session<TState = any> {
 					? options.images
 					: []
 
+			const projectRoot =
+				(this.state.get() as any)?.projectPath || process.cwd()
+			const cleanedAttachments: any[] = []
+
 			for (const f of incomingFiles) {
 				if (!f) continue
 				const mime = String(f.mimeType || f.mediaType || "image/png")
@@ -1279,32 +1284,51 @@ export class Session<TState = any> {
 					f.type === "image" ||
 					mime.startsWith("image/") ||
 					/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)
-				if (isImg) {
-					userParts.push({
-						type: "image",
-						mimeType: mime,
-						mediaType: mime,
-						data: f.data || "",
-						name,
-						filename: name,
-						url:
-							f.url ||
-							(f.data
-								? f.data.startsWith("data:")
-									? f.data
-									: `data:${mime};base64,${f.data}`
-								: undefined),
-					})
-				} else {
-					userParts.push({
-						type: "file",
-						mimeType: mime || "text/plain",
-						mediaType: mime || "text/plain",
-						data: f.data || "",
-						name,
-						filename: name,
-					})
+
+				let assetId = (f.assetId as string) || undefined
+				let assetUrl = (f.url as string) || undefined
+				let assetPath = (f.path as string) || undefined
+				let assetSize = typeof f.size === "number" ? f.size : undefined
+
+				// Persist raw base64 data to .myagent/assets so SQLite never stores heavy base64
+				if (f.data) {
+					try {
+						const meta = await AssetManager.saveAsset(f.data, {
+							filename: name,
+							mimeType: mime,
+							projectRoot,
+							assetId,
+						})
+						assetId = meta.assetId
+						assetUrl = meta.url
+						assetPath = meta.path
+						assetSize = meta.size
+					} catch (saveErr) {
+						logger.warn("run", "Failed to save asset to disk", {
+							error: saveErr,
+							filename: name,
+						})
+					}
 				}
+
+				const assetInfo = {
+					assetId,
+					type: isImg ? "image" : "file",
+					name,
+					filename: name,
+					mimeType: mime,
+					mediaType: mime,
+					size: assetSize,
+					url:
+						assetUrl ||
+						(assetId
+							? `myagent-asset://${assetId}.${AssetManager.getExtension(name, mime)}`
+							: undefined),
+					path: assetPath,
+				}
+
+				cleanedAttachments.push(assetInfo)
+				userParts.push(assetInfo)
 			}
 
 			if (userParts.length === 0) {
@@ -1318,12 +1342,14 @@ export class Session<TState = any> {
 					format: 2,
 					parts: userParts,
 					content: userText,
-					attachments: incomingFiles.length > 0 ? incomingFiles : undefined,
+					attachments:
+						cleanedAttachments.length > 0 ? cleanedAttachments : undefined,
 				},
 				threadId,
 				resourceId,
 				createdAt: new Date(),
-				attachments: incomingFiles.length > 0 ? incomingFiles : undefined,
+				attachments:
+					cleanedAttachments.length > 0 ? cleanedAttachments : undefined,
 			}
 
 			const store = await this.getMemoryStore()
@@ -1630,6 +1656,7 @@ export class Session<TState = any> {
 					const parts: any[] = []
 					let histUserText = ""
 					const attachedNames: string[] = []
+					const assetDescriptions: string[] = []
 
 					const rawParts = Array.isArray(m.content?.parts)
 						? m.content.parts
@@ -1643,14 +1670,23 @@ export class Session<TState = any> {
 							if (p.type === "text" && typeof p.text === "string") {
 								histUserText =
 									(histUserText ? histUserText + "\n" : "") + p.text
+							} else if (p.assetId) {
+								const aName = p.filename || p.name || "attachment"
+								const aMime =
+									p.mimeType || p.mediaType || "application/octet-stream"
+								const aSize = p.size ? ` (${Math.round(p.size / 1024)} KB)` : ""
+								assetDescriptions.push(
+									`[Attached Asset: assetId="${p.assetId}", filename="${aName}", mimeType="${aMime}"${aSize}] (To view or inspect this file/image, call tool \`assets_fetch\` with assetId="${p.assetId}")`,
+								)
 							} else if (p.type === "image") {
+								// Legacy inline image fallback
 								if (canVision) {
 									const rawImg = p.data || p.image || p.url
 									const imgData =
 										typeof rawImg === "string" && rawImg.startsWith("data:")
 											? rawImg.slice(rawImg.indexOf(",") + 1)
 											: rawImg
-									if (imgData) {
+									if (imgData && !imgData.startsWith("myagent-asset://")) {
 										const mediaType = p.mimeType || p.mediaType || "image/png"
 										parts.push({
 											type: "image",
@@ -1673,31 +1709,60 @@ export class Session<TState = any> {
 						}
 					}
 
-					if (parts.length === 0 && Array.isArray(m.attachments)) {
+					if (Array.isArray(m.attachments)) {
 						for (const att of m.attachments) {
-							const mime = String(att.mimeType || att.mediaType || "")
-							const isImg =
-								att.type === "image" ||
-								mime.startsWith("image/") ||
-								/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(String(att.name || ""))
-							if (isImg) {
-								if (canVision && (att.data || att.preview || att.url)) {
-									const rawData = att.data || att.preview || att.url
-									const cleanData =
-										typeof rawData === "string" && rawData.startsWith("data:")
-											? rawData.slice(rawData.indexOf(",") + 1)
-											: rawData
-									parts.push({
-										type: "image",
-										image: String(cleanData),
-										mediaType: mime || "image/png",
-									})
-								} else if (!canVision) {
-									const name = att.name || att.filename || "screenshot.png"
-									attachedNames.push(name)
+							if (!att) continue
+							if (att.assetId) {
+								const aName = att.filename || att.name || "attachment"
+								const aMime =
+									att.mimeType || att.mediaType || "application/octet-stream"
+								const aSize = att.size
+									? ` (${Math.round(att.size / 1024)} KB)`
+									: ""
+								assetDescriptions.push(
+									`[Attached Asset: assetId="${att.assetId}", filename="${aName}", mimeType="${aMime}"${aSize}] (To view or inspect this file/image, call tool \`assets_fetch\` with assetId="${att.assetId}")`,
+								)
+							} else {
+								const mime = String(att.mimeType || att.mediaType || "")
+								const isImg =
+									att.type === "image" ||
+									mime.startsWith("image/") ||
+									/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(
+										String(att.name || ""),
+									)
+								if (isImg) {
+									if (canVision && (att.data || att.preview)) {
+										const rawData = att.data || att.preview
+										const cleanData =
+											typeof rawData === "string" && rawData.startsWith("data:")
+												? rawData.slice(rawData.indexOf(",") + 1)
+												: rawData
+										if (
+											cleanData &&
+											!cleanData.startsWith("myagent-asset://")
+										) {
+											parts.push({
+												type: "image",
+												image: String(cleanData),
+												mediaType: mime || "image/png",
+											})
+										}
+									} else if (!canVision) {
+										const name = att.name || att.filename || "screenshot.png"
+										attachedNames.push(name)
+									}
 								}
 							}
 						}
+					}
+
+					if (assetDescriptions.length > 0) {
+						const uniqueAssets = Array.from(new Set(assetDescriptions)).join(
+							"\n",
+						)
+						histUserText = histUserText
+							? `${histUserText}\n\n${uniqueAssets}`
+							: uniqueAssets
 					}
 
 					if (!canVision && attachedNames.length > 0) {
@@ -1720,6 +1785,8 @@ export class Session<TState = any> {
 				} else {
 					let text = ""
 					let reasoning = ""
+					const toolCalls: any[] = []
+					const toolResults: any[] = []
 
 					if (typeof m.content === "string") {
 						text = m.content
@@ -1745,6 +1812,66 @@ export class Session<TState = any> {
 								if (!text.includes(p.text)) {
 									text = text ? `${text}\n${p.text}` : p.text
 								}
+							} else if (p.type === "tool-call") {
+								let toolInput =
+									p.input !== undefined
+										? p.input
+										: p.args !== undefined
+											? p.args
+											: {}
+								if (typeof toolInput === "string") {
+									try {
+										toolInput = JSON.parse(toolInput)
+									} catch {
+										toolInput = { raw: toolInput }
+									}
+								}
+								if (
+									toolInput === undefined ||
+									toolInput === null ||
+									typeof toolInput !== "object"
+								) {
+									toolInput = {}
+								}
+								const toolCallId = p.toolCallId || p.id || randomUUID()
+								const toolName = p.toolName || p.name || "tool"
+								toolCalls.push({
+									type: "tool-call",
+									toolCallId,
+									toolName,
+									input: toolInput,
+									args: toolInput,
+								})
+							} else if (p.type === "tool-result") {
+								let res = p.result !== undefined ? p.result : p.output
+								if (typeof res === "string" && res.length > 6000) {
+									res =
+										res.slice(0, 6000) +
+										`\n\n[Output truncated: ${res.length} chars total]`
+								} else if (
+									typeof res === "object" &&
+									res &&
+									typeof res.content === "string" &&
+									res.content.length > 6000
+								) {
+									res = {
+										...res,
+										content:
+											res.content.slice(0, 6000) +
+											`\n\n[Output truncated: ${res.content.length} chars total]`,
+									}
+								}
+								const toolCallId = p.toolCallId || p.id
+								const toolName = p.toolName || p.name || "tool"
+								toolResults.push({
+									type: "tool-result",
+									toolCallId,
+									toolName,
+									output:
+										typeof res === "string"
+											? { type: "text", value: res }
+											: { type: "json", value: res ?? {} },
+								})
 							}
 						}
 					}
@@ -1752,17 +1879,95 @@ export class Session<TState = any> {
 					text = text.trim()
 					reasoning = reasoning.trim()
 
-					if (reasoning) {
-						const assistantContent: any[] = [
-							{ type: "reasoning", text: reasoning },
-						]
-						if (text) {
-							assistantContent.push({ type: "text", text })
+					// Guarantee that every toolCall has a corresponding toolResult
+					// Missing tool-results cause OpenAI / Anthropic APIs to reject the turn
+					for (const tc of toolCalls) {
+						const hasResult = toolResults.some(
+							(tr) => tr.toolCallId === tc.toolCallId,
+						)
+						if (!hasResult) {
+							toolResults.push({
+								type: "tool-result",
+								toolCallId: tc.toolCallId,
+								toolName: tc.toolName,
+								output: {
+									type: "text",
+									value:
+										"[Tool execution was interrupted or completed without output]",
+								},
+							})
 						}
+					}
+					// Only keep tool-results that correspond to a tool-call in this turn
+					const validToolResults = toolResults.filter((tr) =>
+						toolCalls.some((tc) => tc.toolCallId === tr.toolCallId),
+					)
+
+					const assistantContent: any[] = []
+					if (reasoning) {
+						assistantContent.push({ type: "reasoning", text: reasoning })
+					}
+					if (text) {
+						assistantContent.push({ type: "text", text })
+					}
+					for (const tc of toolCalls) {
+						assistantContent.push(tc)
+					}
+
+					if (assistantContent.length > 0) {
 						coreMessages.push({ role: "assistant", content: assistantContent })
 					} else if (text) {
 						coreMessages.push({ role: "assistant", content: text })
 					}
+
+					if (validToolResults.length > 0) {
+						coreMessages.push({
+							role: "tool",
+							content: validToolResults,
+						})
+					}
+				}
+			}
+
+			// Token budgeting sliding window: keep recent history within MAX_HISTORY_TOKENS
+			const MAX_HISTORY_TOKENS = 64_000
+			let totalEstimatedTokens = 0
+			const messageTokens: number[] = coreMessages.map((msg) => {
+				const str =
+					typeof msg.content === "string"
+						? msg.content
+						: JSON.stringify(msg.content)
+				const tokens = Math.ceil((str?.length || 0) / 4)
+				totalEstimatedTokens += tokens
+				return tokens
+			})
+
+			if (totalEstimatedTokens > MAX_HISTORY_TOKENS) {
+				let keptTokens = 0
+				let startIndex = coreMessages.length
+				for (let i = coreMessages.length - 1; i >= 0; i--) {
+					if (keptTokens + messageTokens[i] > MAX_HISTORY_TOKENS) {
+						break
+					}
+					keptTokens += messageTokens[i]
+					startIndex = i
+				}
+
+				// If startIndex points to a tool result without its tool call, advance to next user message
+				while (
+					startIndex < coreMessages.length &&
+					coreMessages[startIndex].role === "tool"
+				) {
+					startIndex++
+				}
+
+				if (startIndex > 0 && startIndex < coreMessages.length) {
+					coreMessages.splice(0, startIndex)
+					coreMessages.unshift({
+						role: "user",
+						content:
+							"[System Note: Earlier conversation history was truncated to stay within token context limits.]",
+					})
 				}
 			}
 

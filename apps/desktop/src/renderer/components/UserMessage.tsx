@@ -133,6 +133,7 @@ export const UserMessage = memo(function UserMessage({
 				/\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name)
 			if (isImg) {
 				const src =
+					att.url ||
 					att.preview ||
 					(att.data
 						? att.data.startsWith("data:")
@@ -378,31 +379,11 @@ export const UserMessage = memo(function UserMessage({
 							}}
 						>
 							{rawImages.map((img, i) => (
-								<img
+								<ImageAttachmentItem
 									key={i}
 									src={img.src}
-									alt={img.name || "User attachment"}
-									title={img.name || "Click to zoom"}
-									onClick={(e) => {
-										e.stopPropagation()
-										setPreviewImage(img.src)
-									}}
-									style={{
-										height: IMAGE_HEIGHT,
-										width: "auto",
-										maxWidth: "100%",
-										borderRadius: 8,
-										border: "1px solid var(--border-muted)",
-										cursor: "pointer",
-										objectFit: "contain",
-										transition: "opacity 0.15s, transform 0.1s",
-									}}
-									onMouseEnter={(e) => {
-										e.currentTarget.style.opacity = "0.9"
-									}}
-									onMouseLeave={(e) => {
-										e.currentTarget.style.opacity = "1"
-									}}
+									name={img.name}
+									onZoom={setPreviewImage}
 								/>
 							))}
 						</div>
@@ -545,3 +526,93 @@ export const UserMessage = memo(function UserMessage({
 		</>
 	)
 })
+
+function ImageAttachmentItem({
+	src,
+	name,
+	onZoom,
+}: {
+	src: string
+	name?: string
+	onZoom: (src: string) => void
+}) {
+	const [hasError, setHasError] = useState(false)
+
+	if (hasError) {
+		return (
+			<div
+				title={`图片已失效或本地文件不存在: ${name || src}`}
+				style={{
+					height: IMAGE_HEIGHT,
+					minWidth: 100,
+					maxWidth: 220,
+					borderRadius: 8,
+					border: "1px dashed var(--border-muted)",
+					background: "var(--bg-elevated)",
+					display: "flex",
+					alignItems: "center",
+					gap: 6,
+					padding: "0 10px",
+					fontSize: 11,
+					color: "var(--muted)",
+					userSelect: "none",
+				}}
+			>
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="1.5"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					style={{ flexShrink: 0, opacity: 0.7 }}
+				>
+					<rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+					<circle cx="8.5" cy="8.5" r="1.5" />
+					<polyline points="21 15 16 10 5 21" />
+					<line x1="2" y1="2" x2="22" y2="22" />
+				</svg>
+				<span
+					style={{
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+						whiteSpace: "nowrap",
+					}}
+				>
+					{name || "图片缺失"}
+				</span>
+			</div>
+		)
+	}
+
+	return (
+		<img
+			src={src}
+			alt={name || "User attachment"}
+			title={name || "Click to zoom"}
+			onError={() => setHasError(true)}
+			onClick={(e) => {
+				e.stopPropagation()
+				onZoom(src)
+			}}
+			style={{
+				height: IMAGE_HEIGHT,
+				width: "auto",
+				maxWidth: "100%",
+				borderRadius: 8,
+				border: "1px solid var(--border-muted)",
+				cursor: "pointer",
+				objectFit: "contain",
+				transition: "opacity 0.15s, transform 0.1s",
+			}}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.opacity = "0.9"
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.opacity = "1"
+			}}
+		/>
+	)
+}

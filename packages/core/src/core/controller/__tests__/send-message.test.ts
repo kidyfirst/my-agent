@@ -349,30 +349,24 @@ describe("Session.sendMessage", () => {
 		expect(userMsg.content.parts[1]).toMatchObject({
 			type: "image",
 			mimeType: "image/png",
-			data: "fakeBase64ScreenshotData",
 			name: "screenshot.png",
 		})
+		expect(userMsg.content.parts[1].assetId).toBeDefined()
+		expect(userMsg.content.parts[1].url).toContain("myagent-asset://")
+		expect(userMsg.content.parts[1].data).toBeUndefined()
 		expect(userMsg.attachments).toHaveLength(1)
 
-		// Model prompt verification
+		// Model prompt verification: assets are passed by ID reference, prompting assets_fetch
 		expect(receivedPrompt).toBeDefined()
 		const userTurn = receivedPrompt.find((p: any) => p.role === "user")
 		expect(userTurn).toBeDefined()
-		expect(Array.isArray(userTurn.content)).toBe(true)
-		expect(userTurn.content[0]).toMatchObject({
-			type: "text",
-			text: "看看这个输入框",
-		})
-		const imgPart = userTurn.content.find(
-			(c: any) => c.type === "image" || c.type === "file",
-		)
-		expect(imgPart).toBeDefined()
-		const dataVal =
-			typeof imgPart.data === "object"
-				? imgPart.data.data
-				: imgPart.image || imgPart.data
-		expect(dataVal).toBe("fakeBase64ScreenshotData")
-		expect(imgPart.mediaType || imgPart.mimeType).toBe("image/png")
+		const userPromptText =
+			typeof userTurn.content === "string"
+				? userTurn.content
+				: userTurn.content.map((c: any) => c.text || "").join("\n")
+		expect(userPromptText).toContain("看看这个输入框")
+		expect(userPromptText).toContain("[Attached Asset:")
+		expect(userPromptText).toContain("assets_fetch")
 	})
 
 	it("keeps user images in store while sending text-only prompt to text models like DeepSeek", async () => {
@@ -434,7 +428,8 @@ describe("Session.sendMessage", () => {
 				? userTurn.content
 				: userTurn.content.map((c: any) => c.text || "").join("\n")
 		expect(promptText).toContain("输入框上下内padding减少一半")
-		expect(promptText).toContain("[Attached image: screenshot.png]")
+		expect(promptText).toContain("[Attached Asset:")
+		expect(promptText).toContain("assets_fetch")
 		if (Array.isArray(userTurn.content)) {
 			const nonTextParts = userTurn.content.filter(
 				(c: any) => c.type !== "text",
@@ -443,7 +438,7 @@ describe("Session.sendMessage", () => {
 		}
 	})
 
-	it("passes image parts to multimodal DeepSeek models like deepseek-flash", async () => {
+	it("passes asset reference to multimodal models like deepseek-flash prompting assets_fetch", async () => {
 		let receivedPrompt: any = null
 		const model = new MockLanguageModelV3({
 			modelId: "deepseek-flash",
@@ -486,11 +481,13 @@ describe("Session.sendMessage", () => {
 		expect(receivedPrompt).toBeDefined()
 		const userTurn = receivedPrompt.find((p: any) => p.role === "user")
 		expect(userTurn).toBeDefined()
-		expect(Array.isArray(userTurn.content)).toBe(true)
-		const imgPart = userTurn.content.find(
-			(c: any) => c.type === "image" || c.type === "file",
-		)
-		expect(imgPart).toBeDefined()
+		const promptText =
+			typeof userTurn.content === "string"
+				? userTurn.content
+				: userTurn.content.map((c: any) => c.text || "").join("\n")
+		expect(promptText).toContain("这个图片有什么错误么？")
+		expect(promptText).toContain("[Attached Asset:")
+		expect(promptText).toContain("assets_fetch")
 	})
 
 	it("Session.steer redirects execution during tool approval and delivers guidance to next LLM turn", async () => {

@@ -1147,10 +1147,10 @@ export function EditorInput({
 												}}
 											>
 												<img
-													src={file.preview}
+													src={file.preview || file.url || ""}
 													alt={file.name}
 													title="Click to preview"
-													onClick={() => setPreviewImage(file.preview)}
+													onClick={() => setPreviewImage(file.preview || file.url || null)}
 													style={{
 														height: 52,
 														maxWidth: 100,

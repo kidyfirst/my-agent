@@ -179,7 +179,8 @@ export function buildMessageParts(
 			type: "tool-call",
 			toolCallId: t.id,
 			toolName: t.name,
-			args: t.args,
+			input: t.args ?? {},
+			args: t.args ?? {},
 		})
 		if (t.result !== undefined) {
 			parts.push({

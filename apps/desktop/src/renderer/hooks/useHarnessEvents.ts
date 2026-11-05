@@ -101,6 +101,7 @@ export interface HarnessCallbacks {
 export function useHarnessEvents(callbacks: HarnessCallbacks) {
 	const cbRef = useRef(callbacks)
 	cbRef.current = callbacks
+	const lastErrorRef = useRef<{ text: string; time: number } | null>(null)
 
 	useEffect(() => {
 		const unsubscribe = window.api.onEvent((raw: unknown) => {
@@ -553,10 +554,19 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					const errorText =
 						err?.message ?? String(event.error ?? "Unknown error")
 					console.error("Harness error:", errorText)
+					const now = Date.now()
+					if (
+						lastErrorRef.current &&
+						lastErrorRef.current.text === errorText &&
+						now - lastErrorRef.current.time < 2000
+					) {
+						break
+					}
+					lastErrorRef.current = { text: errorText, time: now }
 					cb.dispatch({
 						type: "MESSAGE_START",
 						message: {
-							id: `error-${Date.now()}`,
+							id: `error-${now}`,
 							role: "assistant",
 							content: [{ type: "text", text: errorText }],
 							createdAt: new Date().toISOString(),
