@@ -18,6 +18,166 @@ describe("src/memory - Native Memory Implementation", () => {
 		await storage.close()
 	})
 
+	describe("Observational memory", () => {
+		it("persists an observation so getSystemMessage returns it", async () => {
+			const memory = new Memory({
+				storage,
+				options: {
+					observationalMemory: {
+						enabled: true,
+						observation: {
+							messageTokens: 100,
+							bufferTokens: 1 / 5,
+							blockAfter: 2,
+							model: {
+								generate: async () => ({ text: "- auth lives in src/auth.ts" }),
+							},
+						},
+					},
+				},
+			})
+
+			expect(await memory.getSystemMessage({ threadId: "t1" })).toBeNull()
+
+			const step = await memory.observe({
+				threadId: "t1",
+				messages: [{ id: "m1", role: "user", content: "where is auth?" }],
+				pendingTokens: 500,
+			})
+			expect(step?.kind).toBe("observed")
+
+			const injected = await memory.getSystemMessage({ threadId: "t1" })
+			expect(injected).toContain("src/auth.ts")
+			expect(injected).toContain("# Observational Memory")
+		})
+
+		it("stays inert when observational memory is not configured", async () => {
+			const memory = new Memory({ storage })
+			expect(memory.resolveObservationalConfig()).toBeNull()
+			expect(
+				await memory.observe({
+					threadId: "t1",
+					messages: [{ id: "m1", role: "user", content: "hi" }],
+					pendingTokens: 10_000,
+				}),
+			).toBeNull()
+			expect(await memory.getSystemMessage({ threadId: "t1" })).toBeNull()
+		})
+
+		it("serialises concurrent observations so no message is observed twice", async () => {
+			let modelCalls = 0
+			const memory = new Memory({
+				storage,
+				options: {
+					observationalMemory: {
+						enabled: true,
+						observation: {
+							messageTokens: 100,
+							bufferTokens: 1 / 5,
+							blockAfter: 2,
+							model: {
+								generate: async () => {
+									modelCalls++
+									return { text: `- fact ${modelCalls}` }
+								},
+							},
+						},
+					},
+				},
+			})
+
+			// Prime the row so the CAS has a generation to compare against.
+			await memory.observe({
+				threadId: "t-concurrent",
+				messages: [{ id: "m1", role: "user", content: "first" }],
+				pendingTokens: 500,
+			})
+			const callsAfterPrime = modelCalls
+			expect(callsAfterPrime).toBe(1)
+
+			// Two turns cross the threshold together. Exactly one may run the model;
+			// the loser must bail before paying for a discarded observation.
+			const [a, b] = await Promise.all([
+				memory.observe({
+					threadId: "t-concurrent",
+					messages: [{ id: "m2", role: "user", content: "second" }],
+					pendingTokens: 600,
+				}),
+				memory.observe({
+					threadId: "t-concurrent",
+					messages: [{ id: "m3", role: "user", content: "third" }],
+					pendingTokens: 600,
+				}),
+			])
+
+			const winners = [a, b].filter((s) => s !== null)
+			expect(winners).toHaveLength(1)
+			expect(modelCalls).toBe(callsAfterPrime + 1)
+		})
+
+		it("keeps buffered observations across a write so nothing is lost", async () => {
+			const memory = new Memory({
+				storage,
+				options: {
+					observationalMemory: {
+						enabled: true,
+						observation: {
+							messageTokens: 100,
+							bufferTokens: 1 / 5,
+							bufferActivation: 8,
+							model: {
+								generate: async () => ({
+									text: "- first fact\n- second fact\n- third fact",
+								}),
+							},
+						},
+					},
+				},
+			})
+
+			await memory.observe({
+				threadId: "t-buffer",
+				messages: [{ id: "m1", role: "user", content: "go" }],
+				pendingTokens: 500,
+			})
+
+			const record = await memory.getObservationalRecord("t-buffer")
+			expect(record).not.toBeNull()
+			const everything = `${record!.activeObservations}\n${record!.bufferedObservations ?? ""}`
+			for (const fact of ["first", "second", "third"]) {
+				expect(everything).toContain(`${fact} fact`)
+			}
+			expect(record!.generationCount).toBe(1)
+		})
+
+		it("swallows a model failure instead of breaking the turn", async () => {
+			const memory = new Memory({
+				storage,
+				options: {
+					observationalMemory: {
+						enabled: true,
+						observation: {
+							messageTokens: 100,
+							bufferTokens: 1 / 5,
+							model: {
+								generate: async () => {
+									throw new Error("provider down")
+								},
+							},
+						},
+					},
+				},
+			})
+			await expect(
+				memory.observe({
+					threadId: "t1",
+					messages: [{ id: "m1", role: "user", content: "hi" }],
+					pendingTokens: 500,
+				}),
+			).resolves.toBeNull()
+		})
+	})
+
 	describe("Thread Management (CRUD)", () => {
 		it("creates, retrieves, updates and deletes a thread", async () => {
 			const memory = new Memory({ storage })

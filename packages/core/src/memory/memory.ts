@@ -2,6 +2,11 @@ import {
 	MyAgentMemory,
 	filterSystemReminderMessages,
 	MessageList,
+	formatObservationalMemory,
+	runObservationStep,
+	type ObservationalRecord,
+	type ObservationMessage,
+	type ObservationStepResult,
 	type MyAgentDBMessage,
 	type MemoryConfigInternal,
 	type StorageThreadType,
@@ -13,7 +18,11 @@ import {
 	type StorageCloneThreadInput,
 	type ObservabilityContext,
 } from "../core/index.js"
-import type { MemoryConstructorConfig, MemoryOptions } from "./types.js"
+import type {
+	MemoryConstructorConfig,
+	MemoryOptions,
+	ObservationalMemoryConfig,
+} from "./types.js"
 import { TokenCounter } from "./token-counter.js"
 
 export class Memory extends MyAgentMemory {
@@ -326,18 +335,139 @@ export class Memory extends MyAgentMemory {
 		memoryConfig?: MemoryConfigInternal
 	}): Promise<string | null> {
 		try {
+			const record = await this.getObservationalRecord(threadId, resourceId)
+			return formatObservationalMemory(record?.activeObservations ?? null)
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Reads the current observation log for a thread.
+	 *
+	 * Returns `null` rather than throwing when storage is missing or the table
+	 * is empty: observation is an optimisation on top of the conversation, so a
+	 * failure here must never break the turn that is already in flight.
+	 */
+	async getObservationalRecord(
+		threadId: string,
+		resourceId?: string,
+	): Promise<ObservationalRecord | null> {
+		try {
 			const store = await this.getMemoryStore()
-			if (typeof store.getObservationalMemory === "function") {
-				const record = await (store as any).getObservationalMemory(
-					threadId,
-					resourceId || "",
-				)
-				if (record?.activeObservations && record.activeObservations.trim()) {
-					return `# Observational Memory\n\n${record.activeObservations.trim()}`
-				}
+			if (typeof (store as any).getObservationalMemory !== "function") {
+				return null
 			}
-		} catch {}
-		return null
+			// Normalised identically to the write path below. The store builds its
+			// lookup key as `${threadId}:${resourceId}`: reading with "" while
+			// writing with null produces two different keys for the same thread, so
+			// the record is written and then never found again.
+			return await (store as any).getObservationalMemory(
+				threadId,
+				resourceId ?? "",
+			)
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Runs one Observer/Reflector pass and persists the result.
+	 *
+	 * Never throws: a failed summarisation leaves the previous log in place and
+	 * reports `null`, so the caller can fall back to the plain token window.
+	 */
+	async observe(args: {
+		threadId: string
+		resourceId?: string
+		messages: ObservationMessage[]
+		pendingTokens: number
+		requestContext?: any
+	}): Promise<ObservationStepResult | null> {
+		const config = this.resolveObservationalConfig()
+		if (!config) return null
+		try {
+			const store = await this.getMemoryStore()
+			const record = await this.getObservationalRecord(
+				args.threadId,
+				args.resourceId,
+			)
+
+			// Claim the generation before spending a model call, not after: a loser
+			// that ran the model first would pay for an observation it then
+			// discards, and two concurrent turns would both pay.
+			//
+			// The key must use the same normalisation as the read and write paths.
+			// Passing the raw `undefined` here builds "thread:undefined", which
+			// matches no row, so the claim always fails and observation silently
+			// stops working after the first success.
+			const resourceKey = args.resourceId ?? ""
+			const currentGeneration = (record as any)?.generationCount ?? 0
+			if (
+				record &&
+				typeof (store as any).claimObservationalGeneration === "function"
+			) {
+				const claimed = await (store as any).claimObservationalGeneration(
+					args.threadId,
+					resourceKey,
+					currentGeneration,
+					currentGeneration + 1,
+				)
+				if (!claimed) return null
+			}
+
+			const step = await runObservationStep({
+				config,
+				record,
+				messages: args.messages,
+				pendingTokens: args.pendingTokens,
+				counter: this.tokenCounter,
+				requestContext: args.requestContext,
+			})
+			if (step.kind === "none") return step
+
+			if (
+				typeof (store as any).insertObservationalMemoryRecord !== "function"
+			) {
+				return step
+			}
+			const resourceId = args.resourceId ?? ""
+			await (store as any).insertObservationalMemoryRecord({
+				id: (record as any)?.id,
+				lookupKey: `${args.threadId || ""}:${resourceId}`,
+				scope: config.scope || "thread",
+				threadId: args.threadId,
+				resourceId: resourceId || null,
+				activeObservations: step.activeObservations,
+				observationTokenCount: this.tokenCounter.estimateTokens(
+					step.activeObservations,
+				),
+				observedMessageIds: step.observedMessageIds,
+				bufferedObservations: step.bufferedObservations ?? null,
+				bufferedObservationTokens: step.bufferedObservationTokens ?? 0,
+				generationCount: currentGeneration + 1,
+				pendingMessageTokens: args.pendingTokens,
+				totalTokensObserved:
+					((record as any)?.totalTokensObserved ?? 0) + args.pendingTokens,
+				lastObservedAt: new Date(),
+				...(step.kind === "reflected" ? { lastReflectionAt: new Date() } : {}),
+			})
+			return step
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Normalises `options.observationalMemory`, which accepts a boolean, a full
+	 * config, or the older Mastra-shaped options object.
+	 */
+	resolveObservationalConfig(): ObservationalMemoryConfig | null {
+		const raw: any = (this.options as any)?.observationalMemory
+		if (!raw) return null
+		if (raw === true) return { enabled: true }
+		if (raw.enabled === false) return null
+		return raw as ObservationalMemoryConfig
 	}
 
 	// Working memory base methods required by MyAgentMemory

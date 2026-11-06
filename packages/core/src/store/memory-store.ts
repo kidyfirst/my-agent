@@ -602,11 +602,20 @@ export class SQLiteMemoryStore {
 				?, ?, ?,
 				?, ?, ?, ?
 			)
-			ON CONFLICT(id) DO UPDATE SET
-				lookupKey = excluded.lookupKey,
-				activeObservations = excluded.activeObservations,
-				updatedAt = excluded.updatedAt
-		`
+            ON CONFLICT(id) DO UPDATE SET
+                lookupKey = excluded.lookupKey,
+                activeObservations = excluded.activeObservations,
+                observationTokenCount = excluded.observationTokenCount,
+                observedMessageIds = excluded.observedMessageIds,
+                generationCount = excluded.generationCount,
+                lastObservedAt = excluded.lastObservedAt,
+                lastReflectionAt = COALESCE(excluded.lastReflectionAt, lastReflectionAt),
+                pendingMessageTokens = excluded.pendingMessageTokens,
+                totalTokensObserved = excluded.totalTokensObserved,
+                bufferedObservations = excluded.bufferedObservations,
+                bufferedObservationTokens = excluded.bufferedObservationTokens,
+                updatedAt = excluded.updatedAt
+        `
 
 		this.db
 			.prepare(sql)
@@ -653,6 +662,43 @@ export class SQLiteMemoryStore {
 				record.createdAt ? String(record.createdAt) : now,
 				now,
 			)
+	}
+	/**
+	 * Compare-and-swap guard for concurrent observation.
+	 *
+	 * Two turns in the same thread can cross the threshold at the same time
+	 * (a background observation plus a foreground retry). Both read the same
+	 * `expectedGeneration`, both call the model, and the loser's write would
+	 * replace the winner's `observedMessageIds` — the dropped messages are then
+	 * observed again on the next pass, so the log bloats with duplicates.
+	 *
+	 * Returns true only when this writer owned the row. Calling it before the
+	 * upsert serialises writers without holding a lock across the model call.
+	 */
+	async claimObservationalGeneration(
+		threadId: string,
+		resourceId: string,
+		expectedGeneration: number,
+		nextGeneration: number,
+	): Promise<boolean> {
+		const lookupKey = this.getOMKey(threadId, resourceId)
+		const sql = `
+            UPDATE myagent_observational_memory
+            SET generationCount = ?, updatedAt = ?
+            WHERE (lookupKey = ? OR (threadId = ? AND resourceId = ?))
+              AND generationCount = ?
+        `
+		const result = this.db
+			.prepare(sql)
+			.run(
+				nextGeneration,
+				new Date().toISOString(),
+				lookupKey,
+				threadId,
+				resourceId,
+				expectedGeneration,
+			)
+		return result.changes > 0
 	}
 
 	async updateActiveObservations(

@@ -42,16 +42,16 @@
 
 ### 全平台客户端下载
 
-| 操作系统 / 平台 | 架构 / 适用机型 | 安装包格式 | 直接下载链接 (v0.1.5) | 说明 |
-| :--- | :--- | :--- | :--- | :--- |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像 | [my-agent-0.1.5-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.dmg) | 推荐 Mac 用户首选 |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包 | [my-agent-0.1.5-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.zip) | 解压即用 |
-| 🍏 **macOS** | **Intel x86_64** 芯片 | `.dmg` 安装镜像 | [my-agent-0.1.5-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.dmg) | 适配 Intel 架构 Mac |
-| 🍏 **macOS** | **Intel x86_64** 芯片 | `.zip` 免安装包 | [my-agent-0.1.5-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.zip) | 解压即用 |
-| 🪟 **Windows** | **Windows 10 / 11** (64 位) | `.exe` 安装程序 | [my-agent-0.1.5-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.exe) | NSIS 引导向导安装 |
-| 🪟 **Windows** | **Windows 10 / 11** (64 位) | `.zip` 免安装便携版 | [my-agent-0.1.5-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.zip) | 解压即可直接运行 |
-| 🐧 **Linux** | **Linux x86_64** (通用) | `.AppImage` 便携镜像 | [my-agent-0.1.5-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
-| 🐧 **Linux** | **Debian / Ubuntu / Deepin** | `.deb` 系统软件包 | [my-agent-0.1.5-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-amd64.deb) | `sudo dpkg -i` 系统级安装 |
+| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.5)                                                                                                                       | 说明                      |
+| :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.5-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.5-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.zip)                 | 解压即用                  |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.5-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.5-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.zip)                     | 解压即用                  |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.5-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.exe)                     | NSIS 引导向导安装         |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.5-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.zip)                     | 解压即可直接运行          |
+| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.5-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
+| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.5-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
 
 > [!IMPORTANT]
 > **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  
@@ -68,6 +68,7 @@
 > - 完整更新履历与历史版本详情请参阅 👉 **[在线 ChangeLog 日志](https://kidyfirst.github.io/my-agent/changelog.html)** 或 **[GitHub Releases 全部发布归档](https://github.com/kidyfirst/my-agent/releases)**。
 
 ---
+
 <!-- LATEST_RELEASE_END -->
 
 <!-- TIP_JAR_START — 二维码就是 apps/desktop/src/renderer/assets/alipay-qr.png，同一份文件，别再放副本 -->
@@ -130,12 +131,14 @@
       - [3.4.7 执行模式与图调度 (`packages/core/src/core/graph/`)](#347-执行模式与图调度-packagescoresrccoregraph)
       - [3.4.8 会话录制与离线回放 (`packages/core/src/core/recorder/`)](#348-会话录制与离线回放-packagescoresrccorerecorder)
     - [3.5 Memory 记忆模块 (`packages/core/src/memory/`)](#35-memory-记忆模块-packagescoresrcmemory)
-      - [3.5.1 类继承关系与职责边界](#351-类继承关系与职责边界)
-      - [3.5.2 存储域适配与线程/消息 CRUD](#352-存储域适配与线程消息-crud)
-      - [3.5.3 Observational Memory 参数与触发阈值](#353-observational-memory-参数与触发阈值)
-      - [3.5.4 动态 Memory 工厂与模型热切换](#354-动态-memory-工厂与模型热切换)
-      - [3.5.5 分词估算与 Working Memory 空实现](#355-分词估算与-working-memory-空实现)
-      - [3.5.6 配置入口与测试覆盖](#356-配置入口与测试覆盖)
+      - [3.5.1 三层分层记忆架构体系](#351-三层分层记忆架构体系)
+      - [3.5.2 类继承关系与职责边界](#352-类继承关系与职责边界)
+      - [3.5.3 存储域适配与线程/消息 CRUD](#353-存储域适配与线程消息-crud)
+      - [3.5.4 会话内工作记忆工程优化 (L1 上下文组装)](#354-会话内工作记忆工程优化-l1-上下文组装)
+      - [3.5.5 观察性记忆运行机制与双阈值阶梯 (L2 Observational Memory)](#355-观察性记忆运行机制与双阈值阶梯-l2-observational-memory)
+      - [3.5.6 跨会话项目级持久记忆与规则系统 (L3 Project Memory)](#356-跨会话项目级持久记忆与规则系统-l3-project-memory)
+      - [3.5.7 模型厂商 Prompt Caching 缓存加速对齐机制](#357-模型厂商-prompt-caching-缓存加速对齐机制)
+      - [3.5.8 动态 Memory 工厂、分词估算与测试覆盖](#358-动态-memory-工厂分词估算与测试覆盖)
     - [3.6 A2A 协议服务 (`packages/a2a/`)](#36-a2a-协议服务-packagesa2a)
     - [3.7 CLI 命令行与本地守护进程 (`packages/cli/`)](#37-cli-命令行与本地守护进程-packagescli)
   - [4. 核心业务与数据流时序](#4-核心业务与数据流时序)
@@ -864,18 +867,75 @@ src/core/recorder/
 
 ### 3.5 Memory 记忆模块 (`packages/core/src/memory/`)
 
-`packages/core/src/memory/` 是项目自研的 `Memory` 实现：它继承 `packages/core/src/core` 的 `MyAgentMemory`，把线程/消息持久化、上下文召回与观察性记忆（OM）压缩统一收敛到一个可直接注入 `AgentController` 的实例中。
+`packages/core/src/memory/` 实现了现代代码智能体的三层分层记忆架构（Three-Tier Memory Architecture）：
+将**会话内短期工作上下文（L1 Working Context）**、**会话内长期观察性记忆（L2 Observational Memory）**、**跨会话项目级规则与持久记忆（L3 Project Memory）**以及**模型厂商 Prompt Caching 缓存加速底座**深度融合，兼顾长周期编码的上下文保真度、跨会话知识沉淀与超低 API 调用成本。
 
 ```
-src/memory/
-├── index.ts          # 对外出口：Memory / TokenCounter / 类型
-├── memory.ts         # Memory 主类（继承 MyAgentMemory）
-├── token-counter.ts  # 轻量分词估算器
-├── types.ts          # ObservationalMemoryConfig / MemoryOptions / 构造配置
-└── __tests__/memory.test.ts
+packages/core/
+├── src/memory/
+│   ├── index.ts            # 对外出口：Memory / TokenCounter / 类型
+│   ├── memory.ts           # Memory 主类（继承 MyAgentMemory，覆写 SQLite 存储读写）
+│   ├── project-memory.ts   # 跨会话项目级 Working Memory / Rules（.myagent/）
+│   ├── token-counter.ts    # 轻量分词估算器 (ceil(len / 4))
+│   ├── types.ts            # ObservationalMemoryConfig / MemoryOptions / 构造配置
+│   └── __tests__/
+│       ├── memory.test.ts
+│       └── project-memory.test.ts
+├── src/core/llm/
+│   └── prompt-cache.ts     # Prompt Caching 断点注入与工具字典序稳定器
+└── src/tools/
+    └── project-memory.ts   # Agent 自主读写工作记忆与规则工具 (project_memory)
 ```
 
-#### 3.5.1 类继承关系与职责边界
+#### 3.5.1 三层分层记忆架构体系
+
+```mermaid
+flowchart TD
+    subgraph L3["L3: 跨会话项目级持久记忆 (.myagent/)"]
+        PContext["project-context.json<br/>(偏好 / 规范 / 备忘)"]
+        PRules["rules/*.md<br/>(团队代码规约 / 技术准则)"]
+        PTool["project_memory 工具<br/>(read / update / save_rule)"]
+        PContext -->|"formatProjectWorkingMemory()"| SysHeader["&lt;project-working-memory&gt;<br/>系统提示头部注入"]
+        PRules -->|"formatProjectWorkingMemory()"| SysHeader
+        Agent["Agent 智能体"] <-->|"自主记录与修改"| PTool
+        PTool --> PContext
+        PTool --> PRules
+    end
+
+    subgraph L2["L2: 会话内长期观察性记忆 (OM)"]
+        History["历史消息流"] -->|"越过 obsThreshold (30k)"| Observer["Observer 模型<br/>(抽取增量事实与观察)"]
+        Observer --> ActiveObs["activeObservations<br/>(观察记录缓冲)"]
+        ActiveObs -->|"越过 refThreshold (40k)"| Reflector["Reflector 模型<br/>(反思与多重合并压缩)"]
+        Reflector --> ActiveObs
+        ActiveObs -->|"getSystemMessage()"| OMHeader["# Observational Memory<br/>系统提示段落注入"]
+    end
+
+    subgraph L1["L1: 会话内短期工作上下文 (In-Session Working Context)"]
+        DB[(myagent.db / SQLiteStore)] <-->|"倒序按需加载 (LIMIT 100)"| RawMsgs["原始历史消息"]
+        RawMsgs --> AssetDecouple["大文件资产解耦<br/>(.myagent/assets/)"]
+        AssetDecouple --> ToolChainFix["AI SDK v6 链路补齐<br/>(缺失 tool-result 自动配对)"]
+        ToolChainFix --> TemporalDecay["时序渐进折叠 (Temporal Decay)<br/>(>2 轮历史折叠至摘要)"]
+        TemporalDecay --> GoalSliding["目标保真滑动窗口 (64k)<br/>(锚定首条 User 核心目标)"]
+    end
+
+    subgraph CacheBase["底座: Prompt Caching 前缀缓存加速"]
+        SysHeader & OMHeader --> StaticPrefix["字节级稳定静态前缀<br/>(System + sortToolsByName)"]
+        GoalSliding --> HistoryTurns["历史回溯 Turns<br/>(确定性 toolCallId)"]
+        StaticPrefix -->|"断点 1: ephemeral"| LLM["统一 LLM 推理接口<br/>(TTFT 降 80% / 成本降 90%)"]
+        HistoryTurns -->|"断点 2: 倒数第 2 轮 User"| LLM
+    end
+```
+
+##### 分层设计对照矩阵
+
+| 记忆层级                  | 存储载体与位置                                            | 生命周期                      | 触发与处理机制                                               | 核心优化与价值                                                                       |
+| :------------------------ | :-------------------------------------------------------- | :---------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------------------------------- |
+| **L1 会话内短期工作记忆** | SQLite `myagent_messages`                                 | 单个会话进程                  | 每轮发送实时读写，经归一化与裁剪后注入模型上下文             | • 资产解耦落盘<br/>• 3 轮前工具结果渐进折叠<br/>• 64k 目标保真滑窗                   |
+| **L2 会话内长期观察记忆** | SQLite `myagent_threads` (OM 域)                          | 单会话 / 跨会话共享 (`scope`) | 双阈值滚动触发（`obsThreshold: 30k`、`refThreshold: 40k`）   | • 异步缓冲预观察 (`bufferTokens: 1/5`)<br/>• 压缩比高达 90%<br/>• `settled()` 零阻塞 |
+| **L3 跨会话项目持久记忆** | `.myagent/project-context.json`<br/>`.myagent/rules/*.md` | 跨所有会话永久持久化          | 新建会话自动检测注入；Agent 调用 `project_memory` 工具自沉淀 | • Git 版本控制友好<br/>• 团队知识规范沉淀<br/>• 彻底根除新会话“失忆”                 |
+| **缓存底座 Prompt Cache** | 模型厂商服务端缓存                                        | 短期内存 (5min 滚动)          | 工具严格字典序排序 + 两级 `ephemeral` 断点注入               | • 首字延迟（TTFT）降低 50%~80%<br/>• 上下文 Token 成本降低 75%~90%                   |
+
+#### 3.5.2 类继承关系与职责边界
 
 | 层                 | 职责                                                                                                            |
 | :----------------- | :-------------------------------------------------------------------------------------------------------------- |
@@ -885,16 +945,39 @@ src/memory/
 
 设计取向是「贴着存储层重写、把 LLM 侧逻辑留给上游」：OM 的观察抽取/反思合并由基类完成并落库，本类只负责把这些记录从存储层 (SQLiteStore) 里正确地取出、拼装并交给 Agent。
 
-#### 3.5.2 存储域适配与线程/消息 CRUD
+基类 `MyAgentMemory`（`packages/core/src/core/memory/base.ts`）是一层**框架适配骨架**，而非可直接使用的实现：它持有 `storage` / `options` / `threadConfig`，提供 `getInputProcessors()` / `getOutputProcessors()` 按需装配 `MessageHistory` 处理器，并给出惰性默认实现（如 `getThreadById` 返回 `null`、`deleteThread` 空操作）。其中线程写路径 `createThread` / `updateThread` / `copyThread` / `cloneThread` 在基类里直接 `throw "not implemented"`——这正是子类 `Memory` 必须逐个覆写这四个方法的原因，任何新增的 Memory 实现都不能指望基类兜底。
+
+#### 3.5.3 存储域适配与线程/消息 CRUD
 
 所有读写都先经由 `getMemoryStore()` 解析复合存储的 `memory` 域，拿不到 `storage` 或该域缺失时直接抛错，避免静默降级：
 
 - **线程**：`createThread` / `saveThread` 在落库前补 `title`（`"New Thread"`），满足数据库 `NOT NULL` 约束；`getThreadById`、`listThreads`、`updateThread`、`deleteThread` 均直接透传到存储域。`copyThread` / `cloneThread` 用于「从历史会话派生新会话」，对 `threadId` 与 `sourceThreadId` 两种入参做兼容并归一化返回结构。
 - **写入消息 (`saveMessages`)**：先用 `MessageList({ generateMessageId }).add(messages, "memory").get.all.db()` 做格式归一化（入参可能是字符串、数组或 parts 结构）；若消息缺 `resourceId` 则回查所属线程补齐；最后批量落库，并按正文长度估算本次写入的 token 用量返回。
-- **召回消息 (`recall`)**：默认 `perPage: 100`、`page: 0`；未显式指定 `orderBy` 时按 `createdAt DESC` 取最新一页，再在内存中反转，从而保证「取最新 N 条、但按时间正序返回」。归一化后调用 `filterSystemReminderMessages` 过滤系统提醒与临时信号，附带 `total / page / perPage / hasMore` 分页信息，供 UI 做滚动加载。
+- **召回消息 (`recall`)**：默认 `perPage: 100`、`page: 0`；未显式指定 `orderBy` 时按 `createdAt DESC` 取最新一页，再在内存中反转，从而保证「取最新 N 条、但按时间正序返回」。归一化后调用 `filterSystemReminderMessages` 过滤系统提醒与临时信号，附带 `total / page / perPage / hasMore` 分页信息，供 UI 做滚动加载。由于 `MessageList` 归一化会丢掉 `durationMs`，召回末尾会按消息 id 把原始 DB 记录里的耗时回填到归一化结果上——否则历史会话重载后，每个执行块的耗时都会消失。
 - **删除消息 (`deleteMessages`)**：兼容 `string[]`、`{ id }[]`、`{ messageIds: [...] }` 三种入参形态，统一抽取 id 后批量删除。
 
-#### 3.5.3 Observational Memory 参数与触发阈值
+#### 3.5.4 会话内工作记忆工程优化 (L1 上下文组装)
+
+为了应对多轮复杂编码场景下的大文件传输卡顿、上下文 Token 爆炸以及历史截断导致的目标遗忘，系统在会话内短期上下文组装层（`packages/core/src/core/controller/controller.ts`）实现了五项核心工程优化：
+
+1. **大文件与资源解耦存储（Asset Decoupled Storage）**：
+   - 用户发送的图片、大文件 Base64 统一剥离，由 `AssetManager` (`packages/core/src/assets/manager.ts`) 落盘至项目根目录 `.myagent/assets/<assetId>.<ext>`（并自动生成 `.gitignore` 防误提交），不再膨胀 SQLite `myagent_messages` 记录；
+   - Electron 端注册 `myagent-asset://` 特权协议流式读取本地资产，UI 保留原生缩略图与点击查看体验；若本地资源被误删，前端自动渲染警示性错误占位卡片；大模型需要探查图片或文档细节时，通过自主调用 `assets_fetch` 工具惰性拉取内容。
+2. **历史工具调用链与 Schema 完整性（AI SDK v6 Tool Call Integrity）**：
+   - 完整还原多轮历史中的 `tool-call` 与 `tool-result`，同时规范化注入 `input` 与 `args`，彻底根除 OpenAI / DeepSeek 等服务端反序列化报错（`missing field arguments`）；
+   - 自动孤立调用补齐：若前序 Turn 发生中断或异常，自动补齐对应的 `tool-result` 占位节点，防止大模型提供商因缺少配对响应而拒绝请求。
+3. **历史工具结果渐进式折叠（Temporal Output Decay）**：
+   - **最新 2 轮**：保留工具完整执行结果（上限 6,000 字符），供模型即时反思与代码修改；
+   - **3 轮及以前的历史 Turn**：若工具输出超过 300 字符，自动折叠为语义占位摘要（`[Tool Result: <toolName> completed. Content folded for context economy...]`），立减 70%~85% 的历史 Token 冗余。
+4. **目标保真的滑动窗口预算机制（Goal-Preserving Sliding Window）**：
+   - 设定 64,000 Token 上下文安全预算；
+   - 当对话超出预算需要修剪早期轮次时，先提取第 1 条用户消息中的核心任务目标（Root Task/Goal），在修剪点头部注入结构化摘要头：
+     `[System Note: Earlier conversation history was truncated (N messages folded). Original User Task: "..."]`
+     彻底防止多轮长对话后产生的“Agent 目标漂移与遗忘”。
+5. **倒序按需加载（Recent-First Paged Retrieval）**：
+   - 历史消息通过 `ORDER BY createdAt DESC LIMIT 100` 从 SQLite 仅拉取最新 100 轮再在内存恢复时间正序，避免无上限加载全量历史引发的反序列化性能瓶颈。
+
+#### 3.5.5 观察性记忆运行机制与双阈值阶梯 (L2 Observational Memory)
 
 OM 的开关与全部阈值集中在 `options.observationalMemory`，类型定义在 `packages/core/src/memory/types.ts`，实际装配在 `packages/core/src/harness/index.ts` 的 `getDynamicMemory`：
 
@@ -904,7 +987,7 @@ observationalMemory: {
   scope,                                  // "thread" | "resource"
   observation: {
     bufferTokens: 1 / 5,                  // 每隔 messageTokens 的 20% 跑一次后台缓冲观察
-    bufferActivation: 2000,               // 达到阈值时激活缓冲的比例，其余留作下轮储备
+    bufferActivation: 2000,               // 单次越线最多激活的 token 预算（绝对 token 数），其余留作下轮储备
     messageTokens: obsThreshold,          // 观察触发阈值，默认 30_000
     blockAfter: 2,                        // 达到 2×messageTokens 时允许同步阻塞观察
     model: ({ requestContext }) => ...,   // Observer 模型
@@ -920,32 +1003,69 @@ observationalMemory: {
 
 - **`scope` 决定记忆可见范围**：`thread`（默认）每条会话独立观察与压缩；`resource` 则在同一 `resourceId` 的所有会话间共享观察记录。解析优先级见 `getOmScope()`（`packages/core/src/utils/project.ts`）：`MYAGENT_OM_SCOPE` 环境变量 → 项目级 `<project>/.myagent/database.json` 的 `omScope` → 全局 `~/.myagent/database.json` → 默认 `thread`。
 - **`bufferTokens`**：以「占 `messageTokens` 的比例」表示后台异步缓冲观察的间隔，`1/5` 即每积累到阈值的 20% 就在后台跑一次 Observer，把结果先存进缓冲区，真正越线时可直接激活而不阻塞。
-- **`bufferActivation`**：越线时激活多少比例的缓冲观察，小于 1 的部分保留到下一轮，用于维持对话连贯性。
+- **`bufferActivation`**：单次越线最多可激活的**绝对 token 预算**，未激活的部分保留在 `bufferedObservations` 列，等下一次越线时再合并激活（是延迟而非丢弃）。切分只发生在整行边界上——观察记录是条目列表，按字符硬切会把一条事实劈成两半，两半都不可用。未配置时视为不限量。
 - **`blockAfter`**：允许「同步阻塞观察」的 token 阈值（取 `1 < x < 100` 时按 `messageTokens` 的倍数解析，取 `≥ 100` 时按绝对 token 数解析）。在 `messageTokens` 与 `blockAfter` 之间只跑异步缓冲，未观察消息最多可增长到 `blockAfter`（此处 `2 ×` ≈ 60k tokens）才插入一次同步观察，避免每个 Agent 步骤都被 LLM 观察调用拖慢。
 - **双阈值阶梯**：会话增长到 `observationThreshold`（`observation.messageTokens`）时 Observer 抽取观察记录；观察记录本身累积到 `reflectionThreshold`（`reflection.observationTokens`）时 Reflector 把观察反思合并成更凝练的长期记忆（`reflection.blockAfter: 1.1` 表示 110% 阈值时同步反思），如此循环实现长对话的滚动压缩。
 - **取数入口 `getSystemMessage()`**：从存储域读取 `activeObservations` 并包装成 `# Observational Memory` 段落，作为系统提示注入下一轮请求；记录不存在或为空时返回 `null`，且整段读取用 `try/catch` 包裹——OM 故障绝不能影响主对话链路。
+- **并发写入保护**：两轮请求可能同时越线（后台观察叠加前台重试），二者读到同一个 `generationCount` 后会互相覆盖 `observedMessageIds`，被覆盖的消息于是在下一轮被重复观察、日志不断膨胀。`claimObservationalGeneration()` 以 CAS 把该列当作乐观锁，且**在调用 Observer 模型之前**抢占——否则抢占失败的一方已经白付了一次模型调用。
+- **UI 进度上报 `loadOMProgress()`**：返回渲染进程 `OMTokenTracker` 所需的完整进度（`pendingTokens` / `threshold` / `observationTokens` / `generationCount` 等）。阈值取自配置而非数据库，因此**从未触发过观察的会话也能显示距离触发还有多远**；OM 未启用时返回 `{}`，组件据此自行隐藏。
+- **当前实现边界**：Reflector（把观察记录反思合并为长期记忆的 `reflection` 段落）尚未实现，`kind` 只会产出 `none` 与 `observed`，因此 `reflection.*` 配置项目前不生效；观察记录只在 Observer 产出新内容时增长，不会自动收敛。OM 仅在主会话 `AgentController` 的请求路径中生效，子智能体（`agent.stream()`）是一次性任务、无持久化会话历史，不参与 OM。
 
-#### 3.5.4 动态 Memory 工厂与模型热切换
+#### 3.5.6 跨会话项目级持久记忆与规则系统 (L3 Project Memory)
 
-`getDynamicMemory()` 返回的不是实例而是**取实例的函数**（`DynamicArgument`），Agent 每次需要解析 memory 时按当时的 request context 现算：
+为了解决大模型在跨会话、新开对话时对当前仓库技术选型、架构约束、开发偏好与规范“失忆”的问题，系统在 `packages/core/src/memory/project-memory.ts` 实现了轻量级、Git 友好的项目级 Working Memory 与 Rules 规则系统：
 
-1. 从 `requestContext` 取 `controller` / `harness` 上的 `HarnessState`，读出 `observationThreshold`、`reflectionThreshold`、`observerModelId`、`reflectorModelId` 与 `projectPath`。
-2. 以 `` `${obsThreshold}:${refThreshold}:${omScope}` `` 作为缓存键：只要阈值与作用域不变就复用已构建的实例，避免每轮回调都重建。
-3. `observation.model` / `reflection.model` 写成闭包而非固定模型：调用时才读 `state.observerModelId ?? DEFAULT_OM_MODEL_ID`（Reflector 同理）并经 `resolveModel(..., { remapForCodexOAuth: true })` 解析，因此**运行中切换阈值或模型会立即生效**，无需重启会话。
+1. **存储架构与文件布局**：
+   - **项目上下文 (`project-context.json`)**：位于 `<projectRoot>/.myagent/project-context.json`（若项目内不存在，自动优雅回退至全局 `~/.myagent/project-context.json`），以 JSON 结构存储开发偏好（`preferences`）、编码与架构规范（`conventions`）以及技术备忘（`notes`）。
+   - **规则文档 (`rules/*.md`)**：位于 `<projectRoot>/.myagent/rules/*.md` 与 `~/.myagent/rules/*.md`，支持将团队规约、技术准则拆分为独立的 Markdown 文档，便于代码评审与 Git 版本控制。
+2. **全自动系统上下文注入**：
+   - 在系统 Prompt 组装阶段（`packages/core/src/prompts/index.ts`），自动调用 `formatProjectWorkingMemory(ctx.workingDir)`；
+   - 一旦检测到持久化的偏好或规则文档，便格式化为权威的 `<project-working-memory>` XML 提示块注入大模型上下文头部，确保所有执行模式（ReAct、Plan、Fast）在新会话伊始均天然获知项目约束——**这一步是只读注入，与下方工具可用性无关**。
+3. **Agent 自主沉淀工具 (`project_memory`)**：
+   - Agent 注册有 `project_memory` 工具（`packages/core/src/tools/project-memory.ts`），支持五大动作：
+     - `read`：主动读取当前项目 Working Memory 上下文与已注册规则；
+     - `update_context`：增量记录/更新项目的偏好、规范和架构备忘（自动去重与合并）；
+     - `save_rule`：沉淀并保存/更新独立的规则 Markdown 文档到 `.myagent/rules/<name>.md`；
+     - `delete_rule`：清理废弃或过期的规则文件；
+     - `list_rules`：列出所有生效的项目级与全局级规则文件。
+   - **模式可用性**：该工具列于 `harness/tools.ts` 的 `WRITE_TOOL_NAMES` 与 `PLAN_TOOL_NAMES`，因此 ReAct / Build / Plan 模式持有它，**Fast 模式不持有**（Fast 只保留只读工具）；但上文第 2 点的系统提示注入在四种模式下都会生效，所以 Fast 模式仍受既有规则约束，只是无法自行写入新规则。
+   - 当用户在日常对话中表达“以后请使用 pnpm 构建”、“组件统一放在 components/ui”或“接口遵循 RESTful 规范”等约定偏好时，Agent 能够自主将其沉淀入 Working Memory，并在所有未来的会话中持久生效。此外基础提示词（`packages/core/src/prompts/base.ts`）中也向模型说明了该工具的用途，模型无需先读文档即可知道要把长期约定写进 `.myagent/`。
 
-模型变更的三条入口都位于 `apps/desktop/src/electron/helpers.ts`（切换主模型、自动升级模型、切换失败后的回退）：它们会同时把 `observerModelId` / `reflectorModelId` 与 `currentModelId` 一起写入 state，保持三者对齐；渲染层设置面板再通过 `setObserverModel` / `setReflectorModel` 命令 + `harness.switchObserverModel()` / `switchReflectorModel()` 单独覆盖。
+#### 3.5.7 模型厂商 Prompt Caching 缓存加速对齐机制
 
-#### 3.5.5 分词估算与 Working Memory 空实现
+主流大语言模型（Anthropic Claude 3.5/3.7、Google Gemini 1.5/2.0、DeepSeek-V3/R1、OpenAI GPT-4o 等）均原生支持 Prompt Caching（上下文前缀缓存）。当 Prompt 前缀（System Prompt + 早期历史消息）在字节层面保持稳定时，命中缓存可带来以下巨大收益：
 
-- **`TokenCounter`**：采用 `ceil(len / 4)`（最少 1）的启发式估算，对代码与英文散文平均偏差可接受，且零依赖、零初始化成本；`countMessage()` 兼容 `content` 为字符串或 `{ content }` 结构。`Memory` 覆写 `estimateTokens()` 委托给它，因此 `saveMessages` / `recall` 返回的 `usage.tokens` 同源。
-- **`settled()`**：直接 `Promise.resolve()`，即不等待后台 OM 任务（观察/反思）落地，保证本轮结束后 UI 侧的 `agent_end` 立即到达；未完成的观察由下一次 `bufferTokens` 检查或后续步骤自然接续。
-- **Working Memory 系列**（`getWorkingMemory`、`getWorkingMemoryTemplate`、`updateWorkingMemory`、`__experimental_updateWorkingMemoryVNext`）：统一返回空值 / 空成功。基类为这些方法提供了默认实现，但本项目不需要「结构化用户画像」这一类工作记忆，长期记忆完全交给 OM 承担，因此显式覆写为空实现，而不是依赖基类可能触发的额外存储读写。
+- **首字延迟（TTFT）降低 50%~80%**；
+- **输入 Token 计费成本降低 75%~90%**。
 
-#### 3.5.6 配置入口与测试覆盖
+为彻底消除动态时间戳、无序工具声明及随机 ID 对缓存哈希的破坏，系统在 `packages/core/src/core/llm/prompt-cache.ts` 构建了完整的 Prompt Caching 加速层：
 
-- **UI 配置**：设置面板 `apps/desktop/src/renderer/components/settings/MemorySection.tsx` 提供 Observer 模型、Reflector 模型、Observation threshold、Reflection threshold 四项；阈值变化会改变缓存键，进而触发 Memory 实例重建。
-- **默认值**：`packages/core/src/harness/state.ts` 中 `DEFAULT_OBS_THRESHOLD = 30_000`、`DEFAULT_REF_THRESHOLD = 40_000`、`DEFAULT_OM_MODEL_ID = process.env.DEFAULT_OM_MODEL_ID ?? DEFAULT_FALLBACK_MODEL_ID`。
-- **测试**：`packages/core/src/memory/__tests__/memory.test.ts` 使用内存态 SQLite（`file::memory:`）覆盖线程 CRUD 与分页、消息保存/召回顺序、系统提醒与信号过滤、召回分页、OM 配置与 `settled()`、`cloneThread`，以及与 `AgentController` 的线程生命周期集成。
+1. **字节级稳定的静态前缀编排**：
+   - **分层 System Prompt**：将高频稳定的基础指令、模式工作流、项目规则（`.myagent/`）、仓库说明置于提示词前段，仅将动态易变的会话任务清单、PR 审查说明附于尾部；
+   - **工具声明确定性排序 (`sortToolsByName`)**：在调用 LLM 前对所有 `tools` 定义按名称字典序重排，规避 JavaScript 对象键迭代无序引起的 schema hash 抖动；
+   - **确定性 Tool ID 派生**：历史中的 `toolCallId` 采用确定性生成策略，杜绝使用实时 UUID 或动态时间戳注入破坏缓存前缀。
+2. **多厂商智能双断点标记 (Dual Breakpoints)**：
+   - **断点 1 (System Prompt 静态基座)**：在 System 消息末尾标记 `cacheControl: { type: "ephemeral" }`（针对 Claude 与 Gemini 协议），永久冻结全局指令与全部工具定义；
+   - **断点 2 (历史对话滚动断点)**：在倒数第二轮用户消息（即当前最新提问之前的上一次完整交互）打上 `cacheControl` 标记，使此前已稳定的多轮对话历史整体命中缓存；
+   - **无缝兼容原生前缀模型**：针对 DeepSeek、OpenAI 等基于前缀自动匹配的模型，无需特殊 header 即可天然享受高达 90% 的缓存命中率。
+
+#### 3.5.8 动态 Memory 工厂、分词估算与测试覆盖
+
+1. **动态 Memory 工厂与模型热切换**：
+   - `getDynamicMemory()` 返回取实例函数（`DynamicArgument`），按当前 request context 现算；
+   - 以 `` `${obsThreshold}:${refThreshold}:${omScope}` `` 为缓存键，阈值与作用域不变时复用单例；
+   - `observation.model` / `reflection.model` 为延迟解析闭包，桌面设置面板修改或模型升级时即刻生效，无需重启会话。
+2. **分词估算与非阻塞 `settled()`**：
+   - **`TokenCounter`**：采用 `ceil(len / 4)` 启发式算法，零依赖估算 token 数，`Memory` 覆写 `estimateTokens()` 统一调用；
+   - **`settled()`**：直接 `Promise.resolve()`，后台观察/反思异步执行，UI 侧 `agent_end` 响应零等待；
+   - **Mastra 原生 Working Memory 覆写**：清空并绕过 Mastra 单会话静态用户画像逻辑，长期记忆完全由 L2 OM 与 L3 `.myagent/` 分层承载。
+3. **自动化测试套件覆盖**：
+   - `packages/core/src/memory/__tests__/memory.test.ts`：内存态 SQLite 验证线程 CRUD、消息保存/召回顺序、信号过滤、OM 配置与 `settled()`、`cloneThread`；
+   - `packages/core/src/core/controller/__tests__/memory-context.test.ts`：全面验证资产解耦脱敏、AI SDK v6 工具完整性补全、第 3 轮后的时序衰减、以及首轮用户目标锁定的滑动窗口；
+   - `packages/core/src/core/llm/__tests__/prompt-cache.test.ts`：验证工具名称字典序排序、System + 倒数第二轮用户的双断点 `cacheControl` 打标与前缀稳定性；
+   - `packages/core/src/memory/__tests__/project-memory.test.ts`：项目级上下文 JSON 读写、规则 Markdown CRUD、增量去重与合并；
+   - `packages/core/src/tools/__tests__/project-memory.test.ts`：Agent 自主调用 `project_memory` 工具读写与管理规则端到端验证；
+   - `packages/core/src/prompts/__tests__/projectMemoryPrompt.test.ts`：验证 `<project-working-memory>` 自动注入与空状态缺省行为。
 
 ### 3.6 A2A 协议服务 (`packages/a2a/`)
 

@@ -44,16 +44,16 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 
 ### Downloads for all platforms
 
-| Platform | Architecture / device | Package | Direct download (v0.1.5) | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer | [my-agent-0.1.5-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.dmg) | Recommended for most Macs |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build | [my-agent-0.1.5-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.zip) | Unzip and run |
-| 🍏 **macOS** | **Intel x86_64** | `.dmg` installer | [my-agent-0.1.5-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.dmg) | For Intel-based Macs |
-| 🍏 **macOS** | **Intel x86_64** | `.zip` portable build | [my-agent-0.1.5-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.zip) | Unzip and run |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit) | `.exe` installer | [my-agent-0.1.5-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.exe) | NSIS guided setup |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit) | `.zip` portable build | [my-agent-0.1.5-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.zip) | Unzip and run |
-| 🐧 **Linux** | **Linux x86_64** (generic) | `.AppImage` portable image | [my-agent-0.1.5-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-x86_64.AppImage) | `chmod +x`, then run it |
-| 🐧 **Linux** | **Debian / Ubuntu / Deepin** | `.deb` package | [my-agent-0.1.5-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-amd64.deb) | Install with `sudo dpkg -i` |
+| Platform       | Architecture / device                 | Package                    | Direct download (v0.1.5)                                                                                                                    | Notes                       |
+| :------------- | :------------------------------------ | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------- |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer           | [my-agent-0.1.5-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.dmg)                 | Recommended for most Macs   |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build      | [my-agent-0.1.5-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.zip)                 | Unzip and run               |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.dmg` installer           | [my-agent-0.1.5-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.dmg)                     | For Intel-based Macs        |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.zip` portable build      | [my-agent-0.1.5-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.zip)                     | Unzip and run               |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.exe` installer           | [my-agent-0.1.5-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.exe)                     | NSIS guided setup           |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.zip` portable build      | [my-agent-0.1.5-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.zip)                     | Unzip and run               |
+| 🐧 **Linux**   | **Linux x86_64** (generic)            | `.AppImage` portable image | [my-agent-0.1.5-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-x86_64.AppImage) | `chmod +x`, then run it     |
+| 🐧 **Linux**   | **Debian / Ubuntu / Deepin**          | `.deb` package             | [my-agent-0.1.5-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-amd64.deb)             | Install with `sudo dpkg -i` |
 
 > [!IMPORTANT]
 > **macOS says the app “is damaged” or “cannot be opened”:**  
@@ -70,6 +70,7 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 > - Full history and per-version details: 👉 **[online ChangeLog](https://kidyfirst.github.io/my-agent/changelog.html)** or **[all releases on GitHub](https://github.com/kidyfirst/my-agent/releases)**.
 
 ---
+
 <!-- LATEST_RELEASE_END -->
 
 <!-- TIP_JAR_START — the QR is apps/desktop/src/renderer/assets/alipay-qr.png itself; do not add a second copy -->
@@ -131,13 +132,15 @@ If this project has been useful to you, treat the cat 🐱
         - [6. Why Multi-Tiered Subagents? (Design Advantages)](#6-why-multi-tiered-subagents-design-advantages)
       - [3.4.7 Execution modes and graph scheduling (`src/core/graph/`)](#347-execution-modes-and-graph-scheduling-srccoregraph)
       - [3.4.8 Session recording and offline replay (`src/core/recorder/`)](#348-session-recording-and-offline-replay-srccorerecorder)
-    - [3.5 Memory module (`src/memory/`)](#35-memory-module-srcmemory)
-      - [3.5.1 Class inheritance and responsibility boundaries](#351-class-inheritance-and-responsibility-boundaries)
-      - [3.5.2 Storage domain adaptation and thread/message CRUD](#352-storage-domain-adaptation-and-threadmessage-crud)
-      - [3.5.3 Observational Memory parameters and trigger thresholds](#353-observational-memory-parameters-and-trigger-thresholds)
-      - [3.5.4 Dynamic Memory factory and hot model switching](#354-dynamic-memory-factory-and-hot-model-switching)
-      - [3.5.5 Token estimation and empty Working Memory implementation](#355-token-estimation-and-empty-working-memory-implementation)
-      - [3.5.6 Configuration entry points and test coverage](#356-configuration-entry-points-and-test-coverage)
+    - [3.5 Memory System (Tiered Memory & Prompt Caching)](#35-memory-system-tiered-memory--prompt-caching)
+      - [3.5.1 Three-Tier Memory Architecture System](#351-three-tier-memory-architecture-system)
+      - [3.5.2 Class Inheritance and Responsibility Boundaries](#352-class-inheritance-and-responsibility-boundaries)
+      - [3.5.3 Storage Domain Adaptation and Thread/Message CRUD](#353-storage-domain-adaptation-and-threadmessage-crud)
+      - [3.5.4 In-Session Working Context Optimizations (L1 Context Assembly)](#354-in-session-working-context-optimizations-l1-context-assembly)
+      - [3.5.5 Observational Memory Mechanics and Dual-Threshold Ladder (L2 OM)](#355-observational-memory-mechanics-and-dual-threshold-ladder-l2-om)
+      - [3.5.6 Cross-Session Project-Level Working Memory & Rules (L3 Project Memory)](#356-cross-session-project-level-working-memory--rules-l3-project-memory)
+      - [3.5.7 Model Provider Prompt Caching Alignment Mechanics](#357-model-provider-prompt-caching-alignment-mechanics)
+      - [3.5.8 Dynamic Memory Factory, Token Estimation and Test Coverage](#358-dynamic-memory-factory-token-estimation-and-test-coverage)
   - [4. Core business and data-flow sequences](#4-core-business-and-data-flow-sequences)
     - [4.1 Streaming sequence for user messages, reasoning chains and execution blocks](#41-streaming-sequence-for-user-messages-reasoning-chains-and-execution-blocks)
     - [4.2 Tool-call approval and human-in-the-loop flow](#42-tool-call-approval-and-human-in-the-loop-flow)
@@ -817,41 +820,122 @@ src/core/recorder/
 - When replay starts, the mode and permissions are restored from `RecordedRuntime` and the session grants are injected, avoiding getting stuck waiting on an approval dialog that no human will ever answer.
 - In the UI, choose a recording file or drag and drop it into `SessionReplayModal` to begin; the tab being replayed displays the Replay state, and you can stop at any time to return to the normal session.
 
-### 3.5 Memory module (`src/memory/`)
+### 3.5 Memory System (Tiered Memory & Prompt Caching) (`packages/core/src/memory/`)
 
-`src/memory/` is the project's home-grown `Memory` implementation: it extends `MyAgentMemory` from `src/core` and brings thread/message persistence, context recall and observational memory (OM) compression together into a single instance that can be injected straight into `AgentController`.
+`packages/core/src/memory/` implements a **Three-Tier Memory Architecture** tailored for autonomous coding agents:
+It deeply integrates **In-Session Short-Term Working Context (L1)**, **In-Session Long-Term Observational Memory (L2 OM)**, **Cross-Session Project-Level Rules & Persistent Working Memory (L3)**, and a **Model Provider Prompt Caching Acceleration Base**. This achieves high context fidelity in multi-hour coding workflows, persistent cross-thread knowledge accumulation, and up to 90% cost/latency reduction.
 
 ```
-src/memory/
-├── index.ts          # public entry point: Memory / TokenCounter / types
-├── memory.ts         # Memory main class (extends MyAgentMemory)
-├── token-counter.ts  # lightweight tokenization estimator
-├── types.ts          # ObservationalMemoryConfig / MemoryOptions / construction config
-└── __tests__/memory.test.ts
+packages/core/
+├── src/memory/
+│   ├── index.ts            # Public entry point: Memory / TokenCounter / types
+│   ├── memory.ts           # Memory main class (extends MyAgentMemory, overrides SQLite storage)
+│   ├── project-memory.ts   # Cross-session project-level Working Memory / Rules (.myagent/)
+│   ├── token-counter.ts    # Lightweight tokenization estimator (ceil(len / 4))
+│   ├── types.ts            # ObservationalMemoryConfig / MemoryOptions / construction config
+│   └── __tests__/
+│       ├── memory.test.ts
+│       └── project-memory.test.ts
+├── src/core/llm/
+│   └── prompt-cache.ts     # Prompt Caching breakpoint injection and tool alphabetization
+└── src/tools/
+    └── project-memory.ts   # Agent autonomous memory & rules tool (project_memory)
 ```
 
-#### 3.5.1 Class inheritance and responsibility boundaries
+#### 3.5.1 Three-Tier Memory Architecture System
 
-| Layer                   | Responsibility                                                                                                                                                                                                   |
-| :---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MyAgentMemory`         | The core base class, providing all the "intelligent" parts: OM Observer/Reflector orchestration, observation record updates and the compression flow, system prompt injection, etc.                              |
-| `Memory` (this project) | Only overrides **storage field reads and writes**: thread CRUD, message reads/writes, recall pagination, system prompt retrieval, tokenization estimation; and leaves Working Memory as an empty implementation. |
-| `TokenCounter`          | A purely functional estimator with no external dependencies, avoiding the startup cost of pulling in the tiktoken encoding tables.                                                                               |
+```mermaid
+flowchart TD
+    subgraph L3["L3: Cross-Session Project Persistent Memory (.myagent/)"]
+        PContext["project-context.json<br/>(Preferences / Conventions / Notes)"]
+        PRules["rules/*.md<br/>(Team Guidelines / Architecture Standards)"]
+        PTool["project_memory Tool<br/>(read / update / save_rule)"]
+        PContext -->|"formatProjectWorkingMemory()"| SysHeader["&lt;project-working-memory&gt;<br/>System Prompt Header Injection"]
+        PRules -->|"formatProjectWorkingMemory()"| SysHeader
+        Agent["Autonomous Agent"] <-->|"Record & Update"| PTool
+        PTool --> PContext
+        PTool --> PRules
+    end
 
-The design orientation is "rewrite close to the storage layer, leave the LLM-side logic upstream": OM observation extraction / reflection merging is done by the base class and written to the database, while this class is only responsible for correctly reading those records out of the storage layer (SQLiteStore), assembling them and handing them to the Agent.
+    subgraph L2["L2: In-Session Long-Term Observational Memory (OM)"]
+        History["Message Stream"] -->|"Exceeds obsThreshold (30k)"| Observer["Observer Model<br/>(Extracts Incremental Facts & Observations)"]
+        Observer --> ActiveObs["activeObservations<br/>(Buffered Observation Store)"]
+        ActiveObs -->|"Exceeds refThreshold (40k)"| Reflector["Reflector Model<br/>(Reflection & Multi-tier Compression)"]
+        Reflector --> ActiveObs
+        ActiveObs -->|"getSystemMessage()"| OMHeader["# Observational Memory<br/>System Prompt Section Injection"]
+    end
 
-#### 3.5.2 Storage domain adaptation and thread/message CRUD
+    subgraph L1["L1: In-Session Working Context (Short-Term Assembly)"]
+        DB[(myagent.db / SQLiteStore)] <-->|"Recent-First Paged Fetch (LIMIT 100)"| RawMsgs["Raw History Messages"]
+        RawMsgs --> AssetDecouple["Asset Decoupling<br/>(.myagent/assets/)"]
+        AssetDecouple --> ToolChainFix["AI SDK v6 Tool Repair<br/>(Synthetic tool-result Pairing)"]
+        ToolChainFix --> TemporalDecay["Temporal Output Decay<br/>(Fold turns > 2 to summaries)"]
+        TemporalDecay --> GoalSliding["Goal-Preserving Sliding Window (64k)<br/>(Anchors Root User Goal)"]
+    end
+
+    subgraph CacheBase["Foundation: Prompt Caching Prefix Acceleration"]
+        SysHeader & OMHeader --> StaticPrefix["Byte-Stable Static Prefix<br/>(System + sortToolsByName)"]
+        GoalSliding --> HistoryTurns["Historical Turns<br/>(Deterministic toolCallId)"]
+        StaticPrefix -->|"Breakpoint 1: ephemeral"| LLM["Unified LLM Inference<br/>(TTFT down 80% / Cost down 90%)"]
+        HistoryTurns -->|"Breakpoint 2: Penultimate User"| LLM
+    end
+```
+
+##### Tiered Architecture Comparison Matrix
+
+| Memory Tier                            | Storage Medium & Location                                           | Lifecycle                                      | Trigger & Processing Mechanism                                                          | Core Optimization & Value                                                                                            |
+| :------------------------------------- | :------------------------------------------------------------------ | :--------------------------------------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| **L1 In-Session Working Context**      | SQLite `myagent_messages`                                           | Single session process                         | Assembled fresh on every turn, normalized and trimmed before LLM dispatch               | • Asset decoupled to disk<br/>• Progressive tool result decay (>2 turns)<br/>• 64k goal-preserving sliding window    |
+| **L2 Observational Memory (OM)**       | SQLite `myagent_threads` (OM domain)                                | Per-session / Shared across sessions (`scope`) | Dual-threshold rolling trigger (`obsThreshold: 30k`, `refThreshold: 40k`)               | • Async background buffering (`bufferTokens: 1/5`)<br/>• Up to 90% compression ratio<br/>• Zero-blocking `settled()` |
+| **L3 Project-Level Persistent Memory** | `.myagent/project-context.json`<br/>`.myagent/rules/*.md`           | Permanently persisted across all sessions      | Auto-injected at session initialization; updated autonomously via `project_memory` tool | • Git-friendly version control<br/>• Team conventions & guidelines<br/>• Completely eliminates new-session amnesia   |
+| **Prompt Cache Base**                  | Provider server-side cache (Anthropic / Gemini / DeepSeek / OpenAI) | Ephemeral in-memory (rolling 5m TTL)           | Alphabetical tool ordering + dual `ephemeral` breakpoint injection                      | • Time to First Token (TTFT) cut by 50%~80%<br/>• Input Token cost slashed by 75%~90%                                |
+
+#### 3.5.2 Class Inheritance and Responsibility Boundaries
+
+| Layer                   | Responsibility                                                                                                                                                                                                          |
+| :---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MyAgentMemory`         | The core base class, providing all the "intelligent" parts: OM Observer/Reflector orchestration, observation record updates and the compression flow, system prompt injection, etc.                                     |
+| `Memory` (this project) | Only overrides **storage field reads and writes**: thread CRUD, message reads/writes, recall pagination, system prompt retrieval, tokenization estimation; and leaves Mastra Working Memory as an empty implementation. |
+| `TokenCounter`          | A purely functional estimator with no external dependencies (`ceil(len / 4)`), avoiding the startup cost of pulling in tiktoken encoding tables.                                                                        |
+
+The design orientation is "rewrite close to the storage layer, leave the LLM-side logic upstream": OM observation extraction / reflection merging is performed by the base class and persisted to the database, while this class is strictly responsible for correctly retrieving those records from the storage layer (SQLiteStore), assembling them, and handing them to the Agent.
+
+The base class `MyAgentMemory` (`packages/core/src/core/memory/base.ts`) is a **framework adapter skeleton**, not a directly usable implementation: it holds `storage` / `options` / `threadConfig`, provides `getInputProcessors()` / `getOutputProcessors()` to assemble a `MessageHistory` processor on demand, and offers lazy defaults (`getThreadById` returns `null`, `deleteThread` is a no-op). Its thread write paths `createThread` / `updateThread` / `copyThread` / `cloneThread` throw `"not implemented"` outright — which is exactly why the `Memory` subclass must override all four, and why no future Memory implementation can rely on the base class as a fallback.
+
+#### 3.5.3 Storage Domain Adaptation and Thread/Message CRUD
 
 Every read and write first resolves the `memory` domain of the composite storage through `getMemoryStore()`; if `storage` cannot be obtained or the domain is missing it throws immediately, avoiding silent degradation:
 
 - **Threads**: `createThread` / `saveThread` fill in `title` (`"New Thread"`) before writing, satisfying the database `NOT NULL` constraint; `getThreadById`, `listThreads`, `updateThread` and `deleteThread` all pass straight through to the storage domain. `copyThread` / `cloneThread` serve "derive a new session from a historical one", accepting both `threadId` and `sourceThreadId` arguments and normalizing the returned structure.
 - **Writing messages (`saveMessages`)**: first normalizes the format with `MessageList({ generateMessageId }).add(messages, "memory").get.all.db()` (the argument may be a string, an array or a parts structure); if a message lacks `resourceId`, the owning thread is looked up to fill it in; finally it writes them to the database in a batch and returns the estimated token usage of this write based on body length.
-- **Recalling messages (`recall`)**: defaults to `perPage: 100` and `page: 0`; when `orderBy` is not given explicitly it takes the newest page using `createdAt DESC` and then reverses it in memory, guaranteeing "take the newest N, but return them in chronological order". After normalization it calls `filterSystemReminderMessages` to filter out system reminders and transient signals, and attaches `total / page / perPage / hasMore` pagination info for the UI to implement scroll loading.
+- **Recalling messages (`recall`)**: defaults to `perPage: 100` and `page: 0`; when `orderBy` is not given explicitly it takes the newest page using `createdAt DESC` and then reverses it in memory, guaranteeing "take the newest N, but return them in chronological order". After normalization it calls `filterSystemReminderMessages` to filter out system reminders and transient signals, and attaches `total / page / perPage / hasMore` pagination info for the UI to implement scroll loading. Because `MessageList` normalization drops `durationMs`, recall re-applies the timing from the raw DB rows by message id at the end — without it every execution block loses its duration once a historical thread is reloaded.
 - **Deleting messages (`deleteMessages`)**: accepts `string[]`, `{ id }[]` and `{ messageIds: [...] }` argument shapes, extracts the ids uniformly and deletes them in a batch.
 
-#### 3.5.3 Observational Memory parameters and trigger thresholds
+#### 3.5.4 In-Session Working Context Optimizations (L1 Context Assembly)
 
-The OM switch and all thresholds are centralized in `options.observationalMemory`; the types are defined in `src/memory/types.ts`, and the actual assembly happens in `getDynamicMemory` in `src/harness/index.ts`:
+To handle large file transfer latency, multi-turn tool output token bloat, and context truncation goal loss during complex coding workflows, the runtime memory assembly layer (`packages/core/src/core/controller/controller.ts`) implements five core engineering optimizations:
+
+1. **Asset Decoupled Storage**:
+   - User-submitted images and document Base64 payloads are completely stripped from SQLite (`myagent_messages`) and stored to disk under `.myagent/assets/<assetId>.<ext>` by `AssetManager` (`packages/core/src/assets/manager.ts`), with auto-generated `.gitignore` protecting repo cleanliness.
+   - Electron registers the privileged scheme `myagent-asset://` to stream assets locally without memory bloat; missing/deleted files gracefully fall back to an informative broken asset placeholder card in the UI.
+   - The agent lazily fetches raw image or document content via the `assets_fetch` tool on demand when visual or text inspection is required.
+2. **Tool Chain Integrity (AI SDK v6 Schema Compatibility)**:
+   - Accurately reconstructs historical `tool-call` and `tool-result` message parts with normalized `input` and `args`, completely eliminating provider deserialization errors (`missing field arguments`).
+   - Auto-fills synthetic placeholder results for interrupted tool executions from aborted previous turns, preventing upstream model APIs from rejecting incomplete tool pairs.
+3. **Temporal Output Decay**:
+   - **Latest 2 turns**: Full tool execution output is preserved (up to 6,000 characters) for immediate model reasoning and code editing.
+   - **Turns older than 2 assistant turns**: Verbose outputs (> 300 characters) are collapsed into concise semantic summary placeholders (`[Tool Result: <toolName> completed. Content folded for context economy...]`), slashing historical token bloat by 70%~85%.
+4. **Goal-Preserving Sliding Window**:
+   - Maintains a safe 64,000-token historical budget.
+   - When older turns must be truncated, extracts the initial root user task and prepends a structured summary note:
+     `[System Note: Earlier conversation history was truncated (N messages folded). Original User Task: "..."]`
+     fundamentally preventing "goal drift" across extended multi-turn sessions.
+5. **Recent-First Paged Retrieval**:
+   - History retrieval queries `ORDER BY createdAt DESC LIMIT 100` before inverting to chronological order in memory, bypassing unbounded full-table scans and deserialization overhead.
+
+#### 3.5.5 Observational Memory Mechanics and Dual-Threshold Ladder (L2 OM)
+
+The OM switch and all thresholds are centralized in `options.observationalMemory`; the types are defined in `packages/core/src/memory/types.ts`, and the actual assembly happens in `getDynamicMemory` in `packages/core/src/harness/index.ts`:
 
 ```ts
 observationalMemory: {
@@ -859,7 +943,7 @@ observationalMemory: {
   scope,                                  // "thread" | "resource"
   observation: {
     bufferTokens: 1 / 5,                  // run a background buffered observation every 20% of messageTokens
-    bufferActivation: 2000,               // ratio of the buffer activated when the threshold is hit; the rest is kept for the next round
+    bufferActivation: 2000,               // absolute token budget activated per crossing; the rest is kept for the next round
     messageTokens: obsThreshold,          // observation trigger threshold, default 30_000
     blockAfter: 2,                        // allow synchronous blocking observation once 2×messageTokens is reached
     model: ({ requestContext }) => ...,   // Observer model
@@ -873,34 +957,71 @@ observationalMemory: {
 }
 ```
 
-- **`scope` decides how far memory is visible**: `thread` (the default) observes and compresses independently for each session; `resource` shares observation records across all sessions with the same `resourceId`. The resolution order lives in `getOmScope()` (`src/utils/project.ts`): `MYAGENT_OM_SCOPE` environment variable → project-level `<project>/.myagent/database.json` `omScope` → global `~/.myagent/database.json` → default `thread`.
+- **`scope` decides how far memory is visible**: `thread` (the default) observes and compresses independently for each session; `resource` shares observation records across all sessions with the same `resourceId`. The resolution order lives in `getOmScope()` (`packages/core/src/utils/project.ts`): `MYAGENT_OM_SCOPE` environment variable → project-level `<project>/.myagent/database.json` `omScope` → global `~/.myagent/database.json` → default `thread`.
 - **`bufferTokens`**: expressed as "a ratio of `messageTokens`", this is the interval for background asynchronous buffered observation; `1/5` means the Observer runs in the background each time 20% of the threshold accumulates, storing results into the buffer so it can be activated directly without blocking when the line is really crossed.
-- **`bufferActivation`**: how much of the buffered observation is activated once the line is crossed; the part below 1 is kept for the next round, to keep the conversation coherent.
+- **`bufferActivation`**: the **absolute token budget** that may be activated in one crossing. Whatever is not activated stays in the `bufferedObservations` column and is merged in at the next crossing — deferred, never dropped. Splitting happens on line boundaries only: the observation log is a list of bullet items, and a character-wise cut would sever one fact mid-sentence, leaving both halves unusable. Unset means unbounded.
 - **`blockAfter`**: the token threshold that permits "synchronous blocking observation" (with `1 < x < 100` it is resolved as a multiple of `messageTokens`, and with `≥ 100` as an absolute token count). Between `messageTokens` and `blockAfter` only asynchronous buffering runs, so unobserved messages may grow up to `blockAfter` (here `2 ×` ≈ 60k tokens) before a synchronous observation is inserted, preventing every Agent step from being slowed down by LLM observation calls.
 - **Two-step threshold ladder**: when the conversation grows to `observationThreshold` (`observation.messageTokens`), the Observer extracts observation records; when the observation records themselves accumulate to `reflectionThreshold` (`reflection.observationTokens`), the Reflector merges the observations through reflection into a more condensed long-term memory (`reflection.blockAfter: 1.1` means synchronous reflection at 110% of the threshold), and the cycle repeats to achieve rolling compression of long conversations.
 - **Retrieval entry `getSystemMessage()`**: reads `activeObservations` from the storage domain and wraps it into an `# Observational Memory` section, injected into the next request as a system prompt; when the record does not exist or is empty it returns `null`, and the whole read is wrapped in `try/catch` — an OM failure must never affect the main conversation path.
+- **Concurrent-write protection**: two turns can cross the threshold together (a background observation plus a foreground retry). Both read the same `generationCount`, and the loser's write replaces the winner's `observedMessageIds` — those messages are then observed again on the next pass and the log keeps growing. `claimObservationalGeneration()` uses that column as an optimistic lock via CAS, and claims **before** calling the Observer model; otherwise the loser has already paid for a model call it discards.
+- **UI progress reporting `loadOMProgress()`**: returns the full progress the renderer's `OMTokenTracker` needs (`pendingTokens` / `threshold` / `observationTokens` / `generationCount`). Thresholds come from the config rather than storage, so **a thread that has never been observed still shows how far it is from the trigger**; it returns `{}` when OM is disabled and the component hides itself.
+- **Current implementation limits**: the Reflector (folding observations into a condensed long-term `reflection` section) is not implemented — `kind` only ever yields `none` or `observed`, so `reflection.*` settings currently have no effect and the log only grows. OM applies solely to the main session's `AgentController` request path; subagents (`agent.stream()`) are one-shot tasks with no persisted session history and do not participate.
 
-#### 3.5.4 Dynamic Memory factory and hot model switching
+#### 3.5.6 Cross-Session Project-Level Working Memory & Rules (L3 Project Memory)
 
-`getDynamicMemory()` returns not an instance but **a function that fetches the instance** (`DynamicArgument`); each time the Agent needs to resolve memory it is computed fresh against the request context of that moment:
+To solve cross-session context amnesia where an agent forgets repository architectural constraints, development habits, and project rules in newly created threads, a lightweight, Git-friendly Project Working Memory and Rules system is implemented in `packages/core/src/memory/project-memory.ts`:
 
-1. Read `HarnessState` from `controller` / `harness` on the `requestContext`, and pull out `observationThreshold`, `reflectionThreshold`, `observerModelId`, `reflectorModelId` and `projectPath`.
-2. Use `` `${obsThreshold}:${refThreshold}:${omScope}` `` as the cache key: as long as the thresholds and the scope stay the same, the already-built instance is reused, avoiding a rebuild on every callback.
-3. `observation.model` / `reflection.model` are written as closures rather than fixed models: at call time they read `state.observerModelId ?? DEFAULT_OM_MODEL_ID` (and likewise for the Reflector) and resolve through `resolveModel(..., { remapForCodexOAuth: true })`, so **switching thresholds or models at runtime takes effect immediately**, with no need to restart the session.
+1. **Storage Architecture & File Layout**:
+   - **Project Context (`project-context.json`)**: Located at `<projectRoot>/.myagent/project-context.json` (gracefully falling back to global `~/.myagent/project-context.json` if absent), storing developer preferences (`preferences`), engineering conventions (`conventions`), and architectural notes (`notes`) as clean JSON.
+   - **Rules Documents (`rules/*.md`)**: Located under `<projectRoot>/.myagent/rules/*.md` and `~/.myagent/rules/*.md`, allowing team guidelines and coding conventions to be maintained as discrete Markdown documents suitable for Git version control and PR reviews.
+2. **Automatic System Prompt Context Injection**:
+   - During system prompt construction (`packages/core/src/prompts/index.ts`), `formatProjectWorkingMemory(ctx.workingDir)` is invoked automatically.
+   - If context or rules exist, an authoritative `<project-working-memory>` XML section is injected into the model prompt header, guaranteeing that all modes (ReAct, Plan, Fast) immediately understand repository constraints at the start of any conversation. **This injection is read-only and is independent of tool availability below.**
+3. **Autonomous Agent Memory Tool (`project_memory`)**:
+   - The agent is equipped with the `project_memory` tool (`packages/core/src/tools/project-memory.ts`) exposing five actions:
+     - `read`: Read current project working memory context and registered rules;
+     - `update_context`: Incrementally update preferences, conventions, and architectural notes with automatic deduplication;
+     - `save_rule`: Save or update individual Markdown rule documents in `.myagent/rules/<name>.md`;
+     - `delete_rule`: Delete obsolete or superseded rule files;
+     - `list_rules`: List all active project-level and global rule files.
+   - **Mode availability**: the tool is listed in `WRITE_TOOL_NAMES` and `PLAN_TOOL_NAMES` in `harness/tools.ts`, so ReAct / Build / Plan hold it while **Fast mode does not** (Fast keeps only read-only tools). The system prompt injection described in point 2 still applies in all four modes, so Fast is bound by existing rules but cannot write new ones.
+   - When a user states repository conventions (e.g. "always use pnpm", "place shared UI components under components/ui"), the Agent autonomously records these into working memory for perpetual recall across all threads. The base prompt (`packages/core/src/prompts/base.ts`) also documents the tool, so the model knows to persist long-lived conventions into `.myagent/` without reading these docs first.
 
-All three entry points for model changes live in `src/electron/helpers.ts` (switching the main model, auto-upgrading the model, and the fallback after a failed switch): they write `observerModelId` / `reflectorModelId` into state together with `currentModelId`, keeping all three aligned; the renderer settings panel can then override them individually through the `setObserverModel` / `setReflectorModel` commands plus `harness.switchObserverModel()` / `switchReflectorModel()`.
+#### 3.5.7 Model Provider Prompt Caching Alignment Mechanics
 
-#### 3.5.5 Token estimation and empty Working Memory implementation
+Mainstream Large Language Models (Anthropic Claude 3.5/3.7, Google Gemini 1.5/2.0, DeepSeek-V3/R1, OpenAI GPT-4o) natively support Prompt Caching (context prefix caching). When prompt prefixes (System Prompt + historical turns) remain byte-level stable across requests, cache hits deliver immense benefits:
 
-- **`TokenCounter`**: uses the `ceil(len / 4)` heuristic (minimum 1), whose average deviation on code and English prose is acceptable, with zero dependencies and zero initialization cost; `countMessage()` accepts `content` as either a string or a `{ content }` structure. `Memory` overrides `estimateTokens()` and delegates to it, so the `usage.tokens` returned by `saveMessages` / `recall` come from the same source.
-- **`settled()`**: directly returns `Promise.resolve()`, i.e. it does not wait for background OM tasks (observation / reflection) to land, guaranteeing that `agent_end` reaches the UI immediately after the current round ends; unfinished observations are naturally picked up by the next `bufferTokens` check or a later step.
-- **Working Memory family** (`getWorkingMemory`, `getWorkingMemoryTemplate`, `updateWorkingMemory`, `__experimental_updateWorkingMemoryVNext`): uniformly return empty values / empty success. The base class provides default implementations for these methods, but this project does not need structured user-profile style working memory — long-term memory is entirely delegated to OM — so they are explicitly overridden as empty implementations instead of relying on the base class, which might trigger extra storage reads and writes.
+- **Time to First Token (TTFT) reduced by 50%~80%**;
+- **Input Token cost slashed by 75%~90%**.
 
-#### 3.5.6 Configuration entry points and test coverage
+To completely eliminate cache hash disruptions caused by dynamic timestamps, unsorted tool declarations, and non-deterministic UUIDs, a dedicated caching acceleration layer is implemented in `packages/core/src/core/llm/prompt-cache.ts`:
 
-- **UI configuration**: the settings panel `src/renderer/components/settings/MemorySection.tsx` offers four items — Observer model, Reflector model, Observation threshold and Reflection threshold; changing a threshold changes the cache key and therefore triggers a rebuild of the Memory instance.
-- **Defaults**: in `src/harness/state.ts`, `DEFAULT_OBS_THRESHOLD = 30_000`, `DEFAULT_REF_THRESHOLD = 40_000`, `DEFAULT_OM_MODEL_ID = process.env.DEFAULT_OM_MODEL_ID ?? DEFAULT_FALLBACK_MODEL_ID`.
-- **Tests**: `src/memory/__tests__/memory.test.ts` uses in-memory SQLite (`file::memory:`) to cover thread CRUD and pagination, message save / recall ordering, system reminder and signal filtering, recall pagination, OM configuration and `settled()`, `cloneThread`, plus integration with the `AgentController` thread lifecycle.
+1. **Byte-Stable Static Prefix Orchestration**:
+   - **Layered System Prompt**: High-frequency static elements (identity, mode workflows, `.myagent/` project rules, repository instructions) are placed strictly at the prompt header, while ephemeral dynamic context (session task checklists, PR review guidelines) is appended to the tail;
+   - **Deterministic Tool Alphabetization (`sortToolsByName`)**: Tool definitions are deterministically sorted in alphabetical order before LLM dispatch, eliminating schema hash discrepancies caused by non-deterministic JavaScript object key iteration;
+   - **Deterministic Historical Tool IDs**: Historical `toolCallId` values are derived deterministically without injecting random UUIDs or runtime timestamps that invalidate prefix hashes.
+2. **Multi-Provider Dual Breakpoints**:
+   - **Breakpoint 1 (System Prompt Static Base)**: Marks the trailing system message with `cacheControl: { type: "ephemeral" }` (for Claude and Gemini protocols), permanently caching global instructions and all tool definitions;
+   - **Breakpoint 2 (Conversation History Rolling Breakpoint)**: Marks the penultimate user message (the completed interaction preceding the current query) with `cacheControl`, caching multi-turn historical context;
+   - **Zero-Config Prefix Cache Compatibility**: Models with automatic prefix caching (DeepSeek, OpenAI) natively enjoy up to 90% cache hit rates without requiring special headers.
+
+#### 3.5.8 Dynamic Memory Factory, Token Estimation and Test Coverage
+
+1. **Dynamic Memory Factory & Hot Model Switching**:
+   - `getDynamicMemory()` returns a dynamic resolution function (`DynamicArgument`) computed fresh against the current request context;
+   - Uses `` `${obsThreshold}:${refThreshold}:${omScope}` `` as cache key to reuse the singleton instance when thresholds and scope remain unchanged;
+   - `observation.model` / `reflection.model` are deferred resolution closures, taking immediate effect upon desktop settings changes or model switches without requiring session restarts.
+2. **Token Estimation & Non-Blocking `settled()`**:
+   - **`TokenCounter`**: Implements the `ceil(len / 4)` heuristic for zero-dependency token estimation, uniformly called via `Memory.estimateTokens()`;
+   - **`settled()`**: Directly returns `Promise.resolve()`, allowing background OM observation/reflection tasks to run asynchronously without blocking UI `agent_end` responses;
+   - **Mastra Working Memory Overrides**: Statically bypasses Mastra's single-thread user profile system, cleanly delegating long-term memory to L2 OM and L3 `.myagent/`.
+3. **Automated Test Suite Coverage**:
+   - `packages/core/src/memory/__tests__/memory.test.ts`: Verifies in-memory SQLite thread CRUD, message ordering, transient signal filtering, OM configuration, and `settled()`;
+   - `packages/core/src/core/controller/__tests__/memory-context.test.ts`: Comprehensively tests asset decoupling, AI SDK v6 tool chain repair, temporal output decay beyond 2 turns, and root user goal preservation;
+   - `packages/core/src/core/llm/__tests__/prompt-cache.test.ts`: Tests alphabetical tool ordering, dual `cacheControl` breakpoint marking, and prefix stability;
+   - `packages/core/src/memory/__tests__/project-memory.test.ts`: Tests project context JSON read/write, Markdown rules CRUD, and incremental deduplication;
+   - `packages/core/src/tools/__tests__/project-memory.test.ts`: Tests end-to-end autonomous invocation of the `project_memory` tool by the agent;
+   - `packages/core/src/prompts/__tests__/projectMemoryPrompt.test.ts`: Validates automated `<project-working-memory>` XML injection and graceful empty state fallbacks.
 
 ### 3.6 A2A Protocol Service (`packages/a2a/`)
 

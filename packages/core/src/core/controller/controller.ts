@@ -24,6 +24,10 @@ import {
 import { AssetManager } from "../../assets/manager.js"
 import { setRuntimeCategoryPolicy } from "../../permissions.js"
 import { sortToolsByName } from "../llm/prompt-cache.js"
+import {
+	formatObservationalMemory,
+	resolveBlockAfter,
+} from "../memory/observational.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
 export type ToolCategory =
@@ -303,9 +307,118 @@ export class AgentController<TState = any> {
 			values: { [opts.key]: opts.value },
 		})
 	}
+	/**
+	 * Reports observational-memory state for the UI token tracker.
+	 *
+	 * The tracker hides itself when both thresholds are 0, so returning `{}`
+	 * (the previous stub) left it permanently invisible: the fields it reads
+	 * were simply absent. Thresholds come from the config rather than storage,
+	 * because a thread that has never been observed still needs to show how far
+	 * it is from the trigger.
+	 */
+	async loadOMProgress(target?: unknown): Promise<unknown> {
+		const memory = this.memory as any
+		const resolveFactory =
+			typeof memory === "function"
+				? memory({ requestContext: new RequestContext() })
+				: memory
+		const m = await resolveFactory
+		if (!m) return {}
 
-	async loadOMProgress(_target?: unknown): Promise<unknown> {
-		return {}
+		let threadId = ""
+		let resourceId = this.resourceId || ""
+		if (typeof target === "string") {
+			resourceId = target || resourceId
+		} else if (target && typeof (target as any).thread?.getId === "function") {
+			threadId = (target as any).thread.getId() || ""
+			resourceId = (target as any).resourceId || resourceId
+		}
+
+		// Without a thread there is nothing observed yet; the tracker still needs
+		// the thresholds so it can show the build-up toward the first trigger.
+		if (!threadId && resourceId) {
+			try {
+				const store = await this.getMemoryStore()
+				const res = await store?.listThreads?.({
+					resourceId,
+					orderBy: { field: "updatedAt", direction: "DESC" },
+					perPage: 1,
+				})
+				const threads = Array.isArray(res) ? res : (res?.threads ?? [])
+				threadId = threads[0]?.id ?? ""
+			} catch {
+				// A missing thread only costs the record fields, not the thresholds.
+			}
+		}
+
+		const config = m.resolveObservationalConfig?.() ?? null
+		const obsConfig = config?.observation ?? {}
+		const refConfig = config?.reflection ?? {}
+		const messageTokens: number = obsConfig.messageTokens ?? 30_000
+		const observationTokens: number = refConfig.observationTokens ?? 40_000
+		if (!config || (messageTokens === 0 && observationTokens === 0)) {
+			return {}
+		}
+
+		const record = threadId
+			? await m.getObservationalRecord?.(threadId, resourceId)
+			: null
+		const pendingTokens = Number(record?.pendingMessageTokens ?? 0)
+		const activeObservationTokens = Number(
+			record?.observationTokenCount ??
+				(record?.activeObservations
+					? (m.tokenCounter?.estimateTokens?.(record.activeObservations) ?? 0)
+					: 0),
+		)
+		const reflectionThreshold = resolveBlockAfter(
+			refConfig.blockAfter,
+			observationTokens,
+			1.1,
+		)
+
+		const pct = (value: number, threshold: number) =>
+			threshold > 0 ? Math.min(100, (value / threshold) * 100) : 0
+
+		return {
+			status: record?.isReflecting
+				? ("reflecting" as const)
+				: record?.isObserving
+					? ("observing" as const)
+					: ("idle" as const),
+			pendingTokens,
+			threshold: messageTokens,
+			thresholdPercent: pct(pendingTokens, messageTokens),
+			observationTokens: activeObservationTokens,
+			reflectionThreshold,
+			reflectionThresholdPercent: pct(
+				activeObservationTokens,
+				reflectionThreshold,
+			),
+			buffered: {
+				observations: {
+					status: record?.bufferedObservations
+						? ("complete" as const)
+						: ("idle" as const),
+					chunks: record?.bufferedObservations
+						? record.bufferedObservations.split("\n").length
+						: 0,
+					messageTokens: pendingTokens,
+					// What the next crossing would remove from the window.
+					projectedMessageRemoval: Number(
+						record?.bufferedObservationTokens ?? 0,
+					),
+					observationTokens: Number(record?.bufferedObservationTokens ?? 0),
+				},
+				reflection: {
+					status: "idle" as const,
+					inputObservationTokens: 0,
+					observationTokens: 0,
+				},
+			},
+			generationCount: Number(record?.generationCount ?? 0),
+			stepNumber: Number(record?.generationCount ?? 0),
+			preReflectionTokens: activeObservationTokens,
+		}
 	}
 
 	getWorkspaceById(workspaceId: string): any {
@@ -1236,6 +1349,8 @@ export class Session<TState = any> {
 		traceStorage.enterWith({ traceId: runId, threadId })
 		let recorder: any = null
 		let replayModelUsed: any = null
+		let memory: any = null
+		const requestContext = options.requestContext || new RequestContext()
 
 		const threadRunState = {
 			threadId,
@@ -1392,7 +1507,6 @@ export class Session<TState = any> {
 			})
 
 			// 2. Prepare request context
-			const requestContext = options.requestContext || new RequestContext()
 			if (!requestContext.get("controller")) {
 				requestContext.set("controller", this.controller)
 			}
@@ -1402,6 +1516,13 @@ export class Session<TState = any> {
 			requestContext.set("session", this)
 			requestContext.set("threadId", threadId)
 			requestContext.set("resourceId", resourceId)
+
+			// Resolve memory instance: `memory` may be an instance or a factory receiving requestContext.
+			const memoryFactory = this.controller.memory
+			memory =
+				typeof memoryFactory === "function"
+					? await memoryFactory({ requestContext })
+					: memoryFactory
 
 			// 3. Emit agent start
 			this.emit({
@@ -1652,7 +1773,44 @@ export class Session<TState = any> {
 				threadId,
 				limit: 100,
 			})
-			const historyMessages: any[] = historyRes?.messages || []
+			const historyMessages: any[] = [...(historyRes?.messages || [])]
+
+			// Call memory input processors if registered
+			if (memory && typeof (memory as any).getInputProcessors === "function") {
+				try {
+					const inputProcessors = await (memory as any).getInputProcessors([], {
+						requestContext,
+						threadId,
+						resourceId,
+					})
+					for (const processor of inputProcessors) {
+						if (typeof processor?.processInput === "function") {
+							await processor.processInput({
+								messageList: {
+									threadId,
+									resourceId,
+									messages: historyMessages,
+									prependMessages: (msgs: any[]) => {
+										const existingIds = new Set(
+											historyMessages.map((m) => m.id).filter(Boolean),
+										)
+										for (let i = msgs.length - 1; i >= 0; i--) {
+											const m = msgs[i]
+											if (!m.id || !existingIds.has(m.id)) {
+												historyMessages.unshift(m)
+												if (m.id) existingIds.add(m.id)
+											}
+										}
+									},
+								},
+								requestContext,
+							})
+						}
+					}
+				} catch (procErr) {
+					console.warn("[Session] Error in memory input processors:", procErr)
+				}
+			}
 
 			// Convert history messages to AI SDK CoreMessage format.
 			// Two kinds of rows must not be replayed as chat turns:
@@ -1997,6 +2155,91 @@ export class Session<TState = any> {
 				return tokens
 			})
 
+			// Observational memory: fold earlier turns into a rolling summary
+			// carried in the system prompt so the truncation window can drop raw
+			// messages without discarding durable decisions, paths, and constraints.
+			let observationBlock: string | null = null
+			if (memory) {
+				const omConfig =
+					typeof (memory as any).resolveObservationalConfig === "function"
+						? (memory as any).resolveObservationalConfig()
+						: (memory as any)?.observationalMemory ||
+							(memory as any)?.options?.observationalMemory ||
+							null
+
+				const obs = omConfig?.observation
+				const messageTokensThreshold = obs?.messageTokens ?? 30_000
+				const bufferTokensRatio =
+					obs?.bufferTokens && obs.bufferTokens > 0 ? obs.bufferTokens : 1 / 5
+				const bufferTrigger = Math.floor(
+					messageTokensThreshold * bufferTokensRatio,
+				)
+				const syncBlockTrigger = resolveBlockAfter(
+					obs?.blockAfter,
+					messageTokensThreshold,
+					2,
+				)
+
+				const isSyncTriggered =
+					totalEstimatedTokens >= syncBlockTrigger ||
+					totalEstimatedTokens > MAX_HISTORY_TOKENS
+				const isBufferTriggered = totalEstimatedTokens >= bufferTrigger
+
+				if (isSyncTriggered && typeof (memory as any).observe === "function") {
+					try {
+						const step = await (memory as any).observe({
+							threadId,
+							resourceId,
+							messages: historyMessages,
+							pendingTokens: totalEstimatedTokens,
+							requestContext,
+						})
+						if (step && step.kind !== "none") {
+							observationBlock = formatObservationalMemory(
+								step.activeObservations,
+							)
+						}
+					} catch {
+						// Observation is best-effort: on failure the plain token window
+						// below still keeps the request inside the model's limit.
+					}
+				} else if (
+					isBufferTriggered &&
+					typeof (memory as any).observe === "function"
+				) {
+					// Asynchronous observation in background: buffer observations
+					// without blocking the immediate response turn.
+					void Promise.resolve().then(async () => {
+						try {
+							await (memory as any).observe({
+								threadId,
+								resourceId,
+								messages: historyMessages,
+								pendingTokens: totalEstimatedTokens,
+								requestContext,
+							})
+						} catch {
+							// Best-effort background observation
+						}
+					})
+				}
+
+				// If synchronous observation didn't generate a fresh block, read existing
+				// observations from persistent store so they are still injected into the prompt.
+				if (
+					!observationBlock &&
+					typeof (memory as any).getSystemMessage === "function"
+				) {
+					try {
+						observationBlock =
+							(await (memory as any).getSystemMessage({
+								threadId,
+								resourceId,
+							})) ?? null
+					} catch {}
+				}
+			}
+
 			if (totalEstimatedTokens > MAX_HISTORY_TOKENS) {
 				let keptTokens = 0
 				let startIndex = coreMessages.length
@@ -2110,11 +2353,18 @@ export class Session<TState = any> {
 			}
 
 			// 7. Execute mode graph via GraphRunner
+			// The observation summary rides in the system prompt rather than as a
+			// message: a synthetic "user said earlier" turn would be replayed as a
+			// real instruction on the next request and could override the actual
+			// task, whereas the system prompt is re-sent verbatim each time.
+			const instructionsWithMemory = observationBlock
+				? `${instructions}\n\n${observationBlock}`
+				: instructions
 			const graphCtx: GraphExecutionContext = {
 				modeId: this._modeId || DEFAULT_EXECUTION_MODE,
 				model: activeModel as any,
 				modelIdStr,
-				instructions,
+				instructions: instructionsWithMemory,
 				executableTools: activeExecutableTools,
 				abortSignal: abortController.signal,
 				emit: (ev) => {
@@ -2200,6 +2450,31 @@ export class Session<TState = any> {
 				await store.saveMessages({ messages: [assistantDbMessage] })
 			}
 
+			// Call memory output processors if registered
+			if (memory && typeof (memory as any).getOutputProcessors === "function") {
+				try {
+					const outputProcessors = await (memory as any).getOutputProcessors(
+						[],
+						{
+							requestContext,
+							threadId,
+							resourceId,
+						},
+					)
+					for (const processor of outputProcessors) {
+						if (typeof processor?.processOutputResult === "function") {
+							await processor.processOutputResult({
+								messageList: [assistantDbMessage],
+								requestContext,
+								result: runResult,
+							})
+						}
+					}
+				} catch (procErr) {
+					console.warn("[Session] Error in memory output processors:", procErr)
+				}
+			}
+
 			// 9. Emit final message_end and agent_end
 			logger.info("run", "run completed", {
 				runId,
@@ -2255,6 +2530,27 @@ export class Session<TState = any> {
 						error: err?.message || String(err),
 					})
 				}
+			}
+
+			// Call memory error processors if registered
+			if (memory && typeof (memory as any).getErrorProcessors === "function") {
+				try {
+					const errorProcessors = await (memory as any).getErrorProcessors([], {
+						requestContext,
+						threadId,
+						resourceId,
+					})
+					for (const processor of errorProcessors) {
+						if (typeof processor?.processError === "function") {
+							await processor.processError({
+								error: err,
+								requestContext,
+								threadId,
+								resourceId,
+							})
+						}
+					}
+				} catch {}
 			}
 			const durationMs = Date.now() - startTime
 
