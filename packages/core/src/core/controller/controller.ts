@@ -60,10 +60,21 @@ export interface AvailableModel {
 
 import type { GraphTopologyMetadata } from "../graph/index.js"
 
+export interface ControllerMessageLike {
+	id?: string
+	role?: string
+	type?: string
+	content?: unknown
+	createdAt?: string
+	metadata?: Record<string, unknown>
+	[key: string]: unknown
+}
+
 export interface HarnessMode {
 	id: string
 	name: string
 	defaultModelId?: string
+	color?: string
 	metadata?: Record<string, unknown>
 	topology?: GraphTopologyMetadata
 }
@@ -264,6 +275,10 @@ export class AgentController<TState = any> {
 		return typeof this.storage.getStore === "function"
 			? await this.storage.getStore("memory")
 			: this.storage
+	}
+
+	async getMemoryStorage(): Promise<any> {
+		return this.getMemoryStore()
 	}
 
 	async writeThreadMetadataValues(opts: {
@@ -519,14 +534,20 @@ export class Session<TState = any> {
 		}
 	}
 
+	get memory() {
+		return this.controller.memory
+	}
+
+	get storage() {
+		return this.controller.storage
+	}
+
 	async getMemoryStore(): Promise<any> {
-		if (!this.controller.storage) return null
-		if (typeof this.controller.storage.init === "function") {
-			await this.controller.storage.init()
-		}
-		return typeof this.controller.storage.getStore === "function"
-			? await this.controller.storage.getStore("memory")
-			: this.controller.storage
+		return this.controller.getMemoryStore()
+	}
+
+	async getMemoryStorage(): Promise<any> {
+		return this.controller.getMemoryStorage()
 	}
 
 	get identity() {
@@ -943,7 +964,7 @@ export class Session<TState = any> {
 		return result
 	}
 
-	getCurrentAssistantMessage(threadId: string): any {
+	getCurrentAssistantMessage(threadId: string): ControllerMessageLike | null {
 		return this._threadRuns.get(threadId)?.currentAssistantMessage || null
 	}
 

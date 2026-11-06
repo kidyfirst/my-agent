@@ -3,6 +3,7 @@ import type { AuthManager } from "../hooks/useAuthManager"
 import type { ProjectManager } from "../hooks/useProjectManager"
 import type { TabManager } from "../hooks/useTabManager"
 import type { PermissionMode } from "../hooks/useThreadModelPermissions"
+import type { PendingApproval } from "../hooks/useDialogManager"
 import { BrowserView } from "./BrowserView"
 import { ChatView, type ChatViewProps } from "./ChatView"
 import { DiffEditor } from "./DiffEditor"
@@ -53,8 +54,8 @@ interface MainContentProps {
 	onDeleteQueued: QueueHandlers["handleDeleteQueued"]
 	onReorderQueue: QueueHandlers["handleReorderQueue"]
 	onClearQueue: QueueHandlers["handleClearQueue"]
-	threadsWithApproval?: Map<string, any>
-	pendingApproval?: any
+	threadsWithApproval?: Map<string, PendingApproval>
+	pendingApproval?: PendingApproval | null
 	onRespondApproval?: (options: {
 		decision: "approve" | "decline"
 		scope: "once" | "conversation" | "project" | "global"

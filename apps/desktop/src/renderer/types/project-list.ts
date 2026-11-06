@@ -1,6 +1,7 @@
 import type { QueuedMessage } from "./chat"
 import type { ThreadInfo } from "./ipc"
 import type { WorktreeStatus } from "./project"
+import type { PendingApproval } from "../hooks/useDialogManager"
 
 export interface WorktreeInfo {
 	path: string
@@ -89,6 +90,6 @@ export interface ProjectListProps {
 	onDeleteThread: (threadId: string) => void
 	onRenameThread: (threadId: string, title: string) => void
 	runningThreads?: Set<string>
-	threadsWithApproval?: Map<string, any>
+	threadsWithApproval?: Map<string, PendingApproval>
 	onAbort?: (threadId?: string) => void
 }

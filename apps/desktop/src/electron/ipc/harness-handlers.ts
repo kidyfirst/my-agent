@@ -1,7 +1,11 @@
 import * as path from "path"
 import * as os from "os"
 import * as fs from "fs"
-import type { IpcCommandHandler, HandlerContext } from "./types.js"
+import type {
+	IpcCommandHandler,
+	HandlerContext,
+	WorktreeSession,
+} from "./types.js"
 import { safeSend } from "../helpers.js"
 import { getBrowserPreview as readBrowserPreview } from "../browser-preview.js"
 import {
@@ -36,6 +40,10 @@ import {
 	YOLO_POLICIES,
 	type ToolCategory,
 	type PermissionPolicy,
+	type ControllerMessageLike,
+	type HarnessMode,
+	type HarnessThread,
+	type SessionEvent,
 } from "@my-agent/core"
 
 function validateRecordingFile(filePath?: string): {
@@ -59,7 +67,8 @@ function validateRecordingFile(filePath?: string): {
 				eventCount: 0,
 			}
 		}
-		let events: any[] = []
+		let events: Array<SessionEvent | { type: string; [key: string]: unknown }> =
+			[]
 		if (content.startsWith("[")) {
 			events = JSON.parse(content)
 		} else {
@@ -86,10 +95,12 @@ function validateRecordingFile(filePath?: string): {
 			}
 		}
 		return { valid: true, eventCount: events.length }
-	} catch (err: any) {
+	} catch (err: unknown) {
+		const message =
+			err instanceof Error ? err.message : "Corrupted recording data"
 		return {
 			valid: false,
-			reason: err?.message || "Corrupted recording data",
+			reason: message,
 			eventCount: 0,
 		}
 	}
@@ -197,7 +208,20 @@ function beginTaskSnapshot(root: string): GitSnapshot | null {
  */
 async function writeThreadMetadata(
 	threadId: string,
-	ctrl: any,
+	ctrl:
+		| {
+				writeThreadMetadataValues?: (opts: {
+					threadId: string
+					values: Record<string, unknown>
+				}) => Promise<void>
+				writeThreadMetadataValue?: (opts: {
+					threadId: string
+					key: string
+					value: unknown
+				}) => Promise<void>
+		  }
+		| null
+		| undefined,
 	entries: Array<[string, unknown]>,
 ): Promise<void> {
 	if (!threadId) return
@@ -278,8 +302,16 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				Array.isArray(command.images) && command.images.length > 0
 			const messageContent = command.content || ""
 
+			interface AttachmentInput {
+				mediaType?: string
+				mimeType?: string
+				data?: string
+				name?: string
+				filename?: string
+			}
+
 			const imageFiles = hasImages
-				? command.images.map((img: any) => ({
+				? (command.images as AttachmentInput[]).map((img) => ({
 						type: "image",
 						mediaType: img.mediaType || img.mimeType || "image/png",
 						mimeType: img.mimeType || img.mediaType || "image/png",
@@ -291,7 +323,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 
 			const nonImgFiles =
 				Array.isArray(command.files) && command.files.length > 0
-					? command.files.map((f: any) => ({
+					? (command.files as AttachmentInput[]).map((f) => ({
 							type: "file",
 							mediaType: f.mediaType || f.mimeType || "text/plain",
 							mimeType: f.mimeType || f.mediaType || "text/plain",
@@ -317,11 +349,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					if (threadAfter) {
 						try {
 							const session = h.activeSession
-							const memoryStore =
-								typeof (session as any)?.memory?.storage?.getStore ===
-								"function"
-									? await (session as any).memory.storage.getStore("memory")
-									: (session as any)?.memory?.storage
+							const memoryStore = await session?.getMemoryStore()
 							if (memoryStore?.updateMessageDuration) {
 								await memoryStore.updateMessageDuration({
 									threadId: threadAfter,
@@ -335,9 +363,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					if (!needsTitle) {
 						try {
 							const session = await h.getSession()
-							const thread = session.threads.find(
-								(t: any) => t.id === threadAfter,
-							)
+							const thread = session.threads.find((t) => t.id === threadAfter)
 							const title = thread?.title ?? ""
 							needsTitle =
 								!title || title === "New Thread" || title === "Untitled"
@@ -366,7 +392,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const targetThreadId = command.threadId as string | undefined
 			if (targetThreadId) {
 				for (const session of ctx.sessions.values()) {
-					if ((session?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+					if (session.harness.isThreadRunning(targetThreadId)) {
 						await session.harness.abort({ threadId: targetThreadId })
 						return
 					}
@@ -379,7 +405,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		getRunningThreads: async (_command, ctx) => {
 			const allRunning = new Set<string>()
 			for (const session of ctx.sessions.values()) {
-				const ids = (session?.harness as any)?.getRunningThreadIds?.() || []
+				const ids = session.harness.getRunningThreadIds() || []
 				for (const id of ids) allRunning.add(id)
 			}
 			const list = Array.from(allRunning)
@@ -387,10 +413,9 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		},
 		getPendingApprovals: async (command, ctx) => {
 			const threadId = command.threadId as string | undefined
-			const allPending: any[] = []
+			const allPending: unknown[] = []
 			for (const session of ctx.sessions.values()) {
-				const pending =
-					(session?.harness as any)?.getPendingApprovals?.(threadId) || []
+				const pending = session.harness.getPendingApprovals(threadId) || []
 				if (Array.isArray(pending)) allPending.push(...pending)
 			}
 			return { pendingApprovals: allPending }
@@ -457,10 +482,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			try {
 				const h = ctx.getActiveSession().harness
 				const session = h.activeSession
-				const memoryStore =
-					typeof (session as any)?.memory?.storage?.getStore === "function"
-						? await (session as any).memory.storage.getStore("memory")
-						: (session as any)?.memory?.storage
+				const memoryStore = await session?.getMemoryStore()
 				if (memoryStore?.updateMessageDuration) {
 					await memoryStore.updateMessageDuration({
 						threadId,
@@ -549,7 +571,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const targetThreadId = command.threadId as string | undefined
 			if (targetThreadId) {
 				for (const session of ctx.sessions.values()) {
-					if ((session?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+					if (session.harness.isThreadRunning(targetThreadId)) {
 						await session.harness.steer({
 							content: command.content,
 							threadId: targetThreadId,
@@ -567,7 +589,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const targetThreadId = command.threadId as string | undefined
 			if (targetThreadId) {
 				for (const session of ctx.sessions.values()) {
-					if ((session?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+					if (session.harness.isThreadRunning(targetThreadId)) {
 						await session.harness.followUp({
 							content: command.content,
 							threadId: targetThreadId,
@@ -587,7 +609,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const threadId =
 				(command.threadId as string) || s.harness.getCurrentThreadId()
 			if (threadId) {
-				const ctrl = (s.harness as any).controller
+				const ctrl = s.harness.controller
 				await ctrl?.writeThreadMetadataValue?.({
 					threadId,
 					key: "modeId",
@@ -605,7 +627,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const threadId =
 				(command.threadId as string) || s.harness.getCurrentThreadId()
 			if (threadId) {
-				const ctrl = (s.harness as any).controller
+				const ctrl = s.harness.controller
 				await ctrl?.writeThreadMetadataValue?.({
 					threadId,
 					key: "modelId",
@@ -661,7 +683,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				await s.harness.renameThread({ title: newTitle })
 			} else {
 				try {
-					const memoryStorage = await (s.harness as any).getMemoryStorage?.()
+					const memoryStorage = await s.harness.controller.getMemoryStorage()
 					if (memoryStorage) {
 						const thread = await memoryStorage.getThreadById({
 							threadId: targetThreadId,
@@ -713,7 +735,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			let h = ctx.getActiveSession().harness
 			if (threadId) {
 				for (const s of ctx.sessions.values()) {
-					if ((s?.harness as any)?.isThreadRunning?.(threadId)) {
+					if (s.harness.isThreadRunning(threadId)) {
 						h = s.harness
 						break
 					}
@@ -729,11 +751,14 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				// If live assistant message wasn't attached because it ran in a different session,
 				// check all sessions for an in-flight assistant message for this thread
 				if (targetThreadId && Array.isArray(rawMessages)) {
-					let liveMsg: any = null
+					let liveMsg:
+						| (ControllerMessageLike & { isStreaming?: boolean })
+						| null = null
 					for (const s of ctx.sessions.values()) {
-						const msg = (
-							s?.harness?.activeSession as any
-						)?.getCurrentAssistantMessage?.(targetThreadId)
+						const msg =
+							s.harness.activeSession?.getCurrentAssistantMessage(
+								targetThreadId,
+							)
 						if (msg) {
 							liveMsg = { ...msg, isStreaming: true }
 							break
@@ -741,7 +766,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					}
 					if (liveMsg) {
 						const existingIdx = rawMessages.findIndex(
-							(m: any) => m.id === liveMsg.id,
+							(m) => m.id === liveMsg!.id,
 						)
 						if (existingIdx >= 0) {
 							rawMessages[existingIdx] = liveMsg
@@ -752,14 +777,16 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 
 					let isTargetRunning = false
 					for (const s of ctx.sessions.values()) {
-						if ((s?.harness as any)?.isThreadRunning?.(targetThreadId)) {
+						if (s.harness.isThreadRunning(targetThreadId)) {
 							isTargetRunning = true
 							break
 						}
 					}
 					if (isTargetRunning && rawMessages.length > 0) {
 						for (let i = rawMessages.length - 1; i >= 0; i--) {
-							const m = rawMessages[i] as any
+							const m = rawMessages[i] as ControllerMessageLike & {
+								isStreaming?: boolean
+							}
 							if (m?.role === "user") break
 							if (m?.role === "assistant") {
 								m.isStreaming = true
@@ -767,7 +794,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 							}
 						}
 					} else if (!isTargetRunning && rawMessages.length > 0) {
-						const lastMsg = rawMessages[rawMessages.length - 1] as any
+						const lastMsg = rawMessages[rawMessages.length - 1]
 						if (
 							lastMsg &&
 							(lastMsg.role === "user" || lastMsg.role === "system")
@@ -813,7 +840,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			return ctx
 				.getActiveSession()
 				.harness.listModes()
-				.map((m: any) => ({
+				.map((m) => ({
 					id: m.id,
 					name: m.name,
 					color: m.color,
@@ -822,7 +849,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		},
 		getModeGraph: async (command, ctx) => {
 			const s = ctx.getActiveSession()
-			return s.harness.getModeGraph?.({ modeId: (command as any).modeId })
+			return s.harness.getModeGraph?.({ modeId: command.modeId as string })
 		},
 		listExecutionModes: async (_command, ctx) => {
 			const s = ctx.getActiveSession()
@@ -880,12 +907,12 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const threadId = command?.threadId as string | undefined
 			if (threadId) {
 				for (const s of ctx.sessions.values()) {
-					if ((s?.harness as any)?.isThreadRunning?.(threadId)) return true
+					if (s.harness.isThreadRunning(threadId)) return true
 				}
 				return false
 			}
 			for (const s of ctx.sessions.values()) {
-				if ((s?.harness as any)?.getRunningThreadIds?.().length > 0) return true
+				if (s.harness.getRunningThreadIds().length > 0) return true
 			}
 			return false
 		},
@@ -898,7 +925,10 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		getAvailableModels: async (_command, ctx) => {
 			const session = ctx.getActiveSession()
 			const rawModels = await session.harness.listAvailableModels()
-			const modelMap = new Map<string, any>()
+			const modelMap = new Map<
+				string,
+				{ id: string; name?: string; provider?: string; hasAuth?: boolean }
+			>()
 			for (const m of CURATED_CHAT_MODELS) {
 				const authId = m.provider === "openai" ? "openai-codex" : m.provider
 				modelMap.set(m.id, {
@@ -938,7 +968,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 		toggleSessionRecording: async (command, ctx) => {
 			let threadId = (command.threadId as string) || undefined
 			let projectPath = (command.projectPath as string) || undefined
-			let active: any = null
+			let active: WorktreeSession | null = null
 			try {
 				active = ctx.getActiveSession()
 				if (!threadId)
@@ -957,10 +987,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			const willStart = enabled !== undefined ? enabled : !isCurrentlyRecording
 
 			if (willStart) {
-				const ctrl = active?.harness?.controller
-				const isRunning = ctrl?.isRunning
-					? ctrl.isRunning()
-					: Boolean(ctrl?._isRunning)
+				const isRunning = active?.harness?.isRunning() ?? false
 				if (isRunning) {
 					return {
 						isRecording: false,
@@ -1092,7 +1119,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 
 			const rawContent = fs.readFileSync(sourcePath, "utf8")
 			if (saveRes.filePath.endsWith(".json")) {
-				let events: any[] = []
+				let events: unknown[] = []
 				const trimmed = rawContent.trim()
 				if (trimmed.startsWith("[")) {
 					try {
@@ -1232,9 +1259,9 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				onExhausted: "wrap",
 			})
 			const s = ctx.getActiveSession()
-			const ctrl = (s?.harness as any)?.controller
+			const ctrl = s.harness.controller
 
-			if (!threadId && s?.harness?.createThread) {
+			if (!threadId && s.harness.createThread) {
 				try {
 					const title = `Replay: ${path.basename(filePath, path.extname(filePath))}`
 					const newThread = await s.harness.createThread({
@@ -1257,7 +1284,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 				// its offline model to a run that is already streaming — that run
 				// would answer the user's real prompt with the recorded reply and
 				// leave a duplicate answer next to the reconstruction.
-				const liveSession = (s?.harness as any)?.activeSession ?? null
+				const liveSession = s.harness.activeSession ?? null
 				const runActive = isReplayRunActive(liveSession)
 				if (!runActive) {
 					sessionRecordingManager.setReplayModel(threadId, replayModel)
@@ -1286,18 +1313,18 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					// message query filters on it, so a hardcoded "default" made the
 					// whole replay invisible.
 					const resourceId =
-						(ctrl as any)?.resourceId ||
-						(s?.harness as any)?.resourceId ||
+						ctrl.resourceId ||
+						s.harness.resourceId ||
+						s.projectRoot ||
 						"default"
-					let store = await ctrl?.getMemoryStore?.()
-					if (
-						!store &&
-						typeof (s?.harness as any)?.getMemoryStore === "function"
-					) {
-						store = await (s.harness as any).getMemoryStore()
+					let store = await ctrl.getMemoryStore?.()
+					if (!store && typeof s.harness.getMemoryStore === "function") {
+						store = await s.harness.getMemoryStore()
 					}
-					if (!store && (s?.harness as any)?.storage) {
-						const st = (s.harness as any).storage
+					if (!store && s.harness.storage) {
+						const st = s.harness.storage as {
+							getStore?: (name: string) => Promise<unknown>
+						}
 						store =
 							typeof st.getStore === "function"
 								? await st.getStore("memory")
@@ -1308,10 +1335,20 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 					// playback of the same file stays where it is, and this one is
 					// appended after the whole conversation (otherwise the new block
 					// would interleave with the old one, or with live messages).
-					let existingMessages: any[] = []
-					if (typeof store?.listMessages === "function") {
+					let existingMessages: Array<{ id?: string; [key: string]: unknown }> =
+						[]
+					if (
+						typeof (store as { listMessages?: unknown })?.listMessages ===
+						"function"
+					) {
 						try {
-							const existing = await store.listMessages({
+							const existing = await (
+								store as {
+									listMessages: (opts: unknown) => Promise<{
+										messages?: Array<{ id?: string; [key: string]: unknown }>
+									}>
+								}
+							).listMessages({
 								threadId,
 								orderBy: { field: "createdAt", direction: "ASC" },
 							})
@@ -1346,11 +1383,16 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 						{ playbackId },
 					)
 
-					if (store?.saveMessages && reconstructedMessages.length > 0) {
+					const storeSaver = store as
+						| {
+								saveMessages?: (opts: { messages: unknown[] }) => Promise<void>
+						  }
+						| undefined
+					if (storeSaver?.saveMessages && reconstructedMessages.length > 0) {
 						// Append. Replaying the same recording several times is a
 						// legitimate review workflow — each pass has to show up as its
 						// own block, so nothing from the previous playback is removed.
-						await store.saveMessages({ messages: reconstructedMessages })
+						await storeSaver.saveMessages({ messages: reconstructedMessages })
 					}
 				} catch (e) {
 					replayError = e instanceof Error ? e.message : String(e)
@@ -1365,7 +1407,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			// really drives a run keeps the replay state alive, in which case the
 			// controller's `finally` finishes it once that run ends.
 			const stillRunning = threadId
-				? isReplayRunActive((s?.harness as any)?.activeSession)
+				? isReplayRunActive(s.harness.activeSession)
 				: false
 
 			safeSend(ctx.mainWindow, "harness:event", {
@@ -1379,10 +1421,7 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 
 			if (threadId && !stillRunning) {
 				await writeThreadMetadata(threadId, ctrl, [["isReplay", false]])
-				const { restored } = endSessionReplay(
-					(s?.harness as any)?.activeSession,
-					threadId,
-				)
+				const { restored } = endSessionReplay(s.harness.activeSession, threadId)
 				await writeThreadMetadata(threadId, ctrl, runtimeMetadata(restored))
 				safeSend(ctx.mainWindow, "harness:event", {
 					type: "session_replay_stopped",
@@ -1417,8 +1456,8 @@ export function getHarnessHandlers(): Record<string, IpcCommandHandler> {
 			}
 			if (threadId) {
 				const s = ctx.getActiveSession()
-				const ctrl = (s?.harness as any)?.controller
-				const liveSession = (s?.harness as any)?.activeSession ?? null
+				const ctrl = s.harness.controller
+				const liveSession = s.harness.activeSession ?? null
 				// Stopping by hand has to undo the same switch the replay made:
 				// otherwise the session stays on the recorded mode / permission.
 				const { restored } = endSessionReplay(liveSession, threadId)

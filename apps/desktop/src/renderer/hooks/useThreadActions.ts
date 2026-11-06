@@ -4,6 +4,7 @@ import type { ChatAction } from "../types/chat"
 import type { ThreadInfo } from "../types/ipc"
 import { ExecutionMode } from "../types/ipc"
 import type { PermissionMode } from "./useThreadModelPermissions"
+import type { PendingApproval } from "./useDialogManager"
 
 export interface ThreadActionsOptions {
 	dispatch: Dispatch<ChatAction>
@@ -47,8 +48,8 @@ export interface ThreadActionsOptions {
 	loadThreads: () => Promise<ThreadInfo[] | undefined>
 	loadMessages?: (threadId?: string) => Promise<void>
 	runningThreads?: Set<string>
-	threadsWithApproval?: Map<string, any>
-	setPendingApproval?: (approval: any) => void
+	threadsWithApproval?: Map<string, PendingApproval>
+	setPendingApproval?: (approval: PendingApproval | null) => void
 	setRunningThreadId?: (id: string | null) => void
 	projectRootPath?: string
 	isAgentActive?: boolean

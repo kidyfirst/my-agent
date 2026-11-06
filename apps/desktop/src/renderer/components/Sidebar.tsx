@@ -17,6 +17,7 @@ import type { EnrichedProject } from "../types/project-list"
 import type { ThreadInfo, UpdateInfo } from "../types/ipc"
 import type { WorktreeStatus } from "../types/project"
 import type { QueuedMessage } from "../types/chat"
+import type { PendingApproval } from "../hooks/useDialogManager"
 
 interface SidebarProps {
 	threads: ThreadInfo[]
@@ -47,7 +48,7 @@ interface SidebarProps {
 	replayingThreads?: Set<string>
 	replayingProjects?: Set<string>
 	runningThreads?: Set<string>
-	threadsWithApproval?: Map<string, any>
+	threadsWithApproval?: Map<string, PendingApproval>
 	onToggleRecording?: (threadId?: string, projectPath?: string) => void
 	onStopReplay?: (threadId?: string, projectPath?: string) => void
 	linkedIssues?: Record<

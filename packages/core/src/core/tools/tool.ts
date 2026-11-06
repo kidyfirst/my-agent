@@ -1,19 +1,19 @@
 import type { z } from "zod"
-import type { ToolConfig, ToolExecutionContext } from "./types.js"
+import type { ToolAction, ToolConfig, ToolExecutionContext } from "./types.js"
 
 export class Tool<
-	TInputSchema extends z.ZodType<any> = z.ZodType<any>,
-	TOutput = any,
-> {
+	TInputSchema extends z.ZodType = z.ZodType,
+	TOutput = unknown,
+> implements ToolAction<z.infer<TInputSchema>, TOutput> {
 	readonly id: string
 	readonly description: string
 	readonly inputSchema?: TInputSchema
-	readonly outputSchema?: z.ZodType<any>
+	readonly outputSchema?: z.ZodType
 	private _execute: (
 		input: z.infer<TInputSchema>,
 		context?: ToolExecutionContext,
 	) => Promise<TOutput> | TOutput;
-	[key: string]: any
+	[key: string]: unknown
 
 	constructor(config: ToolConfig<TInputSchema, TOutput>) {
 		const { execute, ...rest } = config
@@ -26,20 +26,20 @@ export class Tool<
 	}
 
 	async execute(
-		inputData: any,
+		inputData: unknown,
 		context?: ToolExecutionContext,
 	): Promise<TOutput> {
 		let validatedInput = inputData
 		if (this.inputSchema && typeof this.inputSchema.parse === "function") {
 			validatedInput = this.inputSchema.parse(inputData)
 		}
-		return this._execute(validatedInput, context)
+		return this._execute(validatedInput as z.infer<TInputSchema>, context)
 	}
 }
 
 export function createTool<
-	TInputSchema extends z.ZodType<any> = z.ZodType<any>,
-	TOutput = any,
+	TInputSchema extends z.ZodType = z.ZodType,
+	TOutput = unknown,
 >(config: ToolConfig<TInputSchema, TOutput>): Tool<TInputSchema, TOutput> {
 	return new Tool(config)
 }

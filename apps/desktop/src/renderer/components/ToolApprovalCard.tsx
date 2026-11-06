@@ -1,13 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
+import type { PendingApproval } from "../hooks/useDialogManager"
 
-export interface PendingApprovalData {
-	threadId?: string
-	toolCallId: string
-	toolName: string
-	args: unknown
-	category?: string | null
-	categoryLabel?: string | null
-}
+export type PendingApprovalData = PendingApproval
 
 export interface ToolApprovalCardProps {
 	approval: PendingApprovalData

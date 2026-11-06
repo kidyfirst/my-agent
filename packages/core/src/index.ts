@@ -41,6 +41,7 @@ export {
 	type MyAgentEvent,
 	type CreateMyAgentResult,
 	type SendMessageOptions,
+	type ControllerMessageLike,
 } from "./harness/index.js"
 export {
 	createDynamicModelGetter,
@@ -183,6 +184,7 @@ export {
 	endSessionReplay,
 	runtimeMetadata,
 	isReplayRunActive,
+	type SessionEvent,
 } from "./core/recorder/index.js"
 
 // Subagent Worker

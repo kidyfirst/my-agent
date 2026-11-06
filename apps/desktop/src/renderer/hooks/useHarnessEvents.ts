@@ -9,8 +9,15 @@ import type {
 	ThreadInfo,
 	UpdateInfo,
 } from "../types/ipc"
-import type { RightSidebarTab } from "../components/RightSidebar"
+import type { RightSidebarTab } from "../utils/rightSidebarTabs"
 import type { PermissionMode } from "./useThreadModelPermissions"
+import type {
+	PendingApproval,
+	PendingQuestion,
+	PendingPlan,
+} from "./useDialogManager"
+import type { LoginState } from "./useAuthManager"
+import type { EnrichedProject } from "../types/project-list"
 import { playCompletionSound } from "../utils/audio"
 
 export interface HarnessCallbacks {
@@ -43,13 +50,13 @@ export interface HarnessCallbacks {
 			}>
 		>
 	>
-	setPendingApproval: (v: any) => void
-	setPendingQuestion: (v: any) => void
-	setPendingPlan: (v: any) => void
+	setPendingApproval: (v: PendingApproval | null) => void
+	setPendingQuestion: (v: PendingQuestion | null) => void
+	setPendingPlan: (v: PendingPlan | null) => void
 	setActiveGraphNode?: (
 		node: { nodeId: string; nodeLabel: string; modeId: string } | null,
 	) => void
-	setLoginState: (v: any) => void
+	setLoginState: React.Dispatch<React.SetStateAction<LoginState | null>>
 	setIsAuthenticated: (v: boolean) => void
 	setLoggedInProviders: React.Dispatch<React.SetStateAction<Set<string>>>
 	setProjectInfo: (v: ProjectInfo | null) => void
@@ -66,10 +73,10 @@ export interface HarnessCallbacks {
 	setReplayingProjects?: React.Dispatch<React.SetStateAction<Set<string>>>
 	setRunningThreads?: React.Dispatch<React.SetStateAction<Set<string>>>
 	setThreadsWithApproval?: React.Dispatch<
-		React.SetStateAction<Map<string, any>>
+		React.SetStateAction<Map<string, PendingApproval>>
 	>
 	runningThreads?: Set<string>
-	threadsWithApproval?: Map<string, any>
+	threadsWithApproval?: Map<string, PendingApproval>
 	/** Developer logging switch — drives the sidebar Logging entry. */
 	setLoggingEnabled?: (enabled: boolean) => void
 	projectInfoRef: React.RefObject<ProjectInfo | null>
@@ -82,7 +89,7 @@ export interface HarnessCallbacks {
 	/** `path` tags the list with the folder it was listed for (see `threadsPath`). */
 	loadThreads: (path?: string) => Promise<ThreadInfo[] | undefined>
 	loadPRStatus: () => void
-	loadEnrichedProjects: () => Promise<any>
+	loadEnrichedProjects: () => Promise<EnrichedProject[]>
 	handleNewThread: () => void
 	handleOpenFolder: () => void
 	handleBrowserOpenRef: React.RefObject<(url: string) => void>
@@ -107,7 +114,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 		const unsubscribe = window.api.onEvent((raw: unknown) => {
 			const cb = cbRef.current
 			const event = raw as HarnessEventPayload
-			const worktreePath = (event as any).worktreePath as string | undefined
+			const worktreePath = event.worktreePath as string | undefined
 			const currentRoot = cb.projectInfoRef.current?.rootPath
 			const normalize = (p?: string) => p?.replace(/\/+$/, "")
 			const isActiveWorktree =
@@ -116,7 +123,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 				worktreePath === currentRoot ||
 				normalize(worktreePath) === normalize(currentRoot)
 
-			const eventThreadId = (event as any).threadId as string | undefined
+			const eventThreadId = event.threadId as string | undefined
 			const isCurrentThread =
 				!eventThreadId || eventThreadId === cb.currentThreadId
 
@@ -201,7 +208,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						cb.setRunningThreadId?.(null)
 						cb.loadThreads()
 						cb.loadPRStatus()
-						if ((event as any).reason !== "error") {
+						if (event.reason !== "error") {
 							cb.loadMessages(undefined, true).catch(() => {})
 						}
 					} else {
@@ -239,11 +246,12 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				case "message_update":
 					if (isActiveWorktree && isCurrentThread) {
+						const eventId = typeof event.id === "string" ? event.id : undefined
 						const msg =
 							(event.message as Message | undefined) ||
-							((event as any).id
+							(eventId
 								? ({
-										id: (event as any).id,
+										id: eventId,
 										role: "assistant",
 										content: [],
 										createdAt: new Date().toISOString(),
@@ -259,11 +267,12 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				case "message_end":
 					if (isActiveWorktree && isCurrentThread) {
+						const eventId = typeof event.id === "string" ? event.id : undefined
 						const msg =
 							(event.message as Message | undefined) ||
-							((event as any).id
+							(eventId
 								? ({
-										id: (event as any).id,
+										id: eventId,
 										role: "assistant",
 										content: [],
 										createdAt: new Date().toISOString(),
@@ -319,8 +328,9 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						})
 					break
 				case "tool_approval_required": {
-					const approvalTargetId = eventThreadId || cb.currentThreadId
-					const approvalData = {
+					const approvalTargetId =
+						eventThreadId || cb.currentThreadId || undefined
+					const approvalData: PendingApproval = {
 						threadId: approvalTargetId,
 						toolCallId: event.toolCallId as string,
 						toolName: event.toolName as string,
@@ -439,7 +449,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "thread_created": {
-					const newThreadId = (event.thread as any)?.id
+					const newThreadId = (event.thread as ThreadInfo | undefined)?.id
 					if (newThreadId) {
 						cb.setCurrentThreadId(newThreadId)
 						cb.setActiveTab(`thread:${newThreadId}`)
@@ -448,7 +458,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "thread_deleted": {
-					const deletedId = (event as any).threadId
+					const deletedId = event.threadId as string | undefined
 					if (deletedId) {
 						cb.setThreads((prev) => prev.filter((t) => t.id !== deletedId))
 					}
@@ -608,7 +618,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					})
 					break
 				case "login_prompt":
-					cb.setLoginState((prev: any) => ({
+					cb.setLoginState((prev) => ({
 						providerId: (event.providerId as string) ?? prev?.providerId ?? "",
 						stage: "prompt",
 						promptMessage: event.message as string,
@@ -616,7 +626,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					}))
 					break
 				case "login_progress":
-					cb.setLoginState((prev: any) => ({
+					cb.setLoginState((prev) => ({
 						providerId: (event.providerId as string) ?? prev?.providerId ?? "",
 						stage: "progress",
 						progressMessage: event.message as string,
@@ -630,7 +640,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 						"modelId:",
 						event.modelId,
 					)
-					cb.setLoginState((prev: any) => ({
+					cb.setLoginState((prev) => ({
 						providerId: pid || prev?.providerId || "",
 						stage: "success",
 					}))
@@ -645,7 +655,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "login_error":
-					cb.setLoginState((prev: any) => ({
+					cb.setLoginState((prev) => ({
 						providerId: (event.providerId as string) ?? prev?.providerId ?? "",
 						stage: "error",
 						errorMessage: event.error as string,
@@ -754,15 +764,15 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "update_available":
-					if ((event as any).updateInfo) {
-						cb.setUpdateInfo?.((event as any).updateInfo as UpdateInfo)
+					if (event.updateInfo) {
+						cb.setUpdateInfo?.(event.updateInfo as UpdateInfo)
 					}
 					break
 				case "update_download_progress":
 					cb.setDownloadProgress?.({
-						percent: Number((event as any).percent) || 0,
-						downloadedBytes: Number((event as any).downloadedBytes) || 0,
-						totalBytes: Number((event as any).totalBytes) || 0,
+						percent: Number(event.percent) || 0,
+						downloadedBytes: Number(event.downloadedBytes) || 0,
+						totalBytes: Number(event.totalBytes) || 0,
 					})
 					break
 				case "update_download_complete":
@@ -770,12 +780,8 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					cb.setDownloadProgress?.(null)
 					break
 				case "session_recording_changed": {
-					const rThreads = (event as any).recordingThreads as
-						| string[]
-						| undefined
-					const rProjects = (event as any).recordingProjects as
-						| string[]
-						| undefined
+					const rThreads = event.recordingThreads as string[] | undefined
+					const rProjects = event.recordingProjects as string[] | undefined
 					if (Array.isArray(rThreads)) {
 						cb.setRecordingThreads?.(new Set(rThreads))
 					}
@@ -785,7 +791,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "session_recording_exported": {
-					const filePath = (event as any).filePath as string | undefined
+					const filePath = event.filePath as string | undefined
 					if (filePath) {
 						console.log(
 							`[SessionRecording] Successfully exported session to ${filePath}`,
@@ -794,7 +800,7 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "session_replay_started": {
-					const tId = (event as any).threadId as string | undefined
+					const tId = event.threadId as string | undefined
 					if (tId) {
 						cb.setReplayingThreads?.((prev) => new Set(prev).add(tId))
 					}
@@ -802,8 +808,8 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "session_replay_stopped": {
-					const tId = (event as any).threadId as string | undefined
-					const projectPath = (event as any).worktreePath as string | undefined
+					const tId = event.threadId as string | undefined
+					const projectPath = event.worktreePath as string | undefined
 					cb.setReplayingThreads?.((prev) => {
 						const s = new Set(prev)
 						if (tId) s.delete(tId)
@@ -821,7 +827,8 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 					break
 				}
 				case "logging_config_changed": {
-					const enabled = Boolean((event as any).config?.enabled)
+					const config = event.config as { enabled?: boolean } | undefined
+					const enabled = Boolean(config?.enabled)
 					cb.setLoggingEnabled?.(enabled)
 					break
 				}

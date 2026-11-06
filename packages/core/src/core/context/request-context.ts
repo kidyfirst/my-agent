@@ -1,13 +1,19 @@
 export class RequestContext<
-	TValues extends Record<string, any> = Record<string, any>,
+	TValues extends Record<string, unknown> = Record<string, unknown>,
 > {
-	private _map: Map<string, any>
+	private _map: Map<string, unknown>
 
-	constructor(iterable?: Iterable<[string, any]> | Record<string, any>) {
+	constructor(
+		iterable?: Iterable<[string, unknown]> | Record<string, unknown>,
+	) {
 		this._map = new Map()
 		if (iterable) {
-			if (typeof (iterable as any)[Symbol.iterator] === "function") {
-				for (const [k, v] of iterable as Iterable<[string, any]>) {
+			if (
+				Symbol.iterator in (iterable as object) &&
+				typeof (iterable as Iterable<[string, unknown]>)[Symbol.iterator] ===
+					"function"
+			) {
+				for (const [k, v] of iterable as Iterable<[string, unknown]>) {
 					this._map.set(k, v)
 				}
 			} else if (typeof iterable === "object") {
@@ -19,12 +25,13 @@ export class RequestContext<
 	}
 
 	get<K extends keyof TValues>(key: K): TValues[K]
-	get(key: string): any {
+	get<T = unknown>(key: string): T | undefined
+	get(key: string): unknown {
 		return this._map.get(key)
 	}
 
 	set<K extends keyof TValues>(key: K, value: TValues[K]): this
-	set(key: string, value: any): this {
+	set(key: string, value: unknown): this {
 		this._map.set(key, value)
 		return this
 	}
@@ -37,11 +44,11 @@ export class RequestContext<
 		return this._map.delete(key)
 	}
 
-	getRaw(key: string): any {
-		return this._map.get(key)
+	getRaw<T = unknown>(key: string): T | undefined {
+		return this._map.get(key) as T | undefined
 	}
 
-	setRaw(key: string, value: any): this {
+	setRaw(key: string, value: unknown): this {
 		this._map.set(key, value)
 		return this
 	}
@@ -66,29 +73,29 @@ export class RequestContext<
 		return this._map.keys()
 	}
 
-	values(): IterableIterator<any> {
+	values(): IterableIterator<unknown> {
 		return this._map.values()
 	}
 
-	entries(): IterableIterator<[string, any]> {
+	entries(): IterableIterator<[string, unknown]> {
 		return this._map.entries()
 	}
 
 	forEach(
-		callback: (value: any, key: string, map: Map<string, any>) => void,
+		callback: (value: unknown, key: string, map: Map<string, unknown>) => void,
 	): void {
 		this._map.forEach(callback)
 	}
 
-	[Symbol.iterator](): IterableIterator<[string, any]> {
+	[Symbol.iterator](): IterableIterator<[string, unknown]> {
 		return this._map.entries()
 	}
 
-	get all(): Record<string, any> {
+	get all(): Record<string, unknown> {
 		return Object.fromEntries(this._map.entries())
 	}
 
-	isSerializable(value: any): boolean {
+	isSerializable(value: unknown): boolean {
 		if (value === null || value === undefined) return true
 		const type = typeof value
 		if (type === "function" || type === "symbol") return false
@@ -105,8 +112,8 @@ export class RequestContext<
 		return false
 	}
 
-	toJSON(): Record<string, any> {
-		const result: Record<string, any> = {}
+	toJSON(): Record<string, unknown> {
+		const result: Record<string, unknown> = {}
 		for (const [k, v] of this._map.entries()) {
 			if (typeof v === "function" || typeof v === "symbol") continue
 			try {
@@ -117,7 +124,7 @@ export class RequestContext<
 		return result
 	}
 
-	serializeForSpan(): Record<string, any> {
+	serializeForSpan(): Record<string, unknown> {
 		return this.toJSON()
 	}
 }

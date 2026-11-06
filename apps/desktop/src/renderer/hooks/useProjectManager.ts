@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import type { EnrichedProject } from "../types/project-list"
 import type { ProjectInfo } from "../types/project"
 import type { ChatAction } from "../types/chat"
+import type { ThreadInfo, TokenUsage } from "../types/ipc"
 
 export interface PRStatus {
 	exists: boolean
@@ -20,8 +21,8 @@ export function useProjectManager(
 	tabSetters: {
 		setOpenFiles: React.Dispatch<React.SetStateAction<string[]>>
 		setActiveTab: React.Dispatch<React.SetStateAction<string>>
-		setThreads: React.Dispatch<React.SetStateAction<any[]>>
-		setTokenUsage: React.Dispatch<React.SetStateAction<any>>
+		setThreads: React.Dispatch<React.SetStateAction<ThreadInfo[]>>
+		setTokenUsage: React.Dispatch<React.SetStateAction<TokenUsage>>
 		setCurrentThreadId?: React.Dispatch<React.SetStateAction<string | null>>
 	},
 ) {

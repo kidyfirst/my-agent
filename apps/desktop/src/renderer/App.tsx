@@ -44,7 +44,7 @@ import type { AttachedFile } from "./types/chat"
 import { ensureAudioContext } from "./utils/audio"
 import { useChatReducer } from "./hooks/useChatReducer"
 import { useAuthManager } from "./hooks/useAuthManager"
-import { useDialogManager } from "./hooks/useDialogManager"
+import { useDialogManager, type PendingApproval } from "./hooks/useDialogManager"
 import { useTabManager } from "./hooks/useTabManager"
 import { useProjectManager } from "./hooks/useProjectManager"
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
@@ -315,7 +315,7 @@ export function App() {
 	)
 	const [runningThreads, setRunningThreads] = useState<Set<string>>(new Set())
 	const [threadsWithApproval, setThreadsWithApproval] = useState<
-		Map<string, any>
+		Map<string, PendingApproval>
 	>(new Map())
 	const [showReplayModal, setShowReplayModal] = useState(false)
 	const [sessionExportData, setSessionExportData] =
@@ -398,7 +398,10 @@ export function App() {
 	useEffect(() => {
 		window.api
 			.invoke({ type: "getSessionRecordingStatus" })
-			.then((res: any) => {
+			.then((raw) => {
+				const res = raw as
+					| { recordingThreads?: string[]; recordingProjects?: string[] }
+					| undefined
 				if (res?.recordingThreads) {
 					setRecordingThreads(new Set(res.recordingThreads))
 				}
@@ -410,7 +413,10 @@ export function App() {
 
 		window.api
 			.invoke({ type: "getRunningThreads" })
-			.then((res: any) => {
+			.then((raw) => {
+				const res = raw as
+					| { runningThreads?: string[]; runningThreadIds?: string[] }
+					| undefined
 				const list = res?.runningThreads || res?.runningThreadIds
 				if (list && Array.isArray(list)) {
 					setRunningThreads(new Set(list))
@@ -420,9 +426,10 @@ export function App() {
 
 		window.api
 			.invoke({ type: "getPendingApprovals" })
-			.then((res: any) => {
+			.then((raw) => {
+				const res = raw as { pendingApprovals?: PendingApproval[] } | undefined
 				if (res?.pendingApprovals && Array.isArray(res.pendingApprovals)) {
-					const map = new Map<string, any>()
+					const map = new Map<string, PendingApproval>()
 					for (const item of res.pendingApprovals) {
 						if (item.threadId) {
 							map.set(item.threadId, item)
@@ -442,7 +449,8 @@ export function App() {
 		const load = (attempt: number) => {
 			window.api
 				.invoke({ type: "getLoggingStatus" })
-				.then((res: any) => {
+				.then((raw) => {
+					const res = raw as { config?: { enabled?: boolean } } | undefined
 					if (cancelled) return
 					if (typeof res?.config?.enabled === "boolean") {
 						setLoggingEnabled(res.config.enabled)
@@ -473,7 +481,8 @@ export function App() {
 		const check = () => {
 			window.api
 				.invoke({ type: "checkForUpdates" })
-				.then((info: any) => {
+				.then((raw) => {
+					const info = raw as UpdateInfo | null
 					if (info?.hasUpdate) {
 						setUpdateInfo(info)
 					}
@@ -790,11 +799,13 @@ export function App() {
 					const targetThread = session.threads?.find(
 						(t) => t.id === targetThreadId,
 					)
-					const tMeta = (targetThread?.metadata || {}) as Record<string, any>
+					const tMeta = (targetThread?.metadata || {}) as Record<string, unknown>
 
 					// 1. Model
 					const tModel =
-						threadModel.modelsByThread[targetThreadId] || tMeta.modelId
+						(threadModel.modelsByThread[targetThreadId] || tMeta.modelId) as
+							| string
+							| undefined
 					if (tModel) {
 						setModelId(tModel)
 						window.api.invoke({
@@ -1040,12 +1051,15 @@ export function App() {
 	const isCurrentThreadActiveReplay = Boolean(
 		currentThreadId && replayingThreads.has(currentThreadId),
 	)
+	const curThreadMeta = currentThread?.metadata as
+		| Record<string, unknown>
+		| undefined
 	const isCurrentThreadReplaySession = Boolean(
-		(currentThread?.metadata as any)?.isReplay || isCurrentThreadActiveReplay,
+		curThreadMeta?.isReplay || isCurrentThreadActiveReplay,
 	)
 	const currentThreadReplaySource =
-		((currentThread?.metadata as any)?.replayFile as string) ||
-		((currentThread?.metadata as any)?.replaySource as string) ||
+		(curThreadMeta?.replayFile as string | undefined) ||
+		(curThreadMeta?.replaySource as string | undefined) ||
 		undefined
 
 	const handleSelectThreadModel = useCallback(
@@ -1446,7 +1460,11 @@ export function App() {
 		let idleReads = 0
 		const reconcile = async () => {
 			try {
-				const res: any = await window.api.invoke({ type: "getRunningThreads" })
+				const res = (await window.api.invoke({
+					type: "getRunningThreads",
+				})) as
+					| { runningThreads?: string[]; runningThreadIds?: string[] }
+					| undefined
 				if (cancelled) return
 				const runningList: string[] =
 					res?.runningThreads || res?.runningThreadIds || []
@@ -1487,11 +1505,11 @@ export function App() {
 					}
 				}
 
-				const approvalRes: any = await window.api.invoke({
+				const approvalRes = (await window.api.invoke({
 					type: "getPendingApprovals",
-				})
+				})) as { pendingApprovals?: PendingApproval[] } | undefined
 				if (!cancelled && approvalRes?.pendingApprovals) {
-					const map = new Map<string, any>()
+					const map = new Map<string, PendingApproval>()
 					for (const item of approvalRes.pendingApprovals) {
 						if (item.threadId) {
 							map.set(item.threadId, item)
@@ -1499,7 +1517,10 @@ export function App() {
 					}
 					setThreadsWithApproval(map)
 					if (curThread && map.has(curThread)) {
-						dialogs.setPendingApproval(map.get(curThread))
+						const pending = map.get(curThread)
+						if (pending) {
+							dialogs.setPendingApproval(pending)
+						}
 					}
 				}
 			} catch {}

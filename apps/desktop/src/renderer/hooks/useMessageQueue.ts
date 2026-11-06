@@ -1,5 +1,10 @@
 import { useEffect, useCallback, useRef } from "react"
-import type { ChatState, QueuedMessage, AttachedFile } from "../types/chat"
+import type {
+	ChatState,
+	QueuedMessage,
+	AttachedFile,
+	ChatAction,
+} from "../types/chat"
 
 /**
  * Owns the per-thread message queue: persistence to the harness, the
@@ -7,7 +12,7 @@ import type { ChatState, QueuedMessage, AttachedFile } from "../types/chat"
  */
 export function useMessageQueue(
 	chat: ChatState,
-	dispatch: React.Dispatch<any>,
+	dispatch: React.Dispatch<ChatAction>,
 	currentThreadId: string | null,
 	handleSend: (content: string, files?: AttachedFile[]) => Promise<void>,
 ) {
@@ -125,12 +130,10 @@ export function useMessageQueue(
 				message: {
 					id: `user-${Date.now()}`,
 					role: "user",
-					content: item.content,
+					content: [{ type: "text", text: item.content }],
 					createdAt: new Date().toISOString(),
 					attachments:
-						item.files && item.files.length > 0
-							? (item.files as any)
-							: undefined,
+						item.files && item.files.length > 0 ? item.files : undefined,
 				},
 			})
 			try {

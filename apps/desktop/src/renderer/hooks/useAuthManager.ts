@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react"
 import { DEFAULT_FALLBACK_MODEL_ID } from "@my-agent/core"
 
-interface LoginState {
+export interface LoginState {
 	providerId: string
 	stage: "auth" | "prompt" | "progress" | "success" | "error"
 	url?: string

@@ -353,6 +353,10 @@ export interface MyAgentHarness<TState = HarnessState> {
 		threadId: string
 		queue: QueuedMessage[]
 	}): Promise<void>
+	resourceId?: string
+	getMemoryStore?(): Promise<any>
+	getMemoryStorage?(): Promise<any>
+	storage?: unknown
 	abortSignal?: AbortSignal
 	getSubagentModelId?(options?: { agentType?: string }): string | undefined
 	resolveModel?(modelId: string, options?: any): any

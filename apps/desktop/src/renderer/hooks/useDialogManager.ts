@@ -1,21 +1,21 @@
 import { useState, useCallback } from "react"
 
-interface PendingApproval {
+export interface PendingApproval {
 	threadId?: string
 	toolCallId: string
 	toolName: string
 	args: unknown
-	category: string | null
-	categoryLabel: string | null
+	category?: string | null
+	categoryLabel?: string | null
 }
 
-interface PendingQuestion {
+export interface PendingQuestion {
 	questionId: string
 	question: string
 	options?: Array<{ label: string; description?: string }>
 }
 
-interface PendingPlan {
+export interface PendingPlan {
 	planId: string
 	title: string
 	plan: string

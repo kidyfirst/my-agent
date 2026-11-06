@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import type { EnrichedProject } from "../types/project-list"
-import type { RightSidebarTab } from "../components/RightSidebar"
+import type { RightSidebarTab } from "../utils/rightSidebarTabs"
 import type { ProjectInfo } from "../types/project"
 import { hasGitRepo } from "../utils/project-list"
 

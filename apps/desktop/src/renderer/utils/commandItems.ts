@@ -1,6 +1,7 @@
 import type { CommandItem } from "../components/CommandPalette"
 import type { ThreadInfo } from "../types/ipc"
 import { ExecutionMode } from "../types/ipc"
+import type { RightSidebarTab } from "./rightSidebarTabs"
 
 interface BuildCommandItemsArgs {
 	close: () => void
@@ -14,7 +15,7 @@ interface BuildCommandItemsArgs {
 	thinkingLevel?: string
 	setActiveTab: (tab: string) => void
 	setRightSidebarVisible: (visible: boolean) => void
-	setRightSidebarTab: (tab: any) => void
+	setRightSidebarTab: (tab: RightSidebarTab) => void
 	setSidebarVisible: (updater: (v: boolean) => boolean) => void
 	setRightSidebarVisibleUpdater: (updater: (v: boolean) => boolean) => void
 	setShowQuickFileOpen: (v: boolean) => void
