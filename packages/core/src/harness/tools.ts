@@ -19,6 +19,7 @@ import { createAssetsFetchTool } from "../tools/assets-fetch.js"
 import { stringReplaceLspTool } from "../tools/string-replace-lsp.js"
 import { astSmartEditTool } from "../tools/ast-smart-edit.js"
 import { createSubagentTool } from "../tools/subagent.js"
+import { createProjectMemoryTool } from "../tools/project-memory.js"
 import {
 	createWebSearchTool,
 	createWebExtractTool,
@@ -52,12 +53,14 @@ export const WRITE_TOOL_NAMES = [
 	"string_replace_lsp",
 	"ast_smart_edit",
 	"subagent",
+	"project_memory",
 ] as const
 
 export const PLAN_TOOL_NAMES = [
 	...READ_TOOL_NAMES,
 	"write_file",
 	"submit_plan",
+	"project_memory",
 ] as const
 
 /**
@@ -179,6 +182,7 @@ export function createDynamicTools(
 			submit_plan: () => createSubmitPlanTool(projectRoot),
 			request_sandbox_access: () => requestSandboxAccessTool,
 			assets_fetch: () => createAssetsFetchTool(projectRoot),
+			project_memory: () => createProjectMemoryTool(projectRoot),
 			subagent: () => {
 				const effectiveResolver =
 					resolveModel ??

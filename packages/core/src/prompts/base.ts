@@ -309,6 +309,12 @@ You have access to the following tools. Use the RIGHT tool for the job:
 **ast_smart_edit** — Structural edit by AST query
 - Use for precise refactors (rename a symbol, replace a function body) where text matching is fragile.
 - Pass a structural selector plus the replacement; the tool validates the result parses.
+
+**project_memory** — Project-level working memory and rules manager
+- Use to read, update, or record project-level context, preferences, conventions, architectural decisions, and rules.
+- Stored under \`.myagent/project-context.json\` and \`.myagent/rules/*.md\` and persisted across all threads.
+- Actions: \`read\`, \`update_context\`, \`save_rule\`, \`delete_rule\`, \`list_rules\`.
+- When the user expresses a repository-wide preference, convention, or architectural guideline, record it with this tool so future sessions remember it.
 ${ctx.toolNames?.includes("computer") ? browserToolsSection : ""}`
 		: hasTools
 			? readOnlySection

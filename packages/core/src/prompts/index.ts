@@ -12,6 +12,7 @@ import {
 	loadAgentInstructions,
 	formatAgentInstructions,
 } from "../utils/agent-instructions.js"
+import { formatProjectWorkingMemory } from "../memory/project-memory.js"
 
 // Extended prompt context that includes runtime information
 export interface PromptContext extends BasePromptContext {
@@ -67,7 +68,15 @@ export function buildFullPrompt(ctx: PromptContext): string {
 		toolsSection = `\n# Available Tools for ${ctx.modeId} mode:\n${ctx.availableTools}\n`
 	}
 
-	// Inject current todo state so agent doesn't lose track after OM truncation
+	// Load and inject agent instructions from AGENT.md/CLAUDE.md files
+	const instructionSources = loadAgentInstructions(ctx.workingDir)
+	const instructionsSection = formatAgentInstructions(instructionSources)
+
+	// Inject project working memory and rules from .myagent/
+	const projectMemorySection = formatProjectWorkingMemory(ctx.workingDir)
+
+	// Dynamic sections: Inject current todo state and runtime PR instructions at the very end
+	// so the large static prompt prefix remains 100% byte-stable for LLM Prompt Caching.
 	let todoSection = ""
 	const todos = ctx.state?.todos as
 		| { content: string; status: string; activeForm: string }[]
@@ -81,11 +90,6 @@ export function buildFullPrompt(ctx: PromptContext): string {
 		todoSection = `\n<current-task-list>\n${lines.join("\n")}\n</current-task-list>\n`
 	}
 
-	// Load and inject agent instructions from AGENT.md/CLAUDE.md files
-	const instructionSources = loadAgentInstructions(ctx.workingDir)
-	const instructionsSection = formatAgentInstructions(instructionSources)
-
-	// Inject user PR instructions if set
 	let prSection = ""
 	const prInstructions = ctx.state?.prInstructions as string | undefined
 	if (prInstructions?.trim()) {
@@ -95,10 +99,11 @@ export function buildFullPrompt(ctx: PromptContext): string {
 	return (
 		base +
 		toolsSection +
-		todoSection +
-		instructionsSection +
-		prSection +
 		"\n" +
-		modeSpecific
+		modeSpecific +
+		instructionsSection +
+		projectMemorySection +
+		todoSection +
+		prSection
 	)
 }
