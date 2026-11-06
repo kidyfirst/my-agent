@@ -62,6 +62,102 @@
     <!-- Timeline Wrapper -->
     <div id="dynamic-timeline" class="timeline">
 
+      <!-- Version 0.1.6 -->
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="release-card">
+          <div class="release-header">
+            <span class="release-tag">v0.1.6</span>
+            <span class="release-date">2026-11-06</span>
+            <span class="badge-latest">Latest</span>
+          </div>
+
+          <div class="release-content">
+            <h4 class="release-category-title">🧠 观察式记忆真正生效 (Observational Memory)</h4>
+            <ul class="release-list">
+              <li><strong>四处静默失效一次修完</strong>：记录写入时 <code>ON CONFLICT</code> 只更新三列，第二次观察就把前一次的 <code>observedMessageIds</code>、<code>generationCount</code> 与缓冲全部丢弃——OM 在首次成功之后彻底失效，且不报任何错。读写与并发三条路径对 <code>resourceId</code> 的归一化各不相同（<code>""</code> / <code>null</code> / 原始 <code>undefined</code>），拼出的查找键互不相同，记录写进去便再也读不回来。</li>
+              <li><strong>缓冲是延迟而非丢弃</strong>：<code>bufferActivation</code> 改为按整行切分的绝对 token 预算，未激活部分存进 <code>bufferedObservations</code> 列，下次越线时合并激活。原先按字符硬切会把一条事实劈成两半，两半都不可用。</li>
+              <li><strong>并发写入加乐观锁</strong>：两轮请求同时越线会互相覆盖观察到的消息列表，同一批对话被反复观察、日志不断膨胀。以 <code>generationCount</code> 做 CAS 串行化写入，且在调用 Observer 模型<strong>之前</strong>抢占，避免抢占失败的一方白付一次模型调用。</li>
+              <li><strong>进度上报补全</strong>：<code>loadOMProgress()</code> 原先返回空对象，token 追踪器读到的字段始终缺失，组件因此永久隐藏。现在返回真实阈值与进度，从未触发过观察的会话也能显示距离触发还有多远。</li>
+            </ul>
+
+            <h4 class="release-category-title">📎 附件改为资源引用 (Asset-backed Attachments)</h4>
+            <ul class="release-list">
+              <li><strong>不再把 base64 塞进消息体</strong>：图片附件写入 <code>&lt;projectRoot&gt;/.myagent/assets</code>，消息里只保留 <code>assetId</code> 与 <code>url</code>。此前每次重放对话都要连带搬运整份图片数据，主进程还得全程驻留内存。</li>
+            </ul>
+
+            <h4 class="release-category-title">📌 项目级约定跨会话持久化 (Project Memory)</h4>
+            <ul class="release-list">
+              <li><strong>记住这个仓库的规矩</strong>：偏好、约定与架构说明存入 <code>.myagent/project-context.json</code>，较长的规范放在 <code>rules/*.md</code>，全部是 Git 友好的文本，队友拉取即继承。此前每开一个新会话都得重新交代「用 pnpm」「共享组件放 components/ui」。</li>
+            </ul>
+
+            <h4 class="release-category-title">🔍 全链路 Trace (Trace Correlation)</h4>
+            <ul class="release-list">
+              <li><strong>一行日志就能回溯到根因</strong>：基于 <code>AsyncLocalStorage</code> 的 trace 上下文让数百处既有日志调用点无需改动即可带上 <code>traceId</code> / <code>spanId</code>，从用户看到的报错一路走回具体那次工具调用。</li>
+            </ul>
+
+            <h4 class="release-category-title">⚡ Prompt 缓存脱离单一 provider (Prompt Caching)</h4>
+            <ul class="release-list">
+              <li><strong>任何 provider 都能吃到缓存</strong>：缓存断点原先写死在 Claude Max provider 内部，其他路径享受不到，也无法脱离整个 provider 单独测试。抽出为 provider 无关的中间件并补上测试，Anthropic 与 Google 均可挂载；工具的确定性排序一并迁入——schema 哈希在轮次间漂移会静默让缓存全部失效。</li>
+            </ul>
+
+            <h4 class="release-category-title">🧭 长会话任务跳转 (Task Navigator)</h4>
+            <ul class="release-list">
+              <li><strong>几百条消息里直接跳回某一次请求</strong>：会话右侧新增任务导航条，索引每个用户轮次并支持点击跳转，滚动时自动高亮当前任务。此前长会话中任务列表滚出视野，想找一条早期请求只能一路手动翻滚。</li>
+            </ul>
+
+            <h4 class="release-category-title">🔒 计划模式不再能执行命令 (Plan Mode Toolset)</h4>
+            <ul class="release-list">
+              <li><strong>堵住一次越权</strong>：<code>execute_command</code> 原本被列进 <code>READ_TOOL_NAMES</code>，因此「只读」的计划模式也能跑任意 shell——足够在计划批准之前就 <code>git commit</code> 和 <code>git push</code>。它是否只读完全取决于命令行内容，任何按名字分类的清单都无法判定安全，现单独拆出只发给可写模式。</li>
+            </ul>
+
+            <h4 class="release-category-title">🧩 其它打磨 (Polish)</h4>
+            <ul class="release-list">
+              <li>任务导航条的悬浮阴影改用统一的 <code>--shadow-popover</code> token，修正深色模式下的偏差。</li>
+              <li>README 澄清 <code>bufferActivation</code> 是绝对 token 数而非比例，并如实标注 <code>reflection.*</code> 配置当前尚未生效。</li>
+            </ul>
+          </div>
+
+          <div class="release-assets-box">
+            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
+            <div class="assets-chips">
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-arm64.dmg" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-mac-arm64.dmg</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-arm64.zip" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-mac-arm64.zip</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-x64.dmg" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-mac-x64.dmg</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-x64.zip" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-mac-x64.zip</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-win-x64.exe" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-win-x64.exe</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-win-x64.zip" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-win-x64.zip</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-linux-x86_64.AppImage" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-linux-x86_64.AppImage</span>
+              </a>
+              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-linux-amd64.deb" class="asset-chip" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>my-agent-0.1.6-linux-amd64.deb</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Version 0.1.5 -->
       <div class="timeline-item">
         <div class="timeline-dot"></div>
@@ -69,7 +165,6 @@
           <div class="release-header">
             <span class="release-tag">v0.1.5</span>
             <span class="release-date">2026-11-05</span>
-            <span class="badge-latest">Latest</span>
           </div>
 
           <div class="release-content">

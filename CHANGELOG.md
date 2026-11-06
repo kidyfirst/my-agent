@@ -4,6 +4,46 @@
 
 ---
 
+## [v0.1.6] - 2026-11-06
+
+### 🧠 观察式记忆真正生效 (Observational Memory)
+
+- **四处静默失效一次修完**：记录写入时 `ON CONFLICT` 只更新三列，导致第二次观察直接把前一次的 `observedMessageIds`、`generationCount` 与缓冲全部丢弃——OM 在首次成功之后彻底失效，且不报任何错。读写与并发三条路径对 `resourceId` 的归一化各不相同（`""` / `null` / 原始 `undefined`），拼出的查找键互不相同，记录写进去便再也读不回来。
+- **缓冲是延迟而非丢弃**：`bufferActivation` 改为按整行切分的绝对 token 预算，未激活部分存进 `bufferedObservations` 列，下次越线时合并激活。原先按字符硬切会把一条事实劈成两半，两半都不可用。
+- **并发写入加乐观锁**：两轮请求同时越线时会互相覆盖观察到的消息列表，同一批对话被反复观察、日志不断膨胀。以 `generationCount` 做 CAS 串行化写入，且在调用 Observer 模型**之前**抢占，避免抢占失败的一方白付一次模型调用。
+- **进度上报补全**：`loadOMProgress()` 原先返回空对象，渲染进程的 token 追踪器读到的字段始终缺失，组件因此永久隐藏。现在返回真实阈值与进度，**从未触发过观察的会话也能显示距离触发还有多远**。
+
+### 📎 附件改为资源引用 (Asset-backed Attachments)
+
+- **不再把 base64 塞进消息体**：图片附件写入 `<projectRoot>/.myagent/assets`，消息里只保留 `assetId` 与 `url`。此前每次重放对话都要连带搬运整份图片数据，主进程还得全程驻留内存。
+
+### 📌 项目级约定跨会话持久化 (Project Memory)
+
+- **记住这个仓库的规矩**：偏好、约定与架构说明存入 `.myagent/project-context.json`，较长的规范放在 `rules/*.md`，全部是 Git 友好的文本，队友拉取即继承。此前每开一个新会话都得重新交代「用 pnpm」「共享组件放 components/ui」。
+
+### 🔍 全链路 Trace (Trace Correlation)
+
+- **一行日志就能回溯到根因**：基于 AsyncLocalStorage 的 trace 上下文让数百处既有日志调用点无需改动即可带上 `traceId` / `spanId`，从用户看到的报错一路走回具体那次工具调用。此前两个线程并行时，时间戳排序说明不了任何事。
+
+### ⚡ Prompt 缓存脱离单一 provider (Prompt Caching)
+
+- **任何 provider 都能吃到缓存**：缓存断点原先写死在 Claude Max provider 内部，其他路径享受不到，也无法脱离整个 provider 单独测试。抽出为 provider 无关的中间件并补上测试，Anthropic 与 Google 均可挂载；工具的确定性排序一并迁入——schema 哈希在轮次间漂移会静默让缓存全部失效。
+
+### 🧭 长会话任务跳转 (Task Navigator)
+
+- **几百条消息里直接跳回某一次请求**：会话右侧新增任务导航条，索引每一个用户轮次并支持点击跳转，滚动时自动高亮当前任务。此前长会话中任务列表滚出视野，想找一条早期请求只能一路手动翻滚。
+
+### 🔒 计划模式不再能执行命令 (Plan Mode Toolset)
+
+- **堵住一次越权**：`execute_command` 原本被列进 `READ_TOOL_NAMES`，因此「只读」的计划模式也能跑任意 shell——足够在计划提交、更别说批准之前就 `git commit` 和 `git push`。它是否只读完全取决于命令行内容，任何按名字分类的清单都无法判定安全，现单独拆出只发给可写模式。
+
+### 🧩 其它打磨 (Polish)
+
+- 任务导航条的悬浮阴影改用统一的 `--shadow-popover` token，修正深色模式下的偏差。
+- README 澄清 `bufferActivation` 是绝对 token 数而非比例，并如实标注 `reflection.*` 配置当前尚未生效。
+
+---
+
 ## [v0.1.5] - 2026-11-05
 
 ### 🗂️ 右侧栏全面 Tab 化 (Tabbed Right Sidebar)
