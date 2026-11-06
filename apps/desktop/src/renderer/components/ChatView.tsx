@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from "react"
+import { useEffect, useRef, useMemo, useState, useCallback } from "react"
 import { AssistantMessage } from "./AssistantMessage"
 import { UserMessage } from "./UserMessage"
 import { ExecutionBlock, ExecutionStep, ExecutionTool } from "./ExecutionBlock"
@@ -20,6 +20,7 @@ import {
 import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
 import { shouldPinToBottom } from "../utils/chatScroll"
 import { ComputerUsePreview } from "./ComputerUsePreview"
+import { TaskNavigator, type TaskItem } from "./TaskNavigator"
 export interface ChatViewProps {
 	threadId?: string | null
 	/** Root of the project this transcript belongs to; scopes browser previews. */
@@ -54,6 +55,17 @@ export interface ChatViewProps {
 	isReplaySession?: boolean
 	isActivelyReplaying?: boolean
 	replaySource?: string
+	/**
+	 * Callback to delegate TaskNavigator rendering to parent container
+	 * so it can span the full conversation window height.
+	 */
+	onTasksChange?: (
+		nav: {
+			tasks: TaskItem[]
+			activeTaskId: string | null
+			onSelectTask: (taskId: string) => void
+		} | null,
+	) => void
 	/**
 	 * The user stopped this thread's run. Ephemeral by design: nothing about a
 	 * stop is stored, so this note lives only as long as the renderer says so.
@@ -277,6 +289,7 @@ export function ChatView({
 	onRevert,
 	reverting,
 	reverted,
+	onTasksChange,
 }: ChatViewProps) {
 	// The conversation pane is `position: relative`: the browser preview card
 	// is absolutely positioned inside it (see ComputerUsePreview), so the card
@@ -337,6 +350,8 @@ export function ChatView({
 		isLoadingThread,
 	])
 
+	const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+
 	const handleScroll = () => {
 		if (!scrollRef.current) return
 		const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
@@ -346,7 +361,46 @@ export function ChatView({
 		setIsScrolledUp(scrolledUp)
 		setIsScrolledDown(scrollTop > 8)
 		setHasOverflow(scrollHeight - clientHeight > 1)
+
+		if (taskItems.length > 0) {
+			if (distanceFromBottom <= 60) {
+				setActiveTaskId(taskItems[taskItems.length - 1].id)
+			} else if (scrollTop <= 20) {
+				setActiveTaskId(taskItems[0].id)
+			} else {
+				const containerTop = scrollRef.current.getBoundingClientRect().top
+				const turnElements =
+					scrollRef.current.querySelectorAll<HTMLElement>("[data-turn-id]")
+				let currentVisibleId: string | null = null
+				let minDiff = Infinity
+
+				turnElements.forEach((el) => {
+					const rect = el.getBoundingClientRect()
+					const diff = rect.top - containerTop
+					if (diff <= 140 && Math.abs(diff) < minDiff) {
+						minDiff = Math.abs(diff)
+						currentVisibleId = el.getAttribute("data-turn-id")
+					}
+				})
+
+				if (currentVisibleId) {
+					setActiveTaskId(currentVisibleId)
+				}
+			}
+		}
 	}
+
+	const handleSelectTask = useCallback((taskId: string) => {
+		setActiveTaskId(taskId)
+		if (!scrollRef.current) return
+		const targetEl = scrollRef.current.querySelector<HTMLElement>(
+			`[data-turn-id="${taskId}"]`,
+		)
+		if (targetEl) {
+			targetEl.scrollIntoView({ behavior: "smooth", block: "start" })
+		}
+	}, [])
+
 	// `scroll` only fires on user or programmatic scrolling; streaming output
 	// grows the content without one, so the fades need a separate signal. The
 	// observer watches both boxes: the viewport can shrink (window resize) and
@@ -933,6 +987,46 @@ export function ChatView({
 		return groupItemsIntoTurns(cleanedItems)
 	}, [cleanedItems])
 
+	const taskItems = useMemo<TaskItem[]>(() => {
+		return renderedTurns
+			.filter(
+				(
+					t,
+				): t is TurnGroup & {
+					userItem: Extract<RenderItem, { type: "user" }>
+				} => Boolean(t.userItem),
+			)
+			.map((t, idx) => {
+				const id = (t.userItem.data as any)?.id || t.key
+				const rawText = getMessageText(t.userItem.data)
+				const cleanText =
+					rawText.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim() ||
+					`Task ${idx + 1}`
+				return {
+					id,
+					turnKey: t.key,
+					text: cleanText,
+					index: idx,
+				}
+			})
+	}, [renderedTurns])
+
+	// Notify parent container when tasks or active task changes
+	useEffect(() => {
+		if (onTasksChange) {
+			onTasksChange({
+				tasks: taskItems,
+				activeTaskId,
+				onSelectTask: handleSelectTask,
+			})
+		}
+		return () => {
+			if (onTasksChange) {
+				onTasksChange(null)
+			}
+		}
+	}, [onTasksChange, taskItems, activeTaskId, handleSelectTask])
+
 	// Playbacks stack, so number them. Without a number a second pass over the
 	// same recording looks exactly like the first one, which reads as "replay
 	// did nothing".
@@ -1210,9 +1304,12 @@ export function ChatView({
 								const playbackPass = playbackKey
 									? replayPassByKey.get(playbackKey)
 									: undefined
+								const turnId =
+									(turn.userItem?.data as any)?.id || turn.key
 								return (
 									<div
 										key={turn.key}
+										data-turn-id={turnId}
 										style={{
 											display: "flex",
 											flexDirection: "column",
@@ -1433,6 +1530,13 @@ export function ChatView({
 				threadId={threadId}
 				worktreePath={worktreePath}
 				onOpenInPanel={onOpenBrowserPanel}
+			/>
+
+			{/* Floating task timeline navigator on the right side */}
+			<TaskNavigator
+				tasks={taskItems}
+				activeTaskId={activeTaskId}
+				onSelectTask={handleSelectTask}
 			/>
 		</div>
 	)

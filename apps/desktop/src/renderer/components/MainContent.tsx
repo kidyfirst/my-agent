@@ -287,6 +287,7 @@ export function MainContent(props: MainContentProps) {
 			<div
 				onMouseDown={() => project.markWorktreeRead()}
 				style={{
+					position: "relative",
 					flex: 1,
 					display: isChatTab(activeTab) ? "flex" : "none",
 					flexDirection: "column",
