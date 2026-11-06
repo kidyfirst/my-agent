@@ -70,7 +70,17 @@ export type SessionEvent =
 				runtime?: RecordedRuntime
 			}
 	  }
-	| { type: "step/start"; data: { turn: number; step: number } }
+	| {
+			type: "step/start"
+			data: {
+				turn: number
+				step: number
+				/** Span for this step; tool calls nest under it. */
+				spanId?: string
+				parentSpanId?: string
+				startedAt?: number
+			}
+	  }
 	| {
 			type: "assistant/stream"
 			data: {
@@ -90,6 +100,12 @@ export type SessionEvent =
 				input: unknown
 				output: unknown
 				isError: boolean
+				/** Span this tool call opened; keyed by `toolCallId`. */
+				spanId?: string
+				/** Enclosing span (the step), giving the call its place in the tree. */
+				parentSpanId?: string
+				startedAt?: number
+				endedAt?: number
 			}
 	  }
 	| {

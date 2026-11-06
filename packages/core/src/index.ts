@@ -51,6 +51,17 @@ export { describeToolNames } from "./harness/tools.js"
 
 // Storage & Memory
 export { SQLiteStore } from "./store/index.js"
+export {
+	loadProjectContext,
+	saveProjectContext,
+	updateProjectContext,
+	loadProjectRules,
+	saveProjectRule,
+	deleteProjectRule,
+	formatProjectWorkingMemory,
+	type ProjectContextData,
+	type ProjectRuleFile,
+} from "./memory/project-memory.js"
 
 // Snapshot & Rollback
 export {
@@ -87,8 +98,15 @@ export {
 	getBuiltinServer,
 } from "./mcp/builtin.js"
 
-// Prompts
+// Prompts & Prompt Caching
 export { buildFullPrompt } from "./prompts/index.js"
+export {
+	promptCacheMiddleware,
+	applyPromptCacheBreakpoints,
+	addCacheControlToMessage,
+	sortToolsByName,
+	type CacheControlOptions,
+} from "./core/llm/prompt-cache.js"
 
 // Auth & Providers
 export { AuthStorage } from "./auth/storage.js"

@@ -302,4 +302,262 @@ describe("Memory Context & History Preservation", () => {
 		expect(toolMsg).toBeDefined()
 		expect(toolMsg.content[0].toolCallId).toBe("call_abc")
 	})
+
+	it("folds verbose tool results in older turns while preserving recent turns (temporal output decay)", async () => {
+		let receivedPrompt: any = null
+
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				receivedPrompt = options.prompt
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "0" },
+						{ type: "text-delta", id: "0", delta: "Ack" },
+						{ type: "text-end", id: "0" },
+						{
+							type: "finish",
+							finishReason: "stop",
+							usage: mockUsage,
+						},
+					]),
+					warnings: [],
+				}
+			},
+		})
+
+		const storage = new SQLiteStore({ url: ":memory:" })
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Test instructions",
+			model: () => model,
+		})
+		const controller = new AgentController({
+			storage,
+			agent,
+		})
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "test-decay" })
+		await session.thread.create({ title: "Test Decay" })
+		const threadId = session.thread.getId()
+
+		const store = await (controller.storage as SQLiteStore).getStore("memory")
+		// Simulate 3 past assistant turns (Turn 1 is old > 2 turns ago, Turn 2 and 3 are recent)
+		await store.saveMessages({
+			messages: [
+				// Turn 1 (Old)
+				{
+					id: "u1",
+					role: "user",
+					content: {
+						format: 2,
+						parts: [{ type: "text", text: "Read big file" }],
+					},
+					threadId,
+					resourceId: "test-decay",
+					createdAt: new Date(Date.now() - 6000),
+				},
+				{
+					id: "a1",
+					role: "assistant",
+					content: {
+						format: 2,
+						parts: [
+							{
+								type: "tool-call",
+								toolCallId: "c1",
+								toolName: "read_file",
+								args: { path: "big.ts" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "c1",
+								toolName: "read_file",
+								result: "X".repeat(1000),
+							},
+						],
+					},
+					threadId,
+					resourceId: "test-decay",
+					createdAt: new Date(Date.now() - 5000),
+				},
+				// Turn 2 (Recent)
+				{
+					id: "u2",
+					role: "user",
+					content: {
+						format: 2,
+						parts: [{ type: "text", text: "Turn 2 user" }],
+					},
+					threadId,
+					resourceId: "test-decay",
+					createdAt: new Date(Date.now() - 4000),
+				},
+				{
+					id: "a2",
+					role: "assistant",
+					content: {
+						format: 2,
+						parts: [
+							{
+								type: "tool-call",
+								toolCallId: "c2",
+								toolName: "read_file",
+								args: { path: "recent.ts" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "c2",
+								toolName: "read_file",
+								result: "Y".repeat(1000),
+							},
+						],
+					},
+					threadId,
+					resourceId: "test-decay",
+					createdAt: new Date(Date.now() - 3000),
+				},
+				// Turn 3 (Recent)
+				{
+					id: "u3",
+					role: "user",
+					content: {
+						format: 2,
+						parts: [{ type: "text", text: "Turn 3 user" }],
+					},
+					threadId,
+					resourceId: "test-decay",
+					createdAt: new Date(Date.now() - 2000),
+				},
+				{
+					id: "a3",
+					role: "assistant",
+					content: {
+						format: 2,
+						parts: [
+							{
+								type: "tool-call",
+								toolCallId: "c3",
+								toolName: "run_command",
+								args: { cmd: "test" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "c3",
+								toolName: "run_command",
+								result: "Z".repeat(1000),
+							},
+						],
+					},
+					threadId,
+					resourceId: "test-decay",
+					createdAt: new Date(Date.now() - 1000),
+				},
+			],
+		})
+
+		await session.sendMessage({ content: "Next prompt turn 4" })
+
+		expect(receivedPrompt).toBeDefined()
+		const toolMsgs = receivedPrompt.filter((p: any) => p.role === "tool")
+		expect(toolMsgs.length).toBe(3)
+
+		// Tool result 1 (c1, older turn) should be folded to conserve tokens
+		const toolRes1 = toolMsgs[0].content.find((c: any) => c.toolCallId === "c1")
+		expect(toolRes1.output.value).toContain(
+			"Content folded for context economy",
+		)
+
+		// Tool result 2 & 3 (recent turns) should keep full output
+		const toolRes2 = toolMsgs[1].content.find((c: any) => c.toolCallId === "c2")
+		expect(toolRes2.output.value).toBe("Y".repeat(1000))
+
+		const toolRes3 = toolMsgs[2].content.find((c: any) => c.toolCallId === "c3")
+		expect(toolRes3.output.value).toBe("Z".repeat(1000))
+	})
+
+	it("applies prompt caching breakpoints to system prompt and previous turn in multi-turn sessions", async () => {
+		let capturedPrompts: any[] = []
+
+		const model = new MockLanguageModelV3({
+			modelId: "anthropic/claude-3-5-sonnet",
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "0" },
+						{ type: "text-delta", id: "0", delta: "Reply" },
+						{ type: "text-end", id: "0" },
+						{ type: "finish", finishReason: "stop", usage: mockUsage },
+					]),
+					warnings: [],
+				}
+			},
+		})
+
+		const storage = new SQLiteStore({ url: ":memory:" })
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Test instructions",
+			model: () => model,
+			tools: {
+				write_file: {
+					description: "Write file",
+					inputSchema: z.object({ path: z.string() }),
+					execute: async () => ({ ok: true }),
+				},
+				view: {
+					description: "View file",
+					inputSchema: z.object({ path: z.string() }),
+					execute: async () => ({ ok: true }),
+				},
+			},
+		})
+		const controller = new AgentController({
+			storage,
+			agent,
+		})
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "test-cache" })
+
+		// Turn 1
+		await session.sendMessage({ content: "First turn question" })
+		// Turn 2
+		await session.sendMessage({ content: "Second turn question" })
+
+		expect(capturedPrompts.length).toBe(2)
+		const turn2Prompt = capturedPrompts[1]
+
+		// 1. Breakpoint on System Message
+		const systemMsg = turn2Prompt.find((p: any) => p.role === "system")
+		expect(systemMsg).toBeDefined()
+		expect(systemMsg.providerOptions?.anthropic?.cacheControl).toEqual({
+			type: "ephemeral",
+		})
+		expect(systemMsg.providerOptions?.google?.cacheControl).toEqual({
+			type: "ephemeral",
+		})
+
+		// 2. Breakpoint on previous turn user message (second-to-last user message)
+		const userMsgs = turn2Prompt.filter((p: any) => p.role === "user")
+		expect(userMsgs.length).toBe(2)
+		const user1Text =
+			typeof userMsgs[0].content === "string"
+				? userMsgs[0].content
+				: userMsgs[0].content[0].text
+		expect(user1Text).toContain("First turn question")
+		const user1Cache =
+			userMsgs[0].providerOptions?.anthropic?.cacheControl ||
+			userMsgs[0].content[userMsgs[0].content.length - 1]?.providerOptions
+				?.anthropic?.cacheControl
+		expect(user1Cache).toEqual({
+			type: "ephemeral",
+		})
+		// Latest user message is fresh, no breakpoint
+		expect(userMsgs[1].providerOptions).toBeUndefined()
+	})
 })

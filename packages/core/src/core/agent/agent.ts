@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto"
 import { stepCountIs, streamText } from "ai"
 import type { RequestContext } from "../context/index.js"
 import { toModelTool } from "../tools/ai-tool.js"
+import { sortToolsByName } from "../llm/prompt-cache.js"
+import { createEffectiveModel } from "../graph/llm-stream.js"
 
 export interface AgentConfig {
 	id?: string
@@ -76,7 +78,8 @@ export class Agent {
 		const rawTools = await this.listTools({ requestContext })
 
 		const tools: Record<string, any> = {}
-		for (const [name, tool] of Object.entries(rawTools || {})) {
+		const sortedRawTools = sortToolsByName(rawTools || {})
+		for (const [name, tool] of Object.entries(sortedRawTools)) {
 			if (!tool) continue
 			tools[name] =
 				typeof (tool as any).execute === "function"
@@ -93,11 +96,19 @@ export class Agent {
 				? taskOrPrompt
 				: (taskOrPrompt as any)?.content || JSON.stringify(taskOrPrompt)
 
-		const result = (streamText as any)({
+		const effectiveModel = createEffectiveModel(
 			model,
+			(model as any)?.modelId || (model as any)?.id || "",
+		)
+		const sortedTools = sortToolsByName(tools)
+		const result = (streamText as any)({
+			model: effectiveModel,
 			system: instructions,
 			prompt,
-			tools: Object.keys(tools).length > 0 ? tools : undefined,
+			tools:
+				sortedTools && Object.keys(sortedTools).length > 0
+					? sortedTools
+					: undefined,
 			// `maxSteps` no longer exists in the AI SDK; `stopWhen` is the replacement.
 			stopWhen: stepCountIs(options?.maxSteps ?? 50),
 			abortSignal: options?.abortSignal,

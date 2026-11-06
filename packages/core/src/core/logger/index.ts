@@ -1,5 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { currentTrace } from "../trace/context.js"
 
 /**
  * Application-wide logger.
@@ -55,6 +56,14 @@ export interface LogEntry {
 	message: string
 	/** Structured payload, already sanitized (no cycles, no huge strings). */
 	data?: unknown
+	/**
+	 * Run this entry belongs to, copied from the ambient trace context. Absent
+	 * for entries written outside a run (startup, IPC, settings changes), which
+	 * is meaningful: those are not part of any trace.
+	 */
+	traceId?: string
+	/** Span within the run, so the UI can attach a line to a specific node. */
+	spanId?: string
 }
 
 export interface LoggingConfig {
@@ -216,7 +225,11 @@ function serializeData(data: unknown): string {
 export function formatLogLine(entry: LogEntry): string {
 	const level = entry.level.toUpperCase().padEnd(5)
 	const iso = new Date(entry.ts).toISOString()
-	return `${iso} ${level} [${entry.scope}] ${entry.message}${serializeData(entry.data)}`
+	// Trace ids stay on the line as plain text so `grep <traceId>` over the log
+	// file returns exactly the run an error report refers to.
+	const trace = entry.traceId ? ` [trace=${entry.traceId}]` : ""
+	const span = entry.spanId ? ` [span=${entry.spanId}]` : ""
+	return `${iso} ${level} [${entry.scope}]${trace}${span} ${entry.message}${serializeData(entry.data)}`
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +329,9 @@ export class Logger {
 		data?: unknown,
 	): LogEntry | null {
 		if (!isLevelEnabled(level, this.config.level)) return null
+		// One read from the ambient context — never a parameter — so the hundred
+		// existing call sites pick up trace correlation for free.
+		const trace = currentTrace()
 		const entry: LogEntry = {
 			seq: ++this.seq,
 			ts: Date.now(),
@@ -323,6 +339,8 @@ export class Logger {
 			scope,
 			message: truncate(message, 8000),
 			data: data === undefined ? undefined : sanitizeLogData(data),
+			...(trace?.traceId ? { traceId: trace.traceId } : {}),
+			...(trace?.spanId ? { spanId: trace.spanId } : {}),
 		}
 
 		this.buffer.push(entry)

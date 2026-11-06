@@ -130,12 +130,16 @@ export class SessionRecorder {
 		})
 	}
 
-	recordStepStart(turn: number, step: number): void {
+	recordStepStart(
+		turn: number,
+		step: number,
+		meta?: { spanId?: string; parentSpanId?: string },
+	): void {
 		this.flushActiveAggregator()
 		this.currentStepRecords = []
 		this.writeEvent({
 			type: "step/start",
-			data: { turn, step },
+			data: { turn, step, startedAt: Date.now(), ...meta },
 		})
 	}
 
@@ -284,6 +288,10 @@ export class SessionRecorder {
 		input: unknown
 		output: unknown
 		isError: boolean
+		/** Span for this call; defaults to the tool call id. */
+		spanId?: string
+		parentSpanId?: string
+		startedAt?: number
 	}): void {
 		this.writeEvent({
 			type: "tool/result",

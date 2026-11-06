@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto"
+import { traceStorage, withSpan } from "../trace/context.js"
+import type { ExecutedToolItem } from "../graph/types.js"
 import * as os from "node:os"
 import * as path from "node:path"
 import {
@@ -21,6 +23,7 @@ import {
 } from "../graph/index.js"
 import { AssetManager } from "../../assets/manager.js"
 import { setRuntimeCategoryPolicy } from "../../permissions.js"
+import { sortToolsByName } from "../llm/prompt-cache.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
 export type ToolCategory =
@@ -88,7 +91,8 @@ export interface HarnessDisplayState {
 
 export type HarnessRequestContext = any
 
-export type HarnessEvent = any
+export type { HarnessEvent } from "./events.js"
+import type { HarnessEvent } from "./events.js"
 
 export interface HarnessConfig<TState = any> {
 	id?: string
@@ -851,9 +855,20 @@ export class Session<TState = any> {
 	}
 
 	emit(event: HarnessEvent): void {
+		// Stamp the ambient trace onto every event so a subscriber can group
+		// events by run without the ~40 emit() call sites passing it explicitly.
+		const trace = traceStorage.getStore()
+		const stamped =
+			!event?.traceId && trace?.traceId
+				? {
+						...event,
+						traceId: trace.traceId,
+						...(trace.spanId ? { spanId: trace.spanId } : {}),
+					}
+				: event
 		for (const sub of this._subscribers) {
 			try {
-				sub(event)
+				sub(stamped)
 			} catch (e) {
 				console.error("[Session] event subscriber error:", e)
 			}
@@ -1214,6 +1229,11 @@ export class Session<TState = any> {
 
 		const startTime = Date.now()
 		const runId = randomUUID()
+		// Enter the trace context here rather than wrapping the whole body: this
+		// method owns exactly one run, so `enterWith` scopes every log entry and
+		// harness event that follows without reindenting 700 lines. Threads run
+		// concurrently, and AsyncLocalStorage keeps them apart.
+		traceStorage.enterWith({ traceId: runId, threadId })
 		let recorder: any = null
 		let replayModelUsed: any = null
 
@@ -1430,15 +1450,10 @@ export class Session<TState = any> {
 
 			// Build executable tools with approval gate and lifecycle events
 			const executableTools: Record<string, any> = {}
-			const executedTools: Array<{
-				id: string
-				name: string
-				args: any
-				result?: any
-				isError?: boolean
-			}> = []
+			const executedTools: ExecutedToolItem[] = []
 
-			for (const [toolName, tool] of Object.entries(rawTools || {})) {
+			const sortedRawTools = sortToolsByName(rawTools || {})
+			for (const [toolName, tool] of Object.entries(sortedRawTools)) {
 				if (!tool) continue
 				const origTool = tool as any
 				const toolExecute = async (args: any, execContext: any) => {
@@ -1542,6 +1557,10 @@ export class Session<TState = any> {
 						args,
 					})
 					const toolStartTime = Date.now()
+					// Stamp the span bounds on the shared item so the recorder can report a
+					// duration even though it only sees the result as a stream chunk later.
+					const execItem = executedTools.find((t) => t.id === toolCallId)
+					if (execItem) execItem.startedAt = toolStartTime
 					logger.info("tool", `tool start: ${toolName}`, {
 						threadId,
 						toolName,
@@ -1552,18 +1571,23 @@ export class Session<TState = any> {
 					try {
 						const toolContext = { requestContext, toolCallId }
 						let result: any
-						if (typeof origTool.execute === "function") {
-							// The execution context travels as the second argument only.
-							// Folding it into `args` leaked an extra `context` key into the
-							// model-supplied arguments, which MCP servers reject against
-							// their own input schema: LangSearch answered
-							// `Unrecognized key: "context"`.
-							result = await origTool.execute(args, toolContext)
-						} else {
-							result = { success: true }
-						}
+						// Run the tool inside its own span: anything it logs is stamped with
+						// this tool call's id, which is what lets the trace panel attach log
+						// lines to the node the user clicked.
+						result = await withSpan(toolCallId, async () => {
+							if (typeof origTool.execute === "function") {
+								// The execution context travels as the second argument only.
+								// Folding it into `args` leaked an extra `context` key into the
+								// model-supplied arguments, which MCP servers reject against
+								// their own input schema: LangSearch answered
+								// `Unrecognized key: "context"`.
+								return await origTool.execute(args, toolContext)
+							}
+							return { success: true }
+						})
 
 						const toolDurationMs = Date.now() - toolStartTime
+						if (execItem) execItem.endedAt = toolStartTime + toolDurationMs
 						logger.info("tool", `tool end: ${toolName} (${toolDurationMs}ms)`, {
 							threadId,
 							toolName,
@@ -1588,6 +1612,7 @@ export class Session<TState = any> {
 						return result
 					} catch (toolErr: any) {
 						const toolDurationMs = Date.now() - toolStartTime
+						if (execItem) execItem.endedAt = toolStartTime + toolDurationMs
 						logger.error(
 							"tool",
 							`tool error: ${toolName} (${toolDurationMs}ms)`,
@@ -1622,10 +1647,10 @@ export class Session<TState = any> {
 				executableTools[toolName] = toModelTool(origTool, toolExecute)
 			}
 
-			// 5. Recall message history from store
+			// 5. Recall message history from store: load up to 100 recent messages
 			const historyRes = await store.listMessages({
 				threadId,
-				orderBy: { field: "createdAt", direction: "ASC" },
+				limit: 100,
 			})
 			const historyMessages: any[] = historyRes?.messages || []
 
@@ -1647,6 +1672,11 @@ export class Session<TState = any> {
 					!modelIdStr.includes("o1-mini") &&
 					!(modelIdStr.includes("qwen") && !modelIdStr.includes("vl")) &&
 					!(modelIdStr.includes("llama") && !modelIdStr.includes("vision")))
+
+			const totalAssistantTurns = historyMessages.filter(
+				(m) => m.role === "assistant",
+			).length
+			let assistantTurnCounter = 0
 
 			const coreMessages: any[] = []
 			for (const m of historyMessages) {
@@ -1783,6 +1813,10 @@ export class Session<TState = any> {
 						coreMessages.push({ role: "user", content: histUserText })
 					}
 				} else {
+					assistantTurnCounter++
+					const isRecentAssistantTurn =
+						assistantTurnCounter > totalAssistantTurns - 2
+
 					let text = ""
 					let reasoning = ""
 					const toolCalls: any[] = []
@@ -1833,7 +1867,10 @@ export class Session<TState = any> {
 								) {
 									toolInput = {}
 								}
-								const toolCallId = p.toolCallId || p.id || randomUUID()
+								const toolCallId =
+									p.toolCallId ||
+									p.id ||
+									`${m.id || "msg"}_call_${toolCalls.length}`
 								const toolName = p.toolName || p.name || "tool"
 								toolCalls.push({
 									type: "tool-call",
@@ -1844,6 +1881,25 @@ export class Session<TState = any> {
 								})
 							} else if (p.type === "tool-result") {
 								let res = p.result !== undefined ? p.result : p.output
+								const toolCallId = p.toolCallId || p.id
+								const toolName = p.toolName || p.name || "tool"
+
+								// Temporal Output Decay: for older turns (> 2 assistant turns ago),
+								// collapse verbose tool outputs (> 300 chars) into semantic summary tokens.
+								if (!isRecentAssistantTurn) {
+									if (typeof res === "string" && res.length > 300) {
+										res = `[Tool Result: ${toolName} completed (${res.length} chars). Content folded for context economy. Call ${toolName} again if fresh details are needed.]`
+									} else if (
+										typeof res === "object" &&
+										res &&
+										JSON.stringify(res).length > 300
+									) {
+										res = {
+											summary: `[Tool Result: ${toolName} completed. Content folded for context economy. Call ${toolName} again if fresh details are needed.]`,
+										}
+									}
+								}
+
 								if (typeof res === "string" && res.length > 6000) {
 									res =
 										res.slice(0, 6000) +
@@ -1861,8 +1917,7 @@ export class Session<TState = any> {
 											`\n\n[Output truncated: ${res.content.length} chars total]`,
 									}
 								}
-								const toolCallId = p.toolCallId || p.id
-								const toolName = p.toolName || p.name || "tool"
+
 								toolResults.push({
 									type: "tool-result",
 									toolCallId,
@@ -1962,11 +2017,30 @@ export class Session<TState = any> {
 				}
 
 				if (startIndex > 0 && startIndex < coreMessages.length) {
+					// Extract the initial user request/goal from the earliest user message before slicing
+					let initialUserGoal = ""
+					const firstUserMsg = coreMessages.find((m) => m.role === "user")
+					if (firstUserMsg) {
+						if (typeof firstUserMsg.content === "string") {
+							initialUserGoal = firstUserMsg.content
+						} else if (Array.isArray(firstUserMsg.content)) {
+							const textPart = firstUserMsg.content.find(
+								(p: any) => p.type === "text",
+							)
+							initialUserGoal = textPart?.text || ""
+						}
+					}
+					initialUserGoal = initialUserGoal.trim()
+
 					coreMessages.splice(0, startIndex)
+
+					const summaryNote = initialUserGoal
+						? `[System Note: Earlier conversation history was truncated (${startIndex} messages folded) to stay within token context limits. Original User Task: "${initialUserGoal.slice(0, 300)}${initialUserGoal.length > 300 ? "..." : ""}"]`
+						: `[System Note: Earlier conversation history was truncated (${startIndex} messages folded) to stay within token context limits.]`
+
 					coreMessages.unshift({
 						role: "user",
-						content:
-							"[System Note: Earlier conversation history was truncated to stay within token context limits.]",
+						content: summaryNote,
 					})
 				}
 			}
