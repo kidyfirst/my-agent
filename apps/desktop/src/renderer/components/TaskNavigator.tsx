@@ -196,9 +196,7 @@ export function TaskNavigator({
 						? "1px solid color-mix(in srgb, var(--border) 80%, transparent)"
 						: "none",
 					borderRadius: isHovered ? 18 : 11,
-					boxShadow: isHovered
-						? "0 14px 38px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04)"
-						: "none",
+					boxShadow: isHovered ? "var(--shadow-popover)" : "none",
 					transition:
 						"width 0.26s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.22s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, box-shadow 0.24s ease, border-color 0.2s ease",
 					transformOrigin: "right center",
