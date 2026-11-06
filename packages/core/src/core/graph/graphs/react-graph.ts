@@ -7,57 +7,9 @@ import {
 	type GraphTopologyMetadata,
 } from "../types.js"
 import { executeStreamLLM } from "../llm-stream.js"
+import { reactTopology } from "../topologies.js"
 
-export const reactTopology: GraphTopologyMetadata = {
-	modeId: ExecutionMode.REACT,
-	modeName: "ReAct",
-	description:
-		"Day-to-day coding, reading and editing files, bug fixing and terminal commands (autonomous ReAct loop with the full tool chain)",
-	icon: "wrench",
-	nodes: [
-		{
-			id: "agent",
-			label: "Agent Reasoning",
-			description:
-				"Analyzes user prompt, reasons about repository state, and decides next tool or text answer",
-			kind: "llm",
-			configSummary: "Full tools enabled, max 50 steps",
-		},
-		{
-			id: "tools",
-			label: "Execute Tools",
-			description:
-				"Applies file edits, runs shell commands, interacts with LSP, and records tool results",
-			kind: "tool",
-			configSummary: "Filesystem, Terminal, LSP, Subagents",
-		},
-	],
-	edges: [
-		{
-			from: "__start__",
-			to: "agent",
-			label: "User prompt",
-		},
-		{
-			from: "agent",
-			to: "tools",
-			label: "Tool calls generated",
-			conditionType: "has_tools",
-		},
-		{
-			from: "tools",
-			to: "agent",
-			label: "Tool outputs fedback",
-			conditionType: "loop",
-		},
-		{
-			from: "agent",
-			to: "__end__",
-			label: "Goal achieved",
-			conditionType: "no_tools",
-		},
-	],
-}
+export { reactTopology }
 
 export const reactGraphDefinition: AgentGraphDefinition = {
 	id: ExecutionMode.REACT,

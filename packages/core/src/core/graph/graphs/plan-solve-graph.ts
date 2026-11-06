@@ -7,95 +7,9 @@ import {
 	type GraphTopologyMetadata,
 } from "../types.js"
 import { executeStreamLLM } from "../llm-stream.js"
+import { planSolveTopology } from "../topologies.js"
 
-export const planSolveTopology: GraphTopologyMetadata = {
-	modeId: ExecutionMode.PLAN,
-	modeName: "Plan & Solve",
-	description:
-		"Complex multi-step work, large refactors, new feature architecture and systematic migrations (writes a structured task list first, then executes and reviews step by step)",
-	icon: "list-ordered",
-	nodes: [
-		{
-			id: "planner",
-			label: "Task Planner",
-			description:
-				"Analyzes objectives and breaks down complex requirements into structured sub-tasks",
-			kind: "plan",
-			configSummary: "Read-only inspection, task checklist generation",
-		},
-		{
-			id: "task_iterator",
-			label: "Task Iterator",
-			description:
-				"Tracks execution progress, selects the next pending sub-task, and sets focus",
-			kind: "condition",
-			configSummary: "Loop controller",
-		},
-		{
-			id: "executor",
-			label: "Worker Executor",
-			description:
-				"Performs focused tool execution and file modifications for the current sub-task",
-			kind: "llm",
-			configSummary: "Contextual tools execution",
-		},
-		{
-			id: "reviewer",
-			label: "Quality Reviewer",
-			description:
-				"Verifies implemented changes, checks for errors, and confirms task completion",
-			kind: "review",
-			configSummary: "Verification gate",
-		},
-		{
-			id: "summarizer",
-			label: "Final Summarizer",
-			description:
-				"Summarizes completed work and provides next-step suggestions to the user",
-			kind: "llm",
-			configSummary: "Synthesis and report",
-		},
-	],
-	edges: [
-		{
-			from: "__start__",
-			to: "planner",
-			label: "User goal",
-		},
-		{
-			from: "planner",
-			to: "task_iterator",
-			label: "Task checklist ready",
-		},
-		{
-			from: "task_iterator",
-			to: "executor",
-			label: "Next task",
-		},
-		{
-			from: "executor",
-			to: "reviewer",
-			label: "Work completed",
-		},
-		{
-			from: "reviewer",
-			to: "task_iterator",
-			label: "More tasks pending",
-			conditionType: "loop",
-		},
-		{
-			from: "reviewer",
-			to: "summarizer",
-			label: "All tasks completed",
-			conditionType: "default",
-		},
-		{
-			from: "summarizer",
-			to: "__end__",
-			label: "Done",
-		},
-	],
-}
+export { planSolveTopology }
 
 export const planSolveGraphDefinition: AgentGraphDefinition = {
 	id: ExecutionMode.PLAN,

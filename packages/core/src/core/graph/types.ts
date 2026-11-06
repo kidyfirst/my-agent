@@ -81,6 +81,13 @@ export interface ExecutedToolItem {
 	args: unknown
 	result?: unknown
 	isError?: boolean
+	/**
+	 * Wall-clock bounds of the execution, filled in by the controller (which
+	 * runs the tool) so the recorder — driven later by stream chunks — can write
+	 * a span with real durations instead of the time the chunk arrived.
+	 */
+	startedAt?: number
+	endedAt?: number
 }
 
 /**

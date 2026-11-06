@@ -1,6 +1,10 @@
 import { streamText, wrapLanguageModel, type LanguageModel } from "ai"
 import type { ExecutedToolItem } from "./types.js"
 import { logger } from "../logger/index.js"
+import {
+	applyPromptCacheBreakpoints,
+	sortToolsByName,
+} from "../llm/prompt-cache.js"
 
 export interface StreamLLMOptions {
 	model: LanguageModel
@@ -85,6 +89,8 @@ export function createEffectiveModel(
 							}
 						}
 					}
+					// Align with model provider Prompt Caching (Anthropic, Gemini, DeepSeek, OpenAI)
+					params.prompt = applyPromptCacheBreakpoints(params.prompt)
 				}
 				return params
 			},
@@ -308,11 +314,15 @@ export async function executeStreamLLM(
 		toolsCount: tools ? Object.keys(tools).length : 0,
 	})
 
+	const sortedTools = tools ? sortToolsByName(tools) : undefined
 	const streamRes = (streamText as any)({
 		model: effectiveModel,
 		system: instructions,
 		messages,
-		tools: tools && Object.keys(tools).length > 0 ? tools : undefined,
+		tools:
+			sortedTools && Object.keys(sortedTools).length > 0
+				? sortedTools
+				: undefined,
 		...(stopWhen ? { stopWhen } : {}),
 		abortSignal,
 	})
@@ -447,6 +457,10 @@ export async function executeStreamLLM(
 						input: (chunk as any).input ?? (chunk as any).args,
 						output: output,
 						isError,
+						// The controller already ran this tool and recorded real
+						// start/end times; the stream chunk only arrives afterwards.
+						spanId: toolCallId || undefined,
+						startedAt: existing?.startedAt,
 					})
 				} catch {}
 			}

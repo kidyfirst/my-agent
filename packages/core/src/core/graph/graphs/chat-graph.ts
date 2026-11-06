@@ -8,41 +8,13 @@ import {
 } from "../types.js"
 import { executeStreamLLM } from "../llm-stream.js"
 import { selectReadOnlyTools } from "../readonly-tools.js"
+import {
+	chatTopology,
+	FAST_DESCRIPTION,
+	FAST_MAX_STEPS,
+} from "../topologies.js"
 
-/** Tool-call rounds Fast mode may spend before it must answer in text. */
-const FAST_MAX_STEPS = 8
-
-const FAST_DESCRIPTION =
-	"Quick Q&A, concept questions and lookups (answers streamed straight back, read-only tools for files and the web, never writes)"
-
-export const chatTopology: GraphTopologyMetadata = {
-	modeId: ExecutionMode.FAST,
-	modeName: "Fast",
-	description: FAST_DESCRIPTION,
-	icon: "bolt",
-	nodes: [
-		{
-			id: "chat_llm",
-			label: "Direct LLM Stream",
-			description:
-				"Streams the answer, reading files, searching the code and querying the web when it needs context",
-			kind: "llm",
-			configSummary: `Read-only tools, max ${FAST_MAX_STEPS} steps`,
-		},
-	],
-	edges: [
-		{
-			from: "__start__",
-			to: "chat_llm",
-			label: "User message",
-		},
-		{
-			from: "chat_llm",
-			to: "__end__",
-			label: "Response complete",
-		},
-	],
-}
+export { chatTopology }
 
 export const chatGraphDefinition: AgentGraphDefinition = {
 	id: ExecutionMode.FAST,
