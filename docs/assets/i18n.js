@@ -79,6 +79,9 @@
 			"feat7.title": "会话录制与离线回放",
 			"feat7.desc":
 				"一键把真实运行录制为紧凑 JSONL（含思考链与打字节奏），回放零请求零消耗，并按录制时的模型、模式与权限完整还原现场。",
+			"feat8.title": "本地个人知识库",
+			"feat8.desc":
+				"内置全功能 Library 个人知识库，支持 Word、Excel、PPT、PDF、Markdown、代码与高清图片等多格式本地富文本预览与提取，融合 Agent 智能检索与上下文无缝引用。",
 
 			"dl.title": "全平台客户端下载",
 			"dl.descA": "当前最新稳定版本",
@@ -176,6 +179,9 @@
 			"feat7.title": "Session recording & offline replay",
 			"feat7.desc":
 				"Record a real run into a compact JSONL — thinking chain and typing cadence included. Replay it with zero requests and zero cost, restoring the exact model, mode and permissions of the recording.",
+			"feat8.title": "Personal knowledge base (Library)",
+			"feat8.desc":
+				"Built-in offline Library supporting rich multi-format previews and content extraction for Word, Excel, PowerPoint, PDF, Markdown, code, and images — seamlessly integrated with Agent search and context references.",
 
 			"dl.title": "Download for every platform",
 			"dl.descA": "Latest stable release",
