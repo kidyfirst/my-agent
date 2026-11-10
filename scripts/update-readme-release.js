@@ -326,24 +326,44 @@ function syncDocsSite() {
 	const filePath = path.join(rootDir, "docs", "index.html")
 	if (!fs.existsSync(filePath)) {
 		console.log("Skipped docs/index.html: not found")
-		return
+	} else {
+		const before = fs.readFileSync(filePath, "utf8")
+		const after = before
+			.replace(
+				// `v<semver>/my-agent-<semver>-<suffix>`: the version appears twice
+				// per URL. Only the numbers are matched — a looser `[^/"]+` would
+				// swallow the platform prefix too ("mac-arm64.dmg" → "arm64.dmg").
+				new RegExp(`releases/download/v[\\d.]+/${appName}-[\\d.]+-`, "g"),
+				`releases/download/v${targetVersion}/${appName}-${targetVersion}-`,
+			)
+			.replace(/(class="js-version-tag">)v[^<]*(<)/g, `$1v${targetVersion}$2`)
+		if (after === before) {
+			console.log(`docs/index.html already at v${targetVersion}`)
+		} else {
+			fs.writeFileSync(filePath, after, "utf8")
+			console.log(`Updated docs/index.html to v${targetVersion}`)
+		}
 	}
-	const before = fs.readFileSync(filePath, "utf8")
-	const after = before
-		.replace(
-			// `v<semver>/my-agent-<semver>-<suffix>`: the version appears twice
-			// per URL. Only the numbers are matched — a looser `[^/"]+` would
-			// swallow the platform prefix too ("mac-arm64.dmg" → "arm64.dmg").
-			new RegExp(`releases/download/v[\\d.]+/${appName}-[\\d.]+-`, "g"),
-			`releases/download/v${targetVersion}/${appName}-${targetVersion}-`,
-		)
-		.replace(/(class="js-version-tag">)v[^<]*(<)/g, `$1v${targetVersion}$2`)
-	if (after === before) {
-		console.log(`docs/index.html already at v${targetVersion}`)
-		return
+
+	const jsPath = path.join(rootDir, "docs", "assets", "main.js")
+	if (fs.existsSync(jsPath)) {
+		const before = fs.readFileSync(jsPath, "utf8")
+		const after = before
+			.replace(
+				/const DEFAULT_VERSION = (?:[^|\n]+\|\|\s*)?"v[^"]+"/g,
+				`const DEFAULT_VERSION = (staticTag && staticTag.textContent.trim()) || "v${targetVersion}"`,
+			)
+			.replace(
+				new RegExp(`my-agent-[\\d.]+-`, "g"),
+				`my-agent-${targetVersion}-`,
+			)
+		if (after !== before) {
+			fs.writeFileSync(jsPath, after, "utf8")
+			console.log(`Updated docs/assets/main.js to v${targetVersion}`)
+		} else {
+			console.log(`docs/assets/main.js already at v${targetVersion}`)
+		}
 	}
-	fs.writeFileSync(filePath, after, "utf8")
-	console.log(`Updated docs/index.html to v${targetVersion}`)
 }
 
 syncDocsSite()

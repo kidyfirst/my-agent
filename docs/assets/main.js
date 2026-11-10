@@ -8,7 +8,12 @@
 	"use strict"
 
 	const GITHUB_REPO = "kidyfirst/my-agent"
-	const DEFAULT_VERSION = "v0.1.1"
+	const staticTag =
+		typeof document !== "undefined"
+			? document.querySelector(".js-version-tag")
+			: null
+	const DEFAULT_VERSION =
+		(staticTag && staticTag.textContent.trim()) || "v0.1.7"
 	const BASE_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases`
 	const I18N = window.DocsI18n
 
@@ -21,16 +26,17 @@
 			"M12.003 0c-2.457 0-4.043 1.942-4.043 4.398 0 1.259.452 2.738.995 4.093-1.09.432-2.179 1.144-2.846 2.052-.906 1.233-.872 2.651-.872 4.148 0 1.559.39 3.275 1.579 4.35 1.05.947 2.502 1.344 3.904 1.488.47.781 1.096 1.493 1.83 2.087-.456.195-.916.353-1.378.48-1.095.302-2.146.402-2.91.564-.468.099-.54.34-.343.606.336.453 1.27.734 2.215.734 1.844 0 3.864-.897 5.029-2.122 1.165 1.225 3.185 2.122 5.029 2.122.945 0 1.879-.281 2.215-.734.197-.266.125-.507-.343-.606-.764-.162-1.815-.262-2.91-.564-.462-.127-.922-.285-1.378-.48.734-.594 1.36-1.306 1.83-2.087 1.402-.144 2.854-.541 3.904-1.488 1.189-1.075 1.579-2.791 1.579-4.35 0-1.497.034-2.915-.872-4.148-.667-.908-1.756-1.62-2.846-2.052.543-1.355.995-2.834.995-4.093C16.046 1.942 14.46 0 12.003 0z",
 	}
 
-	// Fallback direct download links for v0.1.1
+	// Fallback direct download links for current release
+	const cleanVer = DEFAULT_VERSION.replace(/^v/, "")
 	const FALLBACK_ASSETS = {
-		macArmDmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-arm64.dmg`,
-		macArmZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-arm64.zip`,
-		macX64Dmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-x64.dmg`,
-		macX64Zip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-mac-x64.zip`,
-		winExe: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-win-x64.exe`,
-		winZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-win-x64.zip`,
-		linuxAppImage: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-linux-x86_64.AppImage`,
-		linuxDeb: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-0.1.1-linux-amd64.deb`,
+		macArmDmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-mac-arm64.dmg`,
+		macArmZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-mac-arm64.zip`,
+		macX64Dmg: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-mac-x64.dmg`,
+		macX64Zip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-mac-x64.zip`,
+		winExe: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-win-x64.exe`,
+		winZip: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-win-x64.zip`,
+		linuxAppImage: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-linux-x86_64.AppImage`,
+		linuxDeb: `${BASE_RELEASE_URL}/download/${DEFAULT_VERSION}/my-agent-${cleanVer}-linux-amd64.deb`,
 	}
 
 	/**
@@ -201,37 +207,44 @@
 		const releaseData = await fetchLatestRelease()
 		const release = parseReleaseAssets(releaseData)
 
-		// Update version badge
-		const versionBadges = document.querySelectorAll(".js-version-tag")
-		versionBadges.forEach((el) => {
-			el.textContent = release.tag
-		})
-
-		const dateBadges = document.querySelectorAll(".js-release-date")
-		dateBadges.forEach((el) => {
-			el.textContent = release.date
-		})
-
-		// Update matrix download links
-		const setLink = (id, assetInfo) => {
-			const btn = document.getElementById(id)
-			if (btn && assetInfo && assetInfo.url) {
-				btn.href = assetInfo.url
-				const sizeEl = btn.querySelector(".js-asset-size")
-				if (sizeEl && assetInfo.size) {
-					sizeEl.textContent = `(${assetInfo.size})`
-				}
-			}
+		const getCardHref = (id, fallbackUrl) => {
+			const el = document.getElementById(id)
+			return (el && el.getAttribute("href")) || fallbackUrl
 		}
 
-		setLink("btn-mac-arm-dmg", release.assets.macArmDmg)
-		setLink("btn-mac-arm-zip", release.assets.macArmZip)
-		setLink("btn-mac-x64-dmg", release.assets.macX64Dmg)
-		setLink("btn-mac-x64-zip", release.assets.macX64Zip)
-		setLink("btn-win-exe", release.assets.winExe)
-		setLink("btn-win-zip", release.assets.winZip)
-		setLink("btn-linux-appimage", release.assets.linuxAppImage)
-		setLink("btn-linux-deb", release.assets.linuxDeb)
+		// Only overwrite version badge and matrix links if GitHub API returned valid release data
+		if (releaseData && releaseData.tag_name) {
+			const versionBadges = document.querySelectorAll(".js-version-tag")
+			versionBadges.forEach((el) => {
+				el.textContent = release.tag
+			})
+
+			const dateBadges = document.querySelectorAll(".js-release-date")
+			dateBadges.forEach((el) => {
+				if (release.date) el.textContent = release.date
+			})
+
+			// Update matrix download links
+			const setLink = (id, assetInfo) => {
+				const btn = document.getElementById(id)
+				if (btn && assetInfo && assetInfo.url) {
+					btn.href = assetInfo.url
+					const sizeEl = btn.querySelector(".js-asset-size")
+					if (sizeEl && assetInfo.size) {
+						sizeEl.textContent = `(${assetInfo.size})`
+					}
+				}
+			}
+
+			setLink("btn-mac-arm-dmg", release.assets.macArmDmg)
+			setLink("btn-mac-arm-zip", release.assets.macArmZip)
+			setLink("btn-mac-x64-dmg", release.assets.macX64Dmg)
+			setLink("btn-mac-x64-zip", release.assets.macX64Zip)
+			setLink("btn-win-exe", release.assets.winExe)
+			setLink("btn-win-zip", release.assets.winZip)
+			setLink("btn-linux-appimage", release.assets.linuxAppImage)
+			setLink("btn-linux-deb", release.assets.linuxDeb)
+		}
 
 		// Setup Primary Hero CTA based on detected client.
 		// Only the icon, the i18n key and the target link change here; the copy
@@ -259,7 +272,9 @@
 			if (client.os === "mac") {
 				if (client.arch === "arm64") {
 					applyHero({
-						href: release.assets.macArmDmg.url,
+						href: releaseData
+							? release.assets.macArmDmg.url
+							: getCardHref("btn-mac-arm-dmg", release.assets.macArmDmg.url),
 						labelKey: "hero.ctaMacArm",
 						iconPath: OS_ICONS.mac,
 						tipKey: "hero.tipMacArm",
@@ -267,7 +282,9 @@
 					})
 				} else {
 					applyHero({
-						href: release.assets.macX64Dmg.url,
+						href: releaseData
+							? release.assets.macX64Dmg.url
+							: getCardHref("btn-mac-x64-dmg", release.assets.macX64Dmg.url),
 						labelKey: "hero.ctaMacX64",
 						iconPath: OS_ICONS.mac,
 						tipKey: "hero.tipMacX64",
@@ -276,7 +293,12 @@
 				}
 			} else if (client.os === "windows") {
 				applyHero({
-					href: release.assets.winExe.url || "#downloads",
+					href: releaseData
+						? release.assets.winExe.url
+						: getCardHref(
+								"btn-win-exe",
+								release.assets.winExe.url || "#downloads",
+							),
 					labelKey: "hero.ctaWin",
 					iconPath: OS_ICONS.windows,
 					tipKey: "hero.tipWin",
@@ -284,7 +306,12 @@
 				})
 			} else if (client.os === "linux") {
 				applyHero({
-					href: release.assets.linuxAppImage.url || "#downloads",
+					href: releaseData
+						? release.assets.linuxAppImage.url
+						: getCardHref(
+								"btn-linux-appimage",
+								release.assets.linuxAppImage.url || "#downloads",
+							),
 					labelKey: "hero.ctaLinux",
 					iconPath: OS_ICONS.linux,
 					tipKey: "hero.tipLinux",
