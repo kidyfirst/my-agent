@@ -1981,12 +1981,15 @@ export function App() {
 					dialogs.handleOpenSettings("accounts")
 				}}
 				onOpenAgents={() => dialogs.handleToggleAgents()}
+				onOpenLibrary={() => dialogs.handleToggleLibrary()}
 				loggingEnabled={loggingEnabled}
 				isLoggingActive={dialogs.showLogConsole}
 				onOpenLogging={() => dialogs.handleToggleLogConsole()}
 				isSettingsActive={dialogs.showSettings}
 				isAgentsActive={dialogs.showAgents}
+				isLibraryActive={dialogs.showLibrary}
 				activeAgentCount={project.activeWorktrees.size}
+
 				updateInfo={updateInfo}
 				downloadProgress={downloadProgress}
 				onDownloadUpdate={handleDownloadUpdate}
@@ -2191,6 +2194,7 @@ export function App() {
 				onStartReplay={(filePath) => handleStartReplay(filePath)}
 				onReplayError={(msg) => showToast(msg, "error")}
 				currentThreadId={currentThreadId}
+				showToast={showToast}
 			/>
 
 			{/* Floating Toast Notification */}

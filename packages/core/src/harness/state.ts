@@ -15,6 +15,8 @@ export const stateSchema = z.object({
 	subagentModelId: z.string().optional(),
 	observerModelId: z.string().default(DEFAULT_OM_MODEL_ID),
 	reflectorModelId: z.string().default(DEFAULT_OM_MODEL_ID),
+	libraryJudgeModelId: z.string().default(DEFAULT_OM_MODEL_ID),
+	imageProcessModelId: z.string().default(DEFAULT_OM_MODEL_ID),
 	observationThreshold: z.number().default(DEFAULT_OBS_THRESHOLD),
 	reflectionThreshold: z.number().default(DEFAULT_REF_THRESHOLD),
 	thinkingLevel: z

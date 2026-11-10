@@ -4,6 +4,29 @@
 // and reuse it for all subsequent sounds.
 let sharedAudioCtx: AudioContext | null = null
 
+const STORAGE_KEY_DATA = "myagent-custom-sound-data"
+const STORAGE_KEY_NAME = "myagent-custom-sound-name"
+
+export function getCustomSoundInfo(): { name: string; dataUrl: string } | null {
+	if (typeof localStorage === "undefined") return null
+	const dataUrl = localStorage.getItem(STORAGE_KEY_DATA)
+	const name = localStorage.getItem(STORAGE_KEY_NAME) || "Custom sound"
+	if (!dataUrl) return null
+	return { name, dataUrl }
+}
+
+export function setCustomSound(name: string, dataUrl: string): void {
+	if (typeof localStorage === "undefined") return
+	localStorage.setItem(STORAGE_KEY_DATA, dataUrl)
+	localStorage.setItem(STORAGE_KEY_NAME, name)
+}
+
+export function clearCustomSound(): void {
+	if (typeof localStorage === "undefined") return
+	localStorage.removeItem(STORAGE_KEY_DATA)
+	localStorage.removeItem(STORAGE_KEY_NAME)
+}
+
 export function ensureAudioContext() {
 	if (!sharedAudioCtx) {
 		try {
@@ -18,7 +41,13 @@ export function ensureAudioContext() {
 	}
 }
 
-export function playCompletionSound() {
+export function getAudioContext(): AudioContext | null {
+	ensureAudioContext()
+	return sharedAudioCtx
+}
+
+export function playDefaultChirp() {
+	ensureAudioContext()
 	if (!sharedAudioCtx) return
 	try {
 		const ctx = sharedAudioCtx
@@ -70,4 +99,22 @@ export function playCompletionSound() {
 	} catch {
 		// Audio not available
 	}
+}
+
+export function playCompletionSound() {
+	const custom = getCustomSoundInfo()
+	if (custom?.dataUrl) {
+		try {
+			const audio = new Audio(custom.dataUrl)
+			audio.volume = 0.7
+			void audio.play().catch(() => {
+				playDefaultChirp()
+			})
+			return
+		} catch {
+			playDefaultChirp()
+			return
+		}
+	}
+	playDefaultChirp()
 }

@@ -1,3 +1,5 @@
+import { getLibraryService } from "@my-agent/core"
+import { showNotificationDirect } from "../notifications.js"
 import type { IpcCommandHandler } from "./types.js"
 
 export function getSettingsHandlers(): Record<string, IpcCommandHandler> {
@@ -21,6 +23,12 @@ export function getSettingsHandlers(): Record<string, IpcCommandHandler> {
 				.getActiveSession()
 				.harness.setState({ notifications: command.mode })
 		},
+		previewNotification: async (command) => {
+			const title = (command.title as string) || "Mastra Notification"
+			const body = (command.body as string) || "Notification preview"
+			showNotificationDirect(title, body)
+			return { success: true }
+		},
 		setSmartEditing: async (command, ctx) => {
 			await ctx
 				.getActiveSession()
@@ -35,6 +43,26 @@ export function getSettingsHandlers(): Record<string, IpcCommandHandler> {
 			await ctx
 				.getActiveSession()
 				.harness.switchReflectorModel({ modelId: command.modelId })
+		},
+		setLibraryJudgeModel: async (command, ctx) => {
+			const s = ctx.getActiveSession()
+			await (s.harness as any).switchLibraryJudgeModel?.({
+				modelId: command.modelId,
+			})
+			await s.harness.setState({ libraryJudgeModelId: command.modelId })
+			getLibraryService().setConfig({
+				libraryJudgeModelId: command.modelId as string,
+			})
+		},
+		setImageProcessModel: async (command, ctx) => {
+			const s = ctx.getActiveSession()
+			await (s.harness as any).switchImageProcessModel?.({
+				modelId: command.modelId,
+			})
+			await s.harness.setState({ imageProcessModelId: command.modelId })
+			getLibraryService().setConfig({
+				imageProcessModelId: command.modelId as string,
+			})
 		},
 		setState: async (command, ctx) => {
 			const session = ctx.getActiveSession()

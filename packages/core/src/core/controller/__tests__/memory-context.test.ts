@@ -560,4 +560,123 @@ describe("Memory Context & History Preservation", () => {
 		// Latest user message is fresh, no breakpoint
 		expect(userMsgs[1].providerOptions).toBeUndefined()
 	})
+
+	it("deduplicates duplicate tool-call and tool-result parts in history messages", async () => {
+		let capturedPrompts: any[] = []
+
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return {
+					stream: convertArrayToReadableStream([
+						{ type: "stream-start", warnings: [] },
+						{ type: "text-start", id: "0" },
+						{ type: "text-delta", id: "0", delta: "Answer" },
+						{ type: "text-end", id: "0" },
+						{
+							type: "finish",
+							finishReason: "stop",
+							usage: mockUsage,
+						},
+					]),
+				}
+			},
+		})
+
+		const storage = new SQLiteStore({ url: ":memory:" })
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Test instructions",
+			model: () => model,
+		})
+		const controller = new AgentController({
+			storage,
+			agent,
+		})
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "test-dedup" })
+		await session.thread.create({ title: "Test Dedup" })
+		const threadId = session.thread.getId()
+
+		const store = await (controller.storage as SQLiteStore).getStore("memory")
+		// Seed a corrupted history message with DUPLICATE tool-call and tool-result entries
+		// (identical to what caused Duplicate value for 'tool_call_id' of call_00_...)
+		await store.saveMessages({
+			messages: [
+				{
+					id: "msg-user-1",
+					role: "user",
+					content: "Hello",
+					threadId,
+					resourceId: "test-dedup",
+					createdAt: new Date(Date.now() - 5000),
+				},
+				{
+					id: "msg-asst-1",
+					role: "assistant",
+					content: {
+						format: 2,
+						parts: [
+							{
+								type: "tool-call",
+								toolCallId: "call_00_duplicate",
+								toolName: "test_tool",
+								input: { query: "A" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "call_00_duplicate",
+								toolName: "test_tool",
+								result: { ok: true },
+							},
+							{
+								type: "tool-call",
+								toolCallId: "call_00_duplicate",
+								toolName: "test_tool",
+								input: { query: "A" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "call_00_duplicate",
+								toolName: "test_tool",
+								result: { ok: true },
+							},
+						],
+						content: "Partial reply",
+					},
+					threadId,
+					resourceId: "test-dedup",
+					createdAt: new Date(Date.now() - 4000),
+				},
+			],
+		})
+
+		// Send next message
+		await session.sendMessage({ content: "What is next?" })
+
+		expect(capturedPrompts.length).toBe(1)
+		const prompt = capturedPrompts[0]
+
+		// Check the assistant message in history
+		const assistantMsg = prompt.find((m: any) => m.role === "assistant")
+		expect(assistantMsg).toBeDefined()
+		const toolCalls = assistantMsg.content.filter(
+			(c: any) => c.type === "tool-call",
+		)
+		// Must be deduplicated to exactly 1
+		expect(toolCalls.length).toBe(1)
+		expect(toolCalls[0].toolCallId).toBe("call_00_duplicate")
+
+		// Check the tool message in history
+		const toolMsg = prompt.find((m: any) => m.role === "tool")
+		expect(toolMsg).toBeDefined()
+		const toolResults = toolMsg.content.filter(
+			(c: any) => c.type === "tool-result",
+		)
+		// Must be deduplicated to exactly 1
+		expect(toolResults.length).toBe(1)
+		expect(toolResults[0].toolCallId).toBe("call_00_duplicate")
+	})
 })

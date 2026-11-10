@@ -17,6 +17,7 @@ import { getLoggingHandlers } from "./logging-handlers.js"
 import { getRepoHandlers } from "./repo-handlers.js"
 import { getFeedbackHandlers } from "./feedback-handlers.js"
 import { getA2AHandlers } from "./a2a-handlers.js"
+import { getLibraryHandlers } from "./library-handlers.js"
 
 export type {
 	HandlerContext,
@@ -46,5 +47,6 @@ export function getAllHandlers(): Record<string, IpcCommandHandler> {
 		...getRepoHandlers(),
 		...getFeedbackHandlers(),
 		...getA2AHandlers(),
+		...getLibraryHandlers(),
 	}
 }

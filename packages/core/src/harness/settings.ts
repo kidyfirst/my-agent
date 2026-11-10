@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { getAppDataDir } from "../utils/project.js"
+import { DEFAULT_OM_MODEL_ID } from "./state.js"
 
 export interface CustomProviderConfig {
 	name: string
@@ -16,6 +17,8 @@ export interface SettingsData {
 		subagentModels: Record<string, string>
 		omModelOverride?: string
 		activeModelPackId?: string
+		libraryJudgeModelId?: string
+		imageProcessModelId?: string
 	}
 	preferences: {
 		yolo: boolean | null
@@ -51,6 +54,8 @@ const DEFAULT_SETTINGS: SettingsData = {
 			fast: "google/gemini-2.0-flash",
 		},
 		subagentModels: {},
+		libraryJudgeModelId: DEFAULT_OM_MODEL_ID,
+		imageProcessModelId: DEFAULT_OM_MODEL_ID,
 	},
 	preferences: {
 		yolo: null,

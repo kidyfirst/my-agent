@@ -14,6 +14,7 @@ import { ModelsSection } from "./settings/ModelsSection"
 import { AgentSection } from "./settings/AgentSection"
 import { GitSection } from "./settings/GitSection"
 import { MemorySection } from "./settings/MemorySection"
+import { LibrarySection } from "./settings/LibrarySection"
 import { DeveloperSection } from "./settings/DeveloperSection"
 
 export function Settings({
@@ -76,6 +77,14 @@ export function Settings({
 					(st?.reflectorModelId as string) ||
 					(st?.currentModelId as string) ||
 					"",
+				libraryJudgeModelId:
+					(st?.libraryJudgeModelId as string) ||
+					(st?.observerModelId as string) ||
+					"",
+				imageProcessModelId:
+					(st?.imageProcessModelId as string) ||
+					(st?.observerModelId as string) ||
+					"",
 				observationThreshold: (st?.observationThreshold as number) ?? 30000,
 				reflectionThreshold: (st?.reflectionThreshold as number) ?? 40000,
 				prInstructions: (st?.prInstructions as string) ?? "",
@@ -123,6 +132,18 @@ export function Settings({
 				case "reflectorModelId":
 					await window.api.invoke({
 						type: "setReflectorModel",
+						modelId: value,
+					})
+					break
+				case "libraryJudgeModelId":
+					await window.api.invoke({
+						type: "setLibraryJudgeModel",
+						modelId: value,
+					})
+					break
+				case "imageProcessModelId":
+					await window.api.invoke({
+						type: "setImageProcessModel",
 						modelId: value,
 					})
 					break
@@ -246,6 +267,7 @@ export function Settings({
 		{ id: "general", label: "General" },
 		{ id: "mcp", label: "MCP" },
 		{ id: "models", label: "Models" },
+		{ id: "library", label: "Library" },
 		{ id: "agent", label: "Agent" },
 		{ id: "git", label: "Git" },
 		{ id: "memory", label: "Memory" },
@@ -470,7 +492,21 @@ export function Settings({
 								)}
 
 								{activeSection === "models" && (
-									<ModelsSection state={state} update={update} />
+									<ModelsSection
+										state={state}
+										models={models}
+										modelsLoaded={modelsLoaded}
+										update={update}
+									/>
+								)}
+
+								{activeSection === "library" && (
+									<LibrarySection
+										state={state}
+										models={models}
+										modelsLoaded={modelsLoaded}
+										update={update}
+									/>
 								)}
 
 								{activeSection === "agent" && (

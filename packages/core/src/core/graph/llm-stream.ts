@@ -180,10 +180,35 @@ export function buildMessageParts(
 			text: activeThinking,
 		})
 	}
+	const seenToolIds = new Set<string>()
 	for (const t of executedTools) {
+		const tid = t.id || `call_${parts.length}`
+		if (seenToolIds.has(tid)) {
+			// Update existing parts if this duplicate has result
+			if (t.result !== undefined) {
+				const existingResult = parts.find(
+					(p) =>
+						p.type === "tool-result" && (p.toolCallId === tid || p.id === tid),
+				)
+				if (existingResult) {
+					existingResult.result = t.result
+					existingResult.isError = t.isError
+				} else {
+					parts.push({
+						type: "tool-result",
+						toolCallId: tid,
+						toolName: t.name,
+						result: t.result,
+						isError: t.isError,
+					})
+				}
+			}
+			continue
+		}
+		seenToolIds.add(tid)
 		parts.push({
 			type: "tool-call",
-			toolCallId: t.id,
+			toolCallId: tid,
 			toolName: t.name,
 			input: t.args ?? {},
 			args: t.args ?? {},
@@ -191,7 +216,7 @@ export function buildMessageParts(
 		if (t.result !== undefined) {
 			parts.push({
 				type: "tool-result",
-				toolCallId: t.id,
+				toolCallId: tid,
 				toolName: t.name,
 				result: t.result,
 				isError: t.isError,
@@ -400,7 +425,7 @@ export async function executeStreamLLM(
 				})
 			}
 		} else if (chunk.type === "tool-call") {
-			const toolCallId = (chunk as any).toolCallId
+			const toolCallId = (chunk as any).toolCallId || (chunk as any).id
 			// AI SDK v5 renamed the payload fields: `input` (was `args`). Reading
 			// only the legacy name silently persisted every tool part without its
 			// arguments, which blanked the UI after any transcript reload.
@@ -412,6 +437,8 @@ export async function executeStreamLLM(
 					name: (chunk as any).toolName,
 					args,
 				})
+			} else if (args && Object.keys(args).length > 0) {
+				existing.args = args
 			}
 			const { parts } = buildCurrentContent()
 			emit({
@@ -424,7 +451,7 @@ export async function executeStreamLLM(
 				},
 			})
 		} else if (chunk.type === "tool-result") {
-			const toolCallId = (chunk as any).toolCallId
+			const toolCallId = (chunk as any).toolCallId || (chunk as any).id
 			// v5 renamed `result` → `output`; the legacy name is kept for safety.
 			const output = (chunk as any).output ?? (chunk as any).result
 			const isError = Boolean(
@@ -477,7 +504,7 @@ export async function executeStreamLLM(
 		} else if (chunk.type === "tool-error") {
 			// v5 signals a thrown tool as its own chunk type; without this the
 			// tool stays marked "running" forever and the failure is invisible.
-			const toolCallId = (chunk as any).toolCallId
+			const toolCallId = (chunk as any).toolCallId || (chunk as any).id
 			const errorOutput =
 				(chunk as any).error ?? (chunk as any).output ?? "Tool execution failed"
 			const existing = executedTools.find((t) => t.id === toolCallId)

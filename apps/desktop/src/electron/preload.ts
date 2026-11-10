@@ -45,6 +45,14 @@ const api = {
 		return () => ipcRenderer.removeListener("open-url", handler)
 	},
 
+	/** Listen for requests to preview a library item */
+	onOpenLibraryPreview: (callback: (itemId: string) => void): (() => void) => {
+		const handler = (_: Electron.IpcRendererEvent, itemId: string) =>
+			callback(itemId)
+		ipcRenderer.on("open-library-preview", handler)
+		return () => ipcRenderer.removeListener("open-library-preview", handler)
+	},
+
 	platform: process.platform,
 
 	/**

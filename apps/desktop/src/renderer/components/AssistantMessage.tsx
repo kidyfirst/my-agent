@@ -6,6 +6,221 @@ import { extractMessageDetails } from "../utils/messageParser"
 import { FilesChangedBar } from "./FilesChangedBar"
 import { ImagePreviewModal } from "./ImagePreviewModal"
 import { MessageFeedback } from "./MessageFeedback"
+import { openLibraryPreview } from "../utils/library"
+
+const LOCAL_DOC_EXTENSIONS = [
+	".docx",
+	".doc",
+	".pptx",
+	".ppt",
+	".xlsx",
+	".xls",
+	".pdf",
+	".png",
+	".jpg",
+	".jpeg",
+	".webp",
+	".md",
+	".txt",
+	".csv",
+	".tsv",
+]
+
+function resolveLibraryItemId(
+	href?: string | null,
+	linkText?: string | null,
+): string | null {
+	if (href) {
+		const lowerHref = href.toLowerCase().trim()
+
+		// 1. Explicit library scheme: library://<itemId> or library:<itemId>
+		if (lowerHref.startsWith("library://")) {
+			return decodeURIComponent(href.slice("library://".length).trim())
+		}
+		if (lowerHref.startsWith("library:")) {
+			return decodeURIComponent(href.slice("library:".length).trim())
+		}
+
+		// 2. Direct path containing /my-library/
+		const myLibIdx = lowerHref.indexOf("/my-library/")
+		if (myLibIdx !== -1) {
+			return decodeURIComponent(
+				href.slice(myLibIdx + "/my-library/".length).trim(),
+			)
+		}
+
+		// 3. Dev server localhost URL: http://localhost:5173/filename.docx
+		if (
+			lowerHref.startsWith("http://localhost:5173/") ||
+			lowerHref.startsWith("http://127.0.0.1:5173/") ||
+			lowerHref.startsWith("http://localhost:") ||
+			lowerHref.startsWith("http://127.0.0.1:")
+		) {
+			try {
+				const u = new URL(href)
+				const pathname = decodeURIComponent(u.pathname.replace(/^\/+/, ""))
+				if (pathname) return pathname
+			} catch {}
+		}
+
+		// 4. Relative paths or filenames: e.g. "1-2.习近平总书记重要讲话精神.docx" or "./report.pptx"
+		if (
+			!lowerHref.startsWith("http://") &&
+			!lowerHref.startsWith("https://") &&
+			!lowerHref.startsWith("mailto:")
+		) {
+			const clean = decodeURIComponent(
+				href
+					.replace(/^\.\//, "")
+					.replace(/^file:\/\//, "")
+					.trim(),
+			)
+			if (clean && getDocumentFilename(clean)) return clean
+		}
+
+		// 5. Fallback: Check if href ends with known doc extensions
+		for (const ext of LOCAL_DOC_EXTENSIONS) {
+			if (
+				lowerHref.endsWith(ext) ||
+				lowerHref.includes(`${ext}?`) ||
+				lowerHref.includes(`${ext}#`)
+			) {
+				try {
+					const clean = decodeURIComponent(
+						href
+							.replace(/^.*[\\/]/, "")
+							.replace(/\?.*$/, "")
+							.replace(/#.*$/, ""),
+					)
+					if (clean) return clean
+				} catch {}
+			}
+		}
+	}
+
+	if (linkText && typeof linkText === "string") {
+		const doc = getDocumentFilename(linkText)
+		if (doc) return doc
+	}
+
+	return null
+}
+
+const DOC_EXT_REGEX =
+	/\.(docx|doc|pptx|ppt|xlsx|xls|pdf|png|jpg|jpeg|webp|gif|md|txt|csv|tsv)$/i
+
+function getChildrenText(children: React.ReactNode): string {
+	if (typeof children === "string") return children
+	if (typeof children === "number") return String(children)
+	if (Array.isArray(children)) return children.map(getChildrenText).join("")
+	if (React.isValidElement(children) && (children.props as any)?.children) {
+		return getChildrenText((children.props as any).children)
+	}
+	return ""
+}
+
+function getDocumentFilename(val: unknown): string | null {
+	if (!val) return null
+	if (typeof val === "string") {
+		const trimmed = val.trim()
+		if (
+			DOC_EXT_REGEX.test(trimmed) &&
+			trimmed.length < 150 &&
+			!trimmed.includes("\n")
+		) {
+			return trimmed
+		}
+	}
+	return null
+}
+
+function isPureTextNode(node: any): boolean {
+	return Boolean(
+		node &&
+			Array.isArray(node.children) &&
+			node.children.length === 1 &&
+			node.children[0].type === "text",
+	)
+}
+
+function LibraryDocumentChip({
+	itemId,
+	children,
+}: {
+	itemId: string
+	children?: React.ReactNode
+}) {
+	// Guard against any nested LibraryDocumentChips
+	if (
+		React.isValidElement(children) &&
+		((children.props as any)?.["data-library-chip"] === "true" ||
+			(children.props as any)?.role === "button")
+	) {
+		return children
+	}
+
+	return (
+		<span
+			data-library-chip="true"
+			role="button"
+			tabIndex={0}
+			onClick={(e) => {
+				e.preventDefault()
+				e.stopPropagation()
+				openLibraryPreview(itemId)
+			}}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault()
+					e.stopPropagation()
+					openLibraryPreview(itemId)
+				}
+			}}
+			title={`Click to preview "${itemId}" in Library`}
+			style={{
+				display: "inline-flex",
+				alignItems: "center",
+				gap: 5,
+				padding: "1px 8px",
+				margin: "1px 2px",
+				fontSize: "0.95em",
+				fontFamily: "var(--font-mono)",
+				color: "var(--accent)",
+				backgroundColor: "var(--selected-bg)",
+				border: "1px solid var(--border-accent)",
+				borderRadius: 5,
+				cursor: "pointer",
+				verticalAlign: "baseline",
+				lineHeight: 1.4,
+				fontWeight: 600,
+				transition: "all 0.15s ease",
+				userSelect: "none",
+			}}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.filter = "brightness(0.95)"
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.filter = "none"
+			}}
+		>
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="2"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				style={{ flexShrink: 0 }}
+			>
+				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+				<polyline points="14 2 14 8 20 8" />
+			</svg>
+			<span>{children || itemId}</span>
+		</span>
+	)
+}
 
 interface AssistantMessageProps {
 	message: Message & { isStreaming?: boolean }
@@ -315,6 +530,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 				>
 					<Markdown
 						remarkPlugins={[remarkGfm]}
+						urlTransform={(url) => url}
 						components={{
 							pre({ children }) {
 								const codeElement = React.isValidElement(children)
@@ -331,6 +547,163 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 									)
 								}
 								return <pre>{children}</pre>
+							},
+							a({ href, children, ...props }) {
+								const childrenText = getChildrenText(children)
+								const libraryItemId =
+									resolveLibraryItemId(href, childrenText) ||
+									getDocumentFilename(childrenText) ||
+									(href ? getDocumentFilename(href) : null)
+
+								if (libraryItemId) {
+									return (
+										<LibraryDocumentChip itemId={libraryItemId}>
+											{children || libraryItemId}
+										</LibraryDocumentChip>
+									)
+								}
+
+								// External web link (e.g. https://www.gov.cn)
+								return (
+									<a
+										href={href}
+										onClick={(e) => {
+											const possibleDoc =
+												resolveLibraryItemId(href || "", childrenText) ||
+												getDocumentFilename(childrenText) ||
+												getDocumentFilename(href)
+											if (possibleDoc) {
+												e.preventDefault()
+												e.stopPropagation()
+												openLibraryPreview(possibleDoc)
+												return
+											}
+											if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
+												e.preventDefault()
+												void (window as any).api?.invoke?.({ type: "openExternal", url: href })
+											}
+										}}
+										target="_blank"
+										rel="noopener noreferrer"
+										{...props}
+									>
+										{children}
+									</a>
+								)
+							},
+							p({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<p {...props}>
+												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+											</p>
+										)
+									}
+								}
+								return <p {...props}>{children}</p>
+							},
+							li({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<li {...props}>
+												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+											</li>
+										)
+									}
+								}
+								return <li {...props}>{children}</li>
+							},
+							code({ className, children, ...props }) {
+								const text = getChildrenText(children).trim()
+								const docFile = getDocumentFilename(text)
+								if (docFile && !className) {
+									return (
+										<LibraryDocumentChip itemId={docFile}>
+											{text}
+										</LibraryDocumentChip>
+									)
+								}
+								return (
+									<code className={className} {...props}>
+										{children}
+									</code>
+								)
+							},
+							strong({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<LibraryDocumentChip itemId={docFile}>
+												{docFile}
+											</LibraryDocumentChip>
+										)
+									}
+								}
+								return <strong {...props}>{children}</strong>
+							},
+							h1({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<h1 {...props}>
+												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+											</h1>
+										)
+									}
+								}
+								return <h1 {...props}>{children}</h1>
+							},
+							h2({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<h2 {...props}>
+												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+											</h2>
+										)
+									}
+								}
+								return <h2 {...props}>{children}</h2>
+							},
+							h3({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<h3 {...props}>
+												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+											</h3>
+										)
+									}
+								}
+								return <h3 {...props}>{children}</h3>
+							},
+							h4({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const docFile = getDocumentFilename(text)
+									if (docFile) {
+										return (
+											<h4 {...props}>
+												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+											</h4>
+										)
+									}
+								}
+								return <h4 {...props}>{children}</h4>
 							},
 							img({ src, alt }) {
 								if (!src) return null

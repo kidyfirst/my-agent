@@ -1856,6 +1856,7 @@ export class Session<TState = any> {
 				(m) => m.role === "assistant",
 			).length
 			let assistantTurnCounter = 0
+			const globalSeenToolCallIds = new Set<string>()
 
 			const coreMessages: any[] = []
 			for (const m of historyMessages) {
@@ -2013,8 +2014,14 @@ export class Session<TState = any> {
 						reasoning = m.content.reasoning
 					}
 
-					if (Array.isArray(m.content?.parts) && m.content.parts.length > 0) {
-						for (const p of m.content.parts) {
+					const rawAssistantParts = Array.isArray(m.content?.parts)
+						? m.content.parts
+						: Array.isArray(m.content)
+							? m.content
+							: []
+
+					if (rawAssistantParts.length > 0) {
+						for (const p of rawAssistantParts) {
 							if (!p) continue
 							if (p.type === "reasoning" || p.type === "thinking") {
 								const t = p.text || p.thinking || p.reasoning || ""
@@ -2046,18 +2053,33 @@ export class Session<TState = any> {
 								) {
 									toolInput = {}
 								}
-								const toolCallId =
+								const rawId =
 									p.toolCallId ||
 									p.id ||
 									`${m.id || "msg"}_call_${toolCalls.length}`
 								const toolName = p.toolName || p.name || "tool"
-								toolCalls.push({
-									type: "tool-call",
-									toolCallId,
-									toolName,
-									input: toolInput,
-									args: toolInput,
-								})
+
+								const existingIndex = toolCalls.findIndex(
+									(tc) => tc.toolCallId === rawId,
+								)
+								if (existingIndex >= 0) {
+									if (
+										Object.keys(toolInput).length > 0 &&
+										Object.keys(toolCalls[existingIndex].input || {}).length ===
+											0
+									) {
+										toolCalls[existingIndex].input = toolInput
+										toolCalls[existingIndex].args = toolInput
+									}
+								} else {
+									toolCalls.push({
+										type: "tool-call",
+										toolCallId: rawId,
+										toolName,
+										input: toolInput,
+										args: toolInput,
+									})
+								}
 							} else if (p.type === "tool-result") {
 								let res = p.result !== undefined ? p.result : p.output
 								const toolCallId = p.toolCallId || p.id
@@ -2097,7 +2119,10 @@ export class Session<TState = any> {
 									}
 								}
 
-								toolResults.push({
+								const existingResIdx = toolResults.findIndex(
+									(tr) => tr.toolCallId === toolCallId,
+								)
+								const resItem = {
 									type: "tool-result",
 									toolCallId,
 									toolName,
@@ -2105,13 +2130,45 @@ export class Session<TState = any> {
 										typeof res === "string"
 											? { type: "text", value: res }
 											: { type: "json", value: res ?? {} },
-								})
+								}
+								if (existingResIdx >= 0) {
+									toolResults[existingResIdx] = resItem
+								} else {
+									toolResults.push(resItem)
+								}
 							}
 						}
 					}
 
 					text = text.trim()
 					reasoning = reasoning.trim()
+
+					// Ensure globally unique toolCallIds across the entire conversation
+					// and ensure 1:1 mapping between tool-call and tool-result
+					const callIdMap = new Map<string, string>()
+					for (const tc of toolCalls) {
+						let uniqueId = tc.toolCallId
+						if (globalSeenToolCallIds.has(uniqueId)) {
+							let suffix = 1
+							while (
+								globalSeenToolCallIds.has(
+									`${uniqueId}_t${assistantTurnCounter}_${suffix}`,
+								)
+							) {
+								suffix++
+							}
+							uniqueId = `${uniqueId}_t${assistantTurnCounter}_${suffix}`
+						}
+						globalSeenToolCallIds.add(uniqueId)
+						callIdMap.set(tc.toolCallId, uniqueId)
+						tc.toolCallId = uniqueId
+					}
+
+					for (const tr of toolResults) {
+						if (callIdMap.has(tr.toolCallId)) {
+							tr.toolCallId = callIdMap.get(tr.toolCallId)!
+						}
+					}
 
 					// Guarantee that every toolCall has a corresponding toolResult
 					// Missing tool-results cause OpenAI / Anthropic APIs to reject the turn
@@ -2132,10 +2189,19 @@ export class Session<TState = any> {
 							})
 						}
 					}
-					// Only keep tool-results that correspond to a tool-call in this turn
-					const validToolResults = toolResults.filter((tr) =>
-						toolCalls.some((tc) => tc.toolCallId === tr.toolCallId),
-					)
+
+					// Deduplicate tool results by toolCallId and only keep results that correspond to a tool-call in this turn
+					const seenResultIds = new Set<string>()
+					const validToolResults: any[] = []
+					for (const tr of toolResults) {
+						if (
+							toolCalls.some((tc) => tc.toolCallId === tr.toolCallId) &&
+							!seenResultIds.has(tr.toolCallId)
+						) {
+							seenResultIds.add(tr.toolCallId)
+							validToolResults.push(tr)
+						}
+					}
 
 					const assistantContent: any[] = []
 					if (reasoning) {

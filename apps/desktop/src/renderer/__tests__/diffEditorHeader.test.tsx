@@ -18,11 +18,11 @@ describe("DiffEditor header", () => {
 		expect(html).toContain("Side-by-Side")
 	})
 
-	it("shows the changed path in the header", () => {
+	it("does not show the file path in the header", () => {
 		const html = renderToStaticMarkup(
 			<DiffEditor filePath="src/client/client.css" projectPath="/repo/alpha" />,
 		)
-		expect(html).toContain("src/client/client.css")
+		expect(html).not.toContain("src/client/client.css")
 	})
 
 	it("renders no menu trigger without a project path", () => {

@@ -1,6 +1,16 @@
 import { Notification } from "electron"
 import type { WorktreeSession } from "./ipc/types.js"
 
+export function showNotificationDirect(title: string, body: string) {
+	try {
+		if (Notification.isSupported()) {
+			new Notification({ title, body }).show()
+		}
+	} catch {
+		// Non-critical
+	}
+}
+
 export function sendDesktopNotification(
 	title: string,
 	body: string,

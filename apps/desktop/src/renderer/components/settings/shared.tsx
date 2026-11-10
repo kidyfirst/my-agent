@@ -7,7 +7,7 @@ export function SettingRow({
 	children,
 }: {
 	label: string
-	description?: string
+	description?: React.ReactNode
 	children: React.ReactNode
 }) {
 	return (
@@ -81,40 +81,8 @@ export function Toggle({
 	)
 }
 
-// Select dropdown
-export function Select({
-	value,
-	options,
-	onChange,
-}: {
-	value: string
-	options: Array<{ value: string; label: string }>
-	onChange: (v: string) => void
-}) {
-	return (
-		<select
-			value={value}
-			onChange={(e) => onChange(e.target.value)}
-			style={{
-				background: "var(--bg-elevated)",
-				color: "var(--text)",
-				border: "1px solid var(--border)",
-				borderRadius: 4,
-				padding: "4px 8px",
-				fontSize: 12,
-				cursor: "pointer",
-				fontFamily: "inherit",
-				minWidth: 120,
-			}}
-		>
-			{options.map((o) => (
-				<option key={o.value} value={o.value}>
-					{o.label}
-				</option>
-			))}
-		</select>
-	)
-}
+// Re-export universal Select dropdown
+export { Select, type SelectOption, type SelectProps } from "../Select"
 
 // Section header
 export function SectionHeader({ title }: { title: string }) {

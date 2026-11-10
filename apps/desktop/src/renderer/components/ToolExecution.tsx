@@ -1,5 +1,6 @@
 import { useState } from "react"
 import Ansi from "ansi-to-react"
+import { openLibraryPreview } from "../utils/library"
 
 interface ToolExecutionProps {
 	tool: {
@@ -60,6 +61,40 @@ function countResultLines(result: unknown): number | null {
 	}
 	if (!text) return null
 	return text.split("\n").length
+}
+
+// Parse matched files from search_my_library output
+function extractLibraryResultItems(
+	result: unknown,
+): Array<{ id: string; name: string }> {
+	if (!result || typeof result !== "string") return []
+	const items: Array<{ id: string; name: string }> = []
+	const seen = new Set<string>()
+
+	const itemRegex =
+		/---\s*Item\s*\d+:\s*(?:\[([^\]]+)\]\(library:\/\/[^)]+\)|([^\n(]+?))\s*\([^)]*relative path:\s*([^)]+)\)\s*---/g
+	let m: RegExpExecArray | null
+	while ((m = itemRegex.exec(result)) !== null) {
+		const name = (m[1] || m[2] || "").trim()
+		const id = (m[3] || "").trim()
+		if (id && !seen.has(id)) {
+			seen.add(id)
+			items.push({ id, name: name || id })
+		}
+	}
+
+	if (items.length === 0) {
+		const linkRegex = /\[([^\]]+)\]\(library:\/\/([^)]+)\)/g
+		while ((m = linkRegex.exec(result)) !== null) {
+			const name = m[1].trim()
+			const id = m[2].trim()
+			if (id && !seen.has(id)) {
+				seen.add(id)
+				items.push({ id, name: name || id })
+			}
+		}
+	}
+	return items
 }
 
 // Get diff counts for edit tools
@@ -195,6 +230,14 @@ function getToolDisplay(tool: ToolExecutionProps["tool"]): ToolDisplay {
 				icon: "\u{1F4C1}",
 				label: "Find files",
 				pill: pattern ?? null,
+			}
+		}
+		case "search_my_library": {
+			const query = (args?.query ?? args?.keywords) as string | undefined
+			return {
+				icon: "\u{1F4DA}",
+				label: "Search Library",
+				pill: query ?? null,
 			}
 		}
 		case "web_search": {
@@ -441,6 +484,74 @@ export function ToolExecution({ tool }: ToolExecutionProps) {
 					)}
 				</span>
 			</button>
+
+			{/* Matched library files chips for one-click preview */}
+			{tool.name === "search_my_library" &&
+				tool.status === "complete" &&
+				!tool.isError &&
+				(() => {
+					const matchedItems = extractLibraryResultItems(tool.result)
+					if (matchedItems.length === 0) return null
+					return (
+						<div
+							style={{
+								display: "flex",
+								flexWrap: "wrap",
+								gap: 6,
+								paddingLeft: 28,
+								paddingTop: 3,
+								paddingBottom: 4,
+							}}
+						>
+							{matchedItems.map((item) => (
+								<button
+									key={item.id}
+									type="button"
+									onClick={(e) => {
+										e.stopPropagation()
+										openLibraryPreview(item.id)
+									}}
+									title={`Click to preview "${item.name}" in Library`}
+									style={{
+										display: "inline-flex",
+										alignItems: "center",
+										gap: 5,
+										padding: "3px 8px",
+										background: "var(--bg-surface)",
+										border: "1px solid var(--border-accent)",
+										borderRadius: 6,
+										color: "var(--accent)",
+										fontSize: 12,
+										fontWeight: 500,
+										cursor: "pointer",
+										transition: "all 0.15s ease",
+									}}
+									onMouseEnter={(e) => {
+										e.currentTarget.style.background = "var(--selected-bg)"
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.background = "var(--bg-surface)"
+									}}
+								>
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+										<polyline points="14 2 14 8 20 8" />
+									</svg>
+									<span>{item.name}</span>
+								</button>
+							))}
+						</div>
+					)
+				})()}
 
 			{/* Expanded details */}
 			{expanded && (

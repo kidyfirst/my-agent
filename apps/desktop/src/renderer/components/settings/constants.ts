@@ -1,8 +1,6 @@
 export const notificationOptions: Array<{ value: string; label: string }> = [
 	{ value: "off", label: "Off" },
 	{ value: "bell", label: "Sound" },
-	{ value: "system", label: "System" },
-	{ value: "both", label: "Sound + System" },
 ]
 
 export const thinkingOptions: Array<{ value: string; label: string }> = [

@@ -7,6 +7,9 @@ import { QuickFileOpen } from "./QuickFileOpen"
 import { GraphViewerModal } from "./graph/GraphViewerModal"
 import { Settings } from "./Settings"
 import { AgentDashboard } from "./AgentDashboard"
+import { LibraryModal } from "./LibraryModal"
+import { LibraryPreviewModal } from "./LibraryPreviewModal"
+
 import {
 	SessionExportModal,
 	type SessionExportData,
@@ -40,6 +43,7 @@ interface AppModalsProps {
 	onStartReplay?: (filePath: string) => void
 	onReplayError?: (msg: string) => void
 	currentThreadId?: string | null
+	showToast?: (message: string, type?: "info" | "success" | "error") => void
 }
 
 export function AppModals(props: AppModalsProps) {
@@ -462,6 +466,22 @@ export function AppModals(props: AppModalsProps) {
 						project.handleSwitchProject(worktreePath)
 						dialogs.handleCloseAgents()
 					}}
+				/>
+			)}
+
+			{dialogs.showLibrary && (
+				<LibraryModal
+					isOpen={dialogs.showLibrary}
+					onClose={dialogs.handleCloseLibrary}
+					showToast={props.showToast}
+				/>
+			)}
+
+			{dialogs.previewLibraryItemId && (
+				<LibraryPreviewModal
+					itemId={dialogs.previewLibraryItemId}
+					onClose={dialogs.handleCloseLibraryPreview}
+					showToast={props.showToast}
 				/>
 			)}
 

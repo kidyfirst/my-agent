@@ -20,6 +20,10 @@ import { stringReplaceLspTool } from "../tools/string-replace-lsp.js"
 import { astSmartEditTool } from "../tools/ast-smart-edit.js"
 import { createSubagentTool } from "../tools/subagent.js"
 import { createProjectMemoryTool } from "../tools/project-memory.js"
+import { createLibraryTool } from "../tools/library.js"
+import { getLibraryService } from "../library/library-service.js"
+import { DEFAULT_OM_MODEL_ID } from "./state.js"
+
 import {
 	createWebSearchTool,
 	createWebExtractTool,
@@ -39,6 +43,7 @@ export const READ_TOOL_NAMES = [
 	"find_files",
 	"request_sandbox_access",
 	"assets_fetch",
+	"search_my_library",
 ] as const
 
 /**
@@ -72,6 +77,7 @@ export const FAST_TOOL_NAMES = [
 	"search_content",
 	"find_files",
 	"request_sandbox_access",
+	"search_my_library",
 ] as const
 
 /**
@@ -183,6 +189,30 @@ export function createDynamicTools(
 			request_sandbox_access: () => requestSandboxAccessTool,
 			assets_fetch: () => createAssetsFetchTool(projectRoot),
 			project_memory: () => createProjectMemoryTool(projectRoot),
+			search_my_library: () => {
+				const service = getLibraryService()
+				const harness = (requestContext.get("harness") ||
+					requestContext.get("controller")) as any
+				const effectiveResolver =
+					resolveModel ??
+					((id: string) => {
+						if (typeof harness?.resolveModel === "function") {
+							return harness.resolveModel(id)
+						}
+						return { id }
+					})
+				const state =
+					typeof harness?.getState === "function" ? harness.getState() : {}
+				service.setConfig({
+					resolveModel: effectiveResolver,
+					libraryJudgeModelId:
+						state?.libraryJudgeModelId || DEFAULT_OM_MODEL_ID,
+					imageProcessModelId:
+						state?.imageProcessModelId || DEFAULT_OM_MODEL_ID,
+				})
+				return createLibraryTool(service)
+			},
+
 			subagent: () => {
 				const effectiveResolver =
 					resolveModel ??

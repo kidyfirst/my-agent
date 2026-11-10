@@ -77,12 +77,56 @@ const openTargets = [
 			</svg>
 		),
 	},
+	{
+		id: "browser",
+		label: "Browser",
+		icon: (
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="1.8"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
+				<circle cx="12" cy="12" r="10" />
+				<line x1="2" y1="12" x2="22" y2="12" />
+				<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+			</svg>
+		),
+	},
+	{
+		id: "defaultApp",
+		label: "Default App",
+		icon: (
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="1.8"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			>
+				<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+				<polyline points="15 3 21 3 21 9" />
+				<line x1="10" y1="14" x2="21" y2="3" />
+			</svg>
+		),
+	},
 ]
 
 export function OpenInDropdown({
 	projectPath,
+	filePath,
+	buttonStyle,
 }: {
-	projectPath: string | null
+	projectPath?: string | null
+	filePath?: string | null
+	buttonStyle?: React.CSSProperties
 }) {
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
@@ -108,7 +152,10 @@ export function OpenInDropdown({
 		return () => document.removeEventListener("mousedown", handler, true)
 	}, [open])
 
-	if (!projectPath) return null
+	if (!projectPath && !filePath) return null
+
+	const isFile = Boolean(filePath)
+	const headerTitle = isFile ? "Open file in" : "Open in"
 
 	return (
 		<div
@@ -136,8 +183,9 @@ export function OpenInDropdown({
 					borderRadius: 4,
 					border: "1px solid var(--border)",
 					background: "transparent",
+					...buttonStyle,
 				}}
-				title="Open project in..."
+				title={isFile ? "Open file in..." : "Open project in..."}
 			>
 				Open in...
 				<svg
@@ -184,18 +232,26 @@ export function OpenInDropdown({
 							letterSpacing: "0.5px",
 						}}
 					>
-						Open project in
+						{headerTitle}
 					</div>
 					{openTargets.map((target) => (
 						<button
 							key={target.id}
 							type="button"
 							onClick={() => {
-								window.api.invoke({
-									type: "openProjectIn",
-									target: target.id,
-									projectPath,
-								})
+								if (isFile) {
+									window.api.invoke({
+										type: "openFileIn",
+										target: target.id,
+										filePath,
+									})
+								} else {
+									window.api.invoke({
+										type: "openProjectIn",
+										target: target.id,
+										projectPath,
+									})
+								}
 								setOpen(false)
 							}}
 							title={target.label}

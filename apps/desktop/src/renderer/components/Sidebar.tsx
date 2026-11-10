@@ -5,6 +5,8 @@ import { GlobalSearchModal } from "./GlobalSearchModal"
 import { ShortcutTooltip } from "./ShortcutTooltip"
 import { WindowToggleIcon } from "./WindowToggleIcon"
 import { LogIcon } from "./LogIcon"
+import { LibraryIcon } from "./LibraryIcon"
+
 import { CommunityBanner } from "./sidebar/CommunityBanner"
 import {
 	SIDEBAR_COLLAPSE_THRESHOLD,
@@ -84,6 +86,7 @@ interface SidebarProps {
 	onDeleteWorktree: (worktreePath: string) => void
 	onOpenSettings: () => void
 	onOpenAgents: () => void
+	onOpenLibrary?: () => void
 	onOpenAccounts: () => void
 	/** Developer logging: the sidebar entry only exists while it is enabled. */
 	loggingEnabled?: boolean
@@ -91,7 +94,9 @@ interface SidebarProps {
 	onOpenLogging?: () => void
 	isSettingsActive: boolean
 	isAgentsActive: boolean
+	isLibraryActive?: boolean
 	activeAgentCount: number
+
 	onToggleSidebar?: () => void
 	/**
 	 * Bumped by the ⌘K shortcut. The search modal lives here (it needs the
@@ -179,13 +184,16 @@ export function Sidebar({
 	onDeleteWorktree,
 	onOpenSettings,
 	onOpenAgents,
+	onOpenLibrary,
 	onOpenAccounts,
 	loggingEnabled,
 	isLoggingActive,
 	onOpenLogging,
 	isSettingsActive,
 	isAgentsActive,
+	isLibraryActive,
 	activeAgentCount,
+
 	onToggleSidebar,
 	searchOpenSeq,
 	updateInfo,
@@ -456,6 +464,47 @@ export function Sidebar({
 							{activeAgentCount}
 						</span>
 					)}
+				</button>
+
+				{/* MY Library — knowledge base and user assets */}
+				<button
+					onClick={onOpenLibrary}
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 8,
+						width: "100%",
+						padding: "10px 14px",
+						background: isLibraryActive ? "var(--selected-bg)" : "transparent",
+						borderLeft: isLibraryActive
+							? "3px solid var(--accent)"
+							: "3px solid transparent",
+						borderTop: "none",
+						borderRight: "none",
+						borderBottom: "1px solid var(--border-muted)",
+						cursor: "pointer",
+						flexShrink: 0,
+						textAlign: "left" as const,
+					}}
+					onMouseEnter={(e) => {
+						if (!isLibraryActive)
+							e.currentTarget.style.background = "var(--bg-hover)"
+					}}
+					onMouseLeave={(e) => {
+						if (!isLibraryActive)
+							e.currentTarget.style.background = "transparent"
+					}}
+				>
+					<LibraryIcon size={16} filled={isLibraryActive} />
+					<span
+						style={{
+							fontSize: 13,
+							fontWeight: 600,
+							color: isLibraryActive ? "var(--text)" : "var(--muted)",
+						}}
+					>
+						MY Library
+					</span>
 				</button>
 
 				{/* Logging — developer tool, only present while logging is enabled */}

@@ -48,6 +48,7 @@ import { AuthStorage } from "../auth/storage.js"
 import { MCPManager } from "../mcp/manager.js"
 import type { McpServerStatus } from "../mcp/types.js"
 import { HookManager } from "../hooks/manager.js"
+import { getLibraryService } from "../library/library-service.js"
 import {
 	detectProject,
 	getStorageConfig,
@@ -296,6 +297,8 @@ export interface MyAgentHarness<TState = HarnessState> {
 	): Promise<void>
 	switchObserverModel(options: { modelId: string }): Promise<void>
 	switchReflectorModel(options: { modelId: string }): Promise<void>
+	switchLibraryJudgeModel?(options: { modelId: string }): Promise<void>
+	switchImageProcessModel?(options: { modelId: string }): Promise<void>
 	getCurrentThreadId(): string
 	createThread(options?: {
 		title?: string
@@ -904,6 +907,16 @@ export async function createMyAgent(
 		async switchReflectorModel(options: { modelId: string }) {
 			const session = activeSession ?? (await sessionReady)
 			return session.om?.reflector?.switchModel?.(options)
+		},
+		async switchLibraryJudgeModel(options: { modelId: string }) {
+			const session = activeSession ?? (await sessionReady)
+			await session.state?.set?.({ libraryJudgeModelId: options.modelId })
+			getLibraryService().setConfig({ libraryJudgeModelId: options.modelId })
+		},
+		async switchImageProcessModel(options: { modelId: string }) {
+			const session = activeSession ?? (await sessionReady)
+			await session.state?.set?.({ imageProcessModelId: options.modelId })
+			getLibraryService().setConfig({ imageProcessModelId: options.modelId })
 		},
 		getCurrentThreadId() {
 			return activeSession?.thread?.getId?.() ?? ""

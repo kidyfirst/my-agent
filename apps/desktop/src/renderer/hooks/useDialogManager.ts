@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 
 export interface PendingApproval {
 	threadId?: string
@@ -35,7 +35,12 @@ export function useDialogManager() {
 	const [showGraphViewer, setShowGraphViewer] = useState(false)
 	const [showSettings, setShowSettings] = useState(false)
 	const [showAgents, setShowAgents] = useState(false)
+	const [showLibrary, setShowLibrary] = useState(false)
+	const [previewLibraryItemId, setPreviewLibraryItemId] = useState<
+		string | null
+	>(null)
 	const [showLogConsole, setShowLogConsole] = useState(false)
+
 	const [settingsSection, setSettingsSection] = useState<string | undefined>(
 		undefined,
 	)
@@ -194,6 +199,49 @@ export function useDialogManager() {
 		setShowAgents((prev) => !prev)
 	}, [])
 
+	const handleOpenLibrary = useCallback(() => {
+		setShowLibrary(true)
+	}, [])
+
+	const handleCloseLibrary = useCallback(() => {
+		setShowLibrary(false)
+	}, [])
+
+	const handleToggleLibrary = useCallback(() => {
+		setShowLibrary((prev) => !prev)
+	}, [])
+
+	const handleOpenLibraryPreview = useCallback((itemId: string) => {
+		setPreviewLibraryItemId(itemId)
+	}, [])
+
+	const handleCloseLibraryPreview = useCallback(() => {
+		setPreviewLibraryItemId(null)
+	}, [])
+
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const detail = (e as CustomEvent).detail
+			if (detail?.itemId) {
+				setPreviewLibraryItemId(detail.itemId)
+			}
+		}
+		window.addEventListener("open-library-preview", handler)
+
+		const unsubscribeIpc = window.api?.onOpenLibraryPreview?.(
+			(itemId: string) => {
+				if (itemId) {
+					setPreviewLibraryItemId(itemId)
+				}
+			},
+		)
+
+		return () => {
+			window.removeEventListener("open-library-preview", handler)
+			unsubscribeIpc?.()
+		}
+	}, [])
+
 	const handleOpenLogConsole = useCallback(() => {
 		setShowLogConsole(true)
 	}, [])
@@ -228,6 +276,16 @@ export function useDialogManager() {
 		handleOpenAgents,
 		handleCloseAgents,
 		handleToggleAgents,
+		showLibrary,
+		setShowLibrary,
+		handleOpenLibrary,
+		handleCloseLibrary,
+		handleToggleLibrary,
+		previewLibraryItemId,
+		setPreviewLibraryItemId,
+		handleOpenLibraryPreview,
+		handleCloseLibraryPreview,
+
 		showLogConsole,
 		setShowLogConsole,
 		handleOpenLogConsole,

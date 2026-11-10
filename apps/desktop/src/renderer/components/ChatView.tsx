@@ -816,11 +816,21 @@ export function ChatView({
 								isError,
 								status: isDone ? (isError ? "error" : "complete") : "pending",
 							}
-							currentSteps.push({
-								type: "tool",
-								id: `tool-${toolId}`,
-								tool: resolvedTool,
-							})
+							const stepId = `tool-${toolId}`
+							const existingStepIdx = currentSteps.findIndex((s) => s.id === stepId)
+							if (existingStepIdx >= 0) {
+								currentSteps[existingStepIdx] = {
+									type: "tool",
+									id: stepId,
+									tool: resolvedTool,
+								}
+							} else {
+								currentSteps.push({
+									type: "tool",
+									id: stepId,
+									tool: resolvedTool,
+								})
+							}
 						}
 					}
 				}

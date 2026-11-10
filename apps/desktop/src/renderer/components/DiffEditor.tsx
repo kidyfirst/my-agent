@@ -43,7 +43,7 @@ export function DiffEditor({ filePath, projectPath }: DiffEditorProps) {
 				overflow: "hidden",
 			}}
 		>
-			{/* File path header */}
+			{/* Toolbar header */}
 			<div
 				style={{
 					display: "flex",
@@ -53,21 +53,9 @@ export function DiffEditor({ filePath, projectPath }: DiffEditorProps) {
 					background: "var(--bg-surface)",
 					borderBottom: "1px solid var(--border-muted)",
 					flexShrink: 0,
+					justifyContent: "flex-end",
 				}}
 			>
-				<span
-					style={{
-						fontSize: 11,
-						color: "var(--bg)",
-						background: "var(--accent)",
-						padding: "1px 8px",
-						borderRadius: 3,
-						fontWeight: 500,
-					}}
-				>
-					{filePath}
-				</span>
-				<div style={{ flex: 1 }} />
 				<button
 					onClick={() =>
 						setViewMode(viewMode === "inline" ? "side-by-side" : "inline")

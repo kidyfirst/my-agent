@@ -331,6 +331,19 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 
 					<div style={{ flex: 1 }} />
 
+					{status && (
+						<span
+							style={{
+								fontSize: 11,
+								color: "var(--accent)",
+								whiteSpace: "nowrap",
+								fontWeight: 500,
+							}}
+						>
+							{status}
+						</span>
+					)}
+
 					<button
 						type="button"
 						onClick={() => setFollow((v) => !v)}
@@ -401,11 +414,12 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 					style={{
 						display: "flex",
 						alignItems: "center",
-						gap: 6,
-						padding: "6px 12px",
+						gap: 8,
+						padding: "10px 14px",
 						borderBottom: "1px solid var(--border-muted)",
 						background: "var(--bg)",
 						flexShrink: 0,
+						minHeight: 44,
 					}}
 				>
 					{(["error", "warn", "info", "debug", "trace"] as LogLevel[]).map(
@@ -417,17 +431,17 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 									type="button"
 									onClick={() => toggleLevel(level)}
 									style={{
-										fontSize: 9,
+										fontSize: 10,
 										fontWeight: 700,
 										letterSpacing: "0.3px",
-										padding: "3px 8px",
+										padding: "4px 10px",
 										borderRadius: 999,
 										cursor: "pointer",
 										fontFamily: "inherit",
 										border: `1px solid ${active ? LEVEL_STYLE[level].color : "var(--border)"}`,
 										color: active ? LEVEL_STYLE[level].color : "var(--dim)",
 										background: active ? "transparent" : "var(--bg-surface)",
-										opacity: active ? 1 : 0.55,
+										opacity: active ? 1 : 0.65,
 									}}
 								>
 									{LEVEL_STYLE[level].label}
@@ -442,9 +456,10 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 						style={{
 							flex: 1,
 							minWidth: 0,
-							marginLeft: 6,
-							padding: "5px 10px",
-							fontSize: 11,
+							marginLeft: 4,
+							padding: "6px 12px",
+							fontSize: 12,
+							height: 32,
 							fontFamily: "inherit",
 							color: "var(--text)",
 							background: "var(--bg-surface)",
@@ -454,7 +469,7 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 						}}
 					/>
 					<span
-						style={{ fontSize: 10, color: "var(--dim)", whiteSpace: "nowrap" }}
+						style={{ fontSize: 11, color: "var(--dim)", whiteSpace: "nowrap", marginLeft: 4 }}
 					>
 						{filtered.length} / {entries.length}
 					</span>
@@ -609,41 +624,6 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 							Showing the last {MAX_RENDERED} of {filtered.length} matching
 							entries — narrow the filter to see older ones.
 						</div>
-					)}
-				</div>
-
-				{/* Footer */}
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						padding: "5px 12px",
-						borderTop: "1px solid var(--border-muted)",
-						background: "var(--bg-surface)",
-						fontSize: 10,
-						color: "var(--dim)",
-						flexShrink: 0,
-					}}
-				>
-					<span
-						style={{
-							flex: 1,
-							minWidth: 0,
-							overflow: "hidden",
-							textOverflow: "ellipsis",
-							whiteSpace: "nowrap",
-							fontFamily:
-								"ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-						}}
-						title={filePath}
-					>
-						{filePath || "log file not initialised"}
-					</span>
-					{status && (
-						<span style={{ color: "var(--text)", whiteSpace: "nowrap" }}>
-							{status}
-						</span>
 					)}
 				</div>
 			</div>

@@ -465,33 +465,48 @@ export function ModelPickerInline({
 	return (
 		<div ref={containerRef} style={{ position: "relative" }}>
 			<button
+				type="button"
 				onClick={() => setOpen(!open)}
 				style={{
 					background: isUnauth
 						? "color-mix(in srgb, var(--warning) 7%, transparent)"
 						: "var(--bg-elevated)",
 					color: isUnauth ? "var(--warning)" : "var(--text)",
-					border: isUnauth
-						? "1px solid color-mix(in srgb, var(--warning) 27%, transparent)"
-						: "1px solid var(--border)",
-					borderRadius: 4,
-					padding: "4px 8px",
+					border: open
+						? "1px solid var(--accent)"
+						: isUnauth
+							? "1px solid color-mix(in srgb, var(--warning) 27%, transparent)"
+							: "1px solid var(--border)",
+					borderRadius: 6,
+					padding: "5px 10px",
 					fontSize: 12,
 					cursor: "pointer",
 					fontFamily: "inherit",
-					minWidth: 120,
+					minWidth: 130,
 					textAlign: "left",
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "space-between",
-					gap: 6,
+					gap: 8,
+					transition: "border-color 0.15s ease, background-color 0.15s ease",
+					userSelect: "none",
+				}}
+				onMouseEnter={(e) => {
+					if (!isUnauth && !open) {
+						e.currentTarget.style.borderColor = "var(--border-accent)"
+					}
+				}}
+				onMouseLeave={(e) => {
+					if (!isUnauth && !open) {
+						e.currentTarget.style.borderColor = "var(--border)"
+					}
 				}}
 			>
 				<span
 					style={{
 						display: "flex",
 						alignItems: "center",
-						gap: 4,
+						gap: 6,
 						overflow: "hidden",
 					}}
 				>
@@ -508,9 +523,26 @@ export function ModelPickerInline({
 						{shortName}
 					</span>
 				</span>
-				<span style={{ color: "var(--muted)", fontSize: 10, flexShrink: 0 }}>
-					{open ? "▲" : "▼"}
-				</span>
+
+				{/* Unified SVG Chevron */}
+				<svg
+					width="12"
+					height="12"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					style={{
+						color: "var(--muted)",
+						transform: open ? "rotate(180deg)" : "rotate(0deg)",
+						transition: "transform 0.15s ease",
+						flexShrink: 0,
+					}}
+				>
+					<polyline points="6 9 12 15 18 9" />
+				</svg>
 			</button>
 			{isUnauth && !open && (
 				<div style={{ fontSize: 10, color: "var(--warning)", marginTop: 2 }}>
@@ -522,18 +554,18 @@ export function ModelPickerInline({
 				<div
 					style={{
 						position: "absolute",
-						top: "100%",
+						top: "calc(100% + 4px)",
 						right: 0,
-						marginTop: 6,
+						marginTop: 0,
 						width: 360,
 						maxHeight: 320,
-						background: "var(--bg)",
+						background: "var(--bg-elevated)",
 						border: "1px solid var(--border)",
-						borderRadius: 12,
+						borderRadius: 8,
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
-						zIndex: 50,
+						zIndex: 100,
 						boxShadow: "var(--shadow-popover)",
 					}}
 				>

@@ -47,7 +47,7 @@ export {
 	createDynamicModelGetter,
 	type ModelResolver,
 } from "./harness/model-resolver.js"
-export type { HarnessState } from "./harness/state.js"
+export { DEFAULT_OM_MODEL_ID, type HarnessState } from "./harness/state.js"
 export { describeToolNames } from "./harness/tools.js"
 
 // Storage & Memory
@@ -196,3 +196,6 @@ export {
 	type HostToWorkerMessage,
 	type WorkerToHostMessage,
 } from "./subagent/index.js"
+
+export * from "./library/index.js"
+export { createLibraryTool } from "./tools/library.js"

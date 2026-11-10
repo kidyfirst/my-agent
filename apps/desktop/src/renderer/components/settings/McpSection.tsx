@@ -317,7 +317,7 @@ export function McpSection({
 												rel="noreferrer"
 												style={{ color: "var(--accent)" }}
 											>
-												Get a free API key ↗
+												Get a free API key
 											</a>
 										)}
 										{server.docsUrl && (

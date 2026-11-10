@@ -10,6 +10,8 @@ export interface SettingsState {
 	thinkingLevel: ThinkingLevel
 	observerModelId: string
 	reflectorModelId: string
+	libraryJudgeModelId: string
+	imageProcessModelId: string
 	observationThreshold: number
 	reflectionThreshold: number
 	prInstructions: string

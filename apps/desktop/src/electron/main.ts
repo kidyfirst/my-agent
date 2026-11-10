@@ -53,7 +53,10 @@ import {
 
 // Extracted modules
 import { ElectronStateManager } from "./electron-state.js"
-import { parseExternalUrl } from "./external-links.js"
+import {
+	parseExternalUrl,
+	extractLibraryItemIdFromUrl,
+} from "./external-links.js"
 import type { WorktreeSession, AgentTiming } from "./ipc/types.js"
 import { getAllHandlers } from "./ipc/index.js"
 import { checkForUpdates } from "./updater/updater.js"
@@ -632,6 +635,7 @@ function createWindow() {
 			nodeIntegration: false,
 			contextIsolation: true,
 			sandbox: false,
+			plugins: true,
 			// The right sidebar hosts a real browser as a `<webview>` guest; the
 			// embedder has to opt in for the tag to exist at all.
 			webviewTag: true,
@@ -703,6 +707,14 @@ function createWindow() {
 	// in-app handler.
 	const rendererOrigin = process.env.ELECTRON_RENDERER_URL || ""
 	const openLink = (url: string) => {
+		const libraryItemId = extractLibraryItemIdFromUrl(url, rendererOrigin)
+		if (libraryItemId) {
+			safeSend(mainWindow, "open-library-preview", libraryItemId)
+			return
+		}
+		if (rendererOrigin && url.startsWith(rendererOrigin)) {
+			return
+		}
 		const external = parseExternalUrl(url)
 		if (external) {
 			void shell.openExternal(external)
@@ -712,7 +724,10 @@ function createWindow() {
 	}
 
 	mainWindow.webContents.on("will-navigate", (event, url) => {
-		if (rendererOrigin && url.startsWith(rendererOrigin)) return
+		if (rendererOrigin && url.startsWith(rendererOrigin)) {
+			openLink(url)
+			return
+		}
 		event.preventDefault()
 		openLink(url)
 	})

@@ -190,6 +190,51 @@ export function getFileHandlers(): Record<string, IpcCommandHandler> {
 				} catch {
 					shell.openPath(projectRoot)
 				}
+			} else if (target === "browser") {
+				const { pathToFileURL } = require("node:url")
+				const fileUrl = pathToFileURL(projectRoot).href
+				try {
+					await shell.openExternal(fileUrl)
+				} catch {
+					await shell.openPath(projectRoot)
+				}
+			} else {
+				await shell.openPath(projectRoot)
+			}
+		},
+		openFileIn: async (command) => {
+			const filePath = (command.filePath as string) || ""
+			if (!filePath) return
+			const target = command.target as string
+			const { execSync } =
+				require("child_process") as typeof import("child_process")
+			if (target === "finder") {
+				shell.showItemInFolder(filePath)
+			} else if (target === "browser") {
+				const { pathToFileURL } = require("node:url")
+				const fileUrl = pathToFileURL(filePath).href
+				try {
+					await shell.openExternal(fileUrl)
+				} catch {
+					await shell.openPath(filePath)
+				}
+			} else if (target === "terminal") {
+				const dir = path.dirname(filePath)
+				execSync(`open -a Terminal "${dir}"`, { stdio: "pipe" })
+			} else if (target === "cursor") {
+				try {
+					execSync(`cursor "${filePath}"`, { stdio: "pipe" })
+				} catch {
+					shell.openPath(filePath)
+				}
+			} else if (target === "vscode") {
+				try {
+					execSync(`code "${filePath}"`, { stdio: "pipe" })
+				} catch {
+					shell.openPath(filePath)
+				}
+			} else {
+				await shell.openPath(filePath)
 			}
 		},
 		openExternal: async (command) => {

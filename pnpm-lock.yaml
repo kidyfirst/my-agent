@@ -35,6 +35,9 @@ importers:
       '@xyflow/react':
         specifier: ^12.12.0
         version: 12.12.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@zleap-ai/sag-sdk':
+        specifier: ^0.3.0
+        version: 0.3.0
       ai:
         specifier: ^6.0.50
         version: 6.0.89(zod@3.25.76)
@@ -218,6 +221,9 @@ importers:
       '@tavily/core':
         specifier: ^0.7.1
         version: 0.7.1
+      '@zleap-ai/sag-sdk':
+        specifier: ^0.3.0
+        version: 0.3.0
       ai:
         specifier: ^6.0.50
         version: 6.0.89(zod@3.25.76)
@@ -1252,6 +1258,10 @@ packages:
 
   '@xyflow/system@0.0.83':
     resolution: {integrity: sha512-a//eDjez3WZF47aaPTfVUDD0OINOq+WVwBZCRTqG+m0a5euX8EwlJ4jMY1Wxz0Ocj4xOeekJ70V22Pq0ll8RJw==}
+
+  '@zleap-ai/sag-sdk@0.3.0':
+    resolution: {integrity: sha512-9u07MCf0YsJMPgXmm9uE+Uc+29od6dWvUegm2jFIggr3uMLjOsilyxv/ITS8EYTSnIgqLtam9MZIWKytjQtUoA==}
+    engines: {node: '>=20.19.0'}
 
   abbrev@3.0.1:
     resolution: {integrity: sha512-AO2ac6pjRB3SJmGJo+v5/aK6Omggp6fsLrs6wN9bd35ulu4cCwaAU9+7ZhXjeqHVkaHThLuzH0nZr0YpCDhygg==}
@@ -3281,6 +3291,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
   zustand@4.5.7:
     resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
     engines: {node: '>=12.7.0'}
@@ -4211,6 +4224,10 @@ snapshots:
       d3-interpolate: 3.0.1
       d3-selection: 3.0.0
       d3-zoom: 3.0.0
+
+  '@zleap-ai/sag-sdk@0.3.0':
+    dependencies:
+      zod: 4.6.7
 
   abbrev@3.0.1: {}
 
@@ -6606,6 +6623,8 @@ snapshots:
   yoctocolors@2.1.2: {}
 
   zod@3.25.76: {}
+
+  zod@4.6.7: {}
 
   zustand@4.5.7(@types/react@19.2.14)(react@19.2.4):
     dependencies:

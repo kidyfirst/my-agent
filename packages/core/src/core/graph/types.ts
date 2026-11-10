@@ -141,9 +141,25 @@ export const AgentGraphStateAnnotation = Annotation.Root({
 	executedTools: Annotation<ExecutedToolItem[]>({
 		reducer: (curr, update) => {
 			if (!update || update.length === 0) return curr
-			const existingIds = new Set(curr.map((t) => t.id))
-			const newItems = update.filter((t) => !existingIds.has(t.id))
-			return newItems.length > 0 ? curr.concat(newItems) : curr
+			const existingIds = new Set(curr.map((t) => t.id).filter(Boolean))
+			const result = [...curr]
+			for (const t of update) {
+				if (t.id && existingIds.has(t.id)) {
+					const idx = result.findIndex((x) => x.id === t.id)
+					if (idx >= 0) {
+						result[idx] = {
+							...result[idx],
+							...t,
+							args: t.args ?? result[idx].args,
+							result: t.result !== undefined ? t.result : result[idx].result,
+						}
+					}
+				} else {
+					if (t.id) existingIds.add(t.id)
+					result.push(t)
+				}
+			}
+			return result
 		},
 		default: () => [],
 	}),

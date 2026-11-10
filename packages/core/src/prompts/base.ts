@@ -119,6 +119,17 @@ and call the tool.
 `
 		: ""
 
+	const hasLibraryTool = ctx.toolNames?.includes("search_my_library") ?? false
+
+	const librarySection = hasLibraryTool
+		? `
+# Personal Library (\`search_my_library\`)
+- The user frequently stores official documents, speeches, reports, notes, and reference files in My Library.
+- If you need to search the web, or encounter unknown documents, or before stating that you cannot verify / lack the official text of a speech or document, you MUST query \`search_my_library\` to check the user's local Library.
+- When citing or referring to a file from My Library in your answer, format it as \`[filename](library://relative_path)\` (e.g. \`[105周年讲话.docx](library://105周年讲话.docx)\`) so the user can click it directly to open its preview.
+`
+		: ""
+
 	/**
 	 * A connected search server changes what "I can't look that up" means: the
 	 * model has a real lookup tool, so answering from memory (or claiming there
@@ -132,8 +143,8 @@ and call the tool.
 ${mcpWebTools.map((n) => `\`${n}\``).join(", ")} ${mcpWebTools.length === 1 ? "is" : "are"} connected through MCP and registered in this request.
 
 - Anything that changes outside this repository — weather, prices, news,
-  releases, "latest"/"current"/"today", docs for a version you are unsure about —
-  must be looked up with ${mcpWebTools.map((n) => `\`${n}\``).join(" / ")} before you answer.
+  releases, "latest"/"current"/"today", docs for a version you are unsure about,
+  or topics outside this workspace — can be looked up with ${mcpWebTools.map((n) => `\`${n}\``).join(" / ")}${hasLibraryTool ? ", and you can simultaneously check `search_my_library` for user-saved materials" : ""}.
 - Never say you have no internet access while it is listed above. That
   statement only describes a toolset with no MCP servers attached.
 - Cite the source URLs the tool returns, and say when a result is stale or
@@ -213,7 +224,7 @@ freshly verified.
 
 Fast mode answers directly and quickly, and it may look things up instead of guessing.
 
-- Use \`view\` to read files or list directories, \`search_content\` to search code, and \`find_files\` to locate files by name. Use \`web_search\` / \`web_extract\`, or a connected \`*_web_search\` MCP tool (see Runtime Toolset), when the answer depends on current information.
+- Use \`view\` to read files or list directories, \`search_content\` to search code, and \`find_files\` to locate files by name. Use \`web_search\` / \`web_extract\`, a connected \`*_web_search\` MCP tool (see Runtime Toolset), or \`search_my_library\` when looking up external context or user-saved reference materials.
 - NEVER claim a file was changed. You have no write tool: no \`write_file\`, no \`string_replace_lsp\`, no \`ast_smart_edit\`, no \`execute_command\`.
 - If the user asks for an edit or a command, do the reading you can, then say what you would change and suggest switching to ReAct mode.
 - Keep answers short: read what you need, then answer. Do not narrate every tool call.
@@ -228,7 +239,7 @@ ${ctx.gitBranch ? `Git branch: ${ctx.gitBranch}` : "Not a git repository"}
 Platform: ${ctx.platform}
 Date: ${ctx.date}
 Current mode: ${ctx.mode}
-${toolsetSection}${webAccessSection}${mcpSetupSection}${mcpFailureSection}
+${toolsetSection}${librarySection}${webAccessSection}${mcpSetupSection}${mcpFailureSection}
 # Tone and Style
 - Your output is displayed on a command line interface. Keep responses concise.
 - Use Github-flavored markdown for formatting.
@@ -315,6 +326,14 @@ You have access to the following tools. Use the RIGHT tool for the job:
 - Stored under \`.myagent/project-context.json\` and \`.myagent/rules/*.md\` and persisted across all threads.
 - Actions: \`read\`, \`update_context\`, \`save_rule\`, \`delete_rule\`, \`list_rules\`.
 - When the user expresses a repository-wide preference, convention, or architectural guideline, record it with this tool so future sessions remember it.
+${
+	hasLibraryTool
+		? `
+**search_my_library** — Search user's personal library
+- If you need to search the web, encounter unknown documents, or before stating you lack/cannot verify official texts, query \`search_my_library\`.
+`
+		: ""
+}
 ${ctx.toolNames?.includes("computer") ? browserToolsSection : ""}`
 		: hasTools
 			? readOnlySection
