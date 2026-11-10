@@ -471,7 +471,7 @@ export function AgentDashboard({
 											/>
 										)}
 
-										{/* Branch name */}
+										{/* Project & Branch name */}
 										<span
 											style={{
 												fontSize: 13,
@@ -482,9 +482,29 @@ export function AgentDashboard({
 												whiteSpace: "nowrap",
 												flex: 1,
 												minWidth: 0,
+												display: "inline-flex",
+												alignItems: "center",
+												gap: 6,
 											}}
 										>
-											{agent.gitBranch || agent.projectName}
+											{agent.projectName &&
+											agent.gitBranch &&
+											agent.projectName !== agent.gitBranch ? (
+												<>
+													<span
+														style={{
+															color: "var(--muted)",
+															fontWeight: 500,
+														}}
+													>
+														{agent.projectName}
+													</span>
+													<span style={{ opacity: 0.4 }}>/</span>
+													<span>{agent.gitBranch}</span>
+												</>
+											) : (
+												<span>{agent.gitBranch || agent.projectName}</span>
+											)}
 										</span>
 
 										{/* Linked issue */}
