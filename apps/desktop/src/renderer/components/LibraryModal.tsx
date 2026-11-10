@@ -609,14 +609,18 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 					</div>
 					<span
 						style={{
-							fontSize: 9,
-							fontWeight: 600,
+							fontSize: 10,
+							fontWeight: 500,
 							padding: "1px 6px",
-							borderRadius: 999,
-							border: "1px solid var(--border-accent)",
-							color: "var(--accent)",
-							background: "var(--selected-bg)",
+							borderRadius: 4,
+							border: "1px solid var(--border-muted)",
+							color: "var(--muted)",
+							background: "var(--bg-elevated)",
 							letterSpacing: "0.3px",
+							lineHeight: 1.4,
+							display: "inline-flex",
+							alignItems: "center",
+							userSelect: "none",
 						}}
 					>
 						{isSagConnected ? "SAG SYNC" : "LOCAL"}
@@ -1244,6 +1248,7 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 											}}
 										>
 											<button
+												type="button"
 												onClick={(e) => handleToggleFavorite(e, item.id)}
 												title={
 													item.isFavorite
@@ -1251,8 +1256,12 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 														: "Add to favorites"
 												}
 												style={{
-													background: "var(--scrim-subtle)",
-													border: "none",
+													background: item.isFavorite
+														? "color-mix(in srgb, var(--warning) 16%, var(--bg-surface))"
+														: "var(--bg-surface)",
+													border: item.isFavorite
+														? "1px solid color-mix(in srgb, var(--warning) 40%, var(--border))"
+														: "1px solid var(--border)",
 													borderRadius: "50%",
 													width: 24,
 													height: 24,
@@ -1260,12 +1269,26 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 													display: "flex",
 													alignItems: "center",
 													justifyContent: "center",
+													boxShadow: "0 1px 3px rgba(0, 0, 0, 0.25)",
+													transition: "all 0.15s ease",
+												}}
+												onMouseEnter={(e) => {
+													if (!item.isFavorite) {
+														e.currentTarget.style.borderColor = "var(--warning)"
+														e.currentTarget.style.background = "var(--bg-hover)"
+													}
+												}}
+												onMouseLeave={(e) => {
+													if (!item.isFavorite) {
+														e.currentTarget.style.borderColor = "var(--border)"
+														e.currentTarget.style.background = "var(--bg-surface)"
+													}
 												}}
 											>
 												<StarIcon
 													size={13}
 													filled={item.isFavorite}
-													color={item.isFavorite ? "var(--warning)" : "var(--bg)"}
+													color={item.isFavorite ? "var(--warning)" : "var(--thinking-text)"}
 												/>
 											</button>
 										</div>
@@ -1590,7 +1613,7 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 											<StarIcon
 												size={14}
 												filled={item.isFavorite}
-												color={item.isFavorite ? "var(--warning)" : "var(--muted)"}
+												color={item.isFavorite ? "var(--warning)" : "var(--thinking-text)"}
 											/>
 										</button>
 										{item.type === "image" && (!item.hasOcr || ocrSuccessIds[item.id]) && (
