@@ -121,7 +121,7 @@
 		}
 	}
 
-	function renderReleaseItem(release, isLatest) {
+	function renderReleaseItem(release, isLatest, index = 0) {
 		const tagName = release.tag_name || "v0.1.0"
 		const date = release.published_at
 			? release.published_at.split("T")[0]
@@ -129,7 +129,11 @@
 		const bodyHtml = markdownToHtml(release.body)
 
 		let assetsHtml = ""
-		if (Array.isArray(release.assets) && release.assets.length > 0) {
+		if (
+			index < 5 &&
+			Array.isArray(release.assets) &&
+			release.assets.length > 0
+		) {
 			const nonMetaAssets = release.assets.filter(
 				(a) => !a.name.endsWith(".yml") && !a.name.endsWith(".txt"),
 			)
@@ -215,12 +219,17 @@
 					const badge = existing.querySelector(".badge-latest")
 					if (badge) badge.remove()
 				}
+				// Keep only the latest 5 releases with downloadable assets
+				if (index >= 5) {
+					const box = existing.querySelector(".release-assets-box")
+					if (box) box.remove()
+				}
 				// Keep the hand-written notes and their measured asset sizes.
 				fragment.appendChild(existing)
 				return
 			}
 			const host = document.createElement("div")
-			host.innerHTML = renderReleaseItem(release, index === 0)
+			host.innerHTML = renderReleaseItem(release, index === 0, index)
 			if (host.firstElementChild) fragment.appendChild(host.firstElementChild)
 		})
 

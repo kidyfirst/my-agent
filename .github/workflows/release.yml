@@ -168,6 +168,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prune older release assets (keep latest 5)
+        run: node scripts/prune-release-assets.js 5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Update READMEs and docs site with latest release info
         if: startsWith(github.ref, 'refs/tags/v')
         run: |

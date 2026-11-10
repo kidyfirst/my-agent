@@ -4,6 +4,31 @@
 
 ---
 
+## [v0.1.7] - 2026-11-10
+
+### 📚 本地个人知识库 (Personal Library)
+
+- **个人知识库面板**：新增侧边栏 `MY Library` 模块，集中管理与索引个人文档、图表、学习资料与多媒体资源，支持推荐、收藏、文件夹、图片等智能分类与全文字符级检索。
+- **全格式富文本本地预览**：
+  - **Office 文档原生预览**：完整支持 Word (`.docx`) 格式排版与段落结构渲染、Excel (`.xlsx` / `.csv`) 结构化表格自适应布局、PowerPoint (`.pptx`) 幻灯片原稿演示。
+  - **Chromium PDF 渲染深度修复**：解决 Electron 沙箱与跨源策略拦截 `data:application/pdf` 造成预览空白的问题，采用同源 `Blob URL` 桥接 Chromium 原生 PDFium 引擎，实现毫秒级高清渲染与缩放。
+  - **代码与标记语言高亮**：完整支持 Markdown、JSON、YAML、TypeScript/JavaScript、Python 等语法高亮与目录提纲索引。
+  - **高清图片与视觉解析**：图片文件默认自适应窗口最佳展示（Fit to Window），深度打通模型视觉提取能力。
+- **统一外部应用打开 (Open In)**：梳理整合 OpenIn 操作逻辑，统一提供在 Finder/资源管理器、Cursor、VS Code、Terminal 或系统默认应用中一键定位与打开文件。
+- **Agent 上下文智能引用**：内置 `query_library` 工具，Agent 在多轮推理中能够自动检索并精准引用个人知识库中的文档片段与数据。
+
+### 🎨 界面体验优化 (UI Polish)
+
+- **预览工具栏去冗余**：精简 Word、PPT、图片等模态框顶部冗余的切换按钮行，默认呈现自适应窗口的最佳阅读视图。
+- **特性主站与文档升级**：官方 Landing Page 同步更新产品全景工作台主图，新增本地知识库核心特性卡片与双语介绍。
+
+### 🛠️ 发布与稳定性修复 (Release & Fixes)
+
+- **修复版本号回退 Bug**：彻底解决 GitHub API 匿名限频（403）或网络波动时，前端客户端脚本因硬编码 fallback 导致版本号意外覆盖回退到 0.1.1 的历史问题。
+- **发布脚本全链路同步**：完善 `update-readme-release.js`，保证版本号与多平台安装包映射在各端及自动化脚本中全局同步。
+
+---
+
 ## [v0.1.6] - 2026-11-06
 
 ### 🧠 观察式记忆真正生效 (Observational Memory)
