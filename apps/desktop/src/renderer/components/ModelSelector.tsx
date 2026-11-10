@@ -410,6 +410,7 @@ interface ModelPickerInlineProps {
 	loading: boolean
 	onSelect: (modelId: string) => void
 	onlyConnected?: boolean
+	disabled?: boolean
 }
 
 export function ModelPickerInline({
@@ -418,6 +419,7 @@ export function ModelPickerInline({
 	loading,
 	onSelect,
 	onlyConnected = true,
+	disabled = false,
 }: ModelPickerInlineProps) {
 	// Check if the currently selected model is authenticated
 	const currentModel = models.find((m) => m.id === currentModelId)
@@ -443,6 +445,13 @@ export function ModelPickerInline({
 		return () => document.removeEventListener("mousedown", handler)
 	}, [open])
 
+	// Automatically close if disabled or loading
+	useEffect(() => {
+		if ((disabled || loading) && open) {
+			setOpen(false)
+		}
+	}, [disabled, loading, open])
+
 	// Focus search when opened
 	useEffect(() => {
 		if (open) inputRef.current?.focus()
@@ -466,7 +475,8 @@ export function ModelPickerInline({
 		<div ref={containerRef} style={{ position: "relative" }}>
 			<button
 				type="button"
-				onClick={() => setOpen(!open)}
+				disabled={disabled || loading}
+				onClick={() => !disabled && !loading && setOpen(!open)}
 				style={{
 					background: isUnauth
 						? "color-mix(in srgb, var(--warning) 7%, transparent)"
@@ -480,7 +490,8 @@ export function ModelPickerInline({
 					borderRadius: 6,
 					padding: "5px 10px",
 					fontSize: 12,
-					cursor: "pointer",
+					cursor: disabled || loading ? "not-allowed" : "pointer",
+					opacity: disabled ? 0.5 : 1,
 					fontFamily: "inherit",
 					minWidth: 130,
 					textAlign: "left",
@@ -550,7 +561,7 @@ export function ModelPickerInline({
 				</div>
 			)}
 
-			{open && (
+			{open && !disabled && !loading && (
 				<div
 					style={{
 						position: "absolute",

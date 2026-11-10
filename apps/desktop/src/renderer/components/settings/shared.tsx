@@ -47,13 +47,17 @@ export function SettingRow({
 export function Toggle({
 	checked,
 	onChange,
+	disabled = false,
 }: {
 	checked: boolean
 	onChange: (v: boolean) => void
+	disabled?: boolean
 }) {
 	return (
 		<button
-			onClick={() => onChange(!checked)}
+			type="button"
+			disabled={disabled}
+			onClick={() => !disabled && onChange(!checked)}
 			style={{
 				width: 36,
 				height: 20,
@@ -61,8 +65,9 @@ export function Toggle({
 				background: checked ? "var(--accent)" : "var(--bg-elevated)",
 				border: `1px solid ${checked ? "var(--accent)" : "var(--border)"}`,
 				position: "relative",
-				cursor: "pointer",
-				transition: "background 0.15s, border-color 0.15s",
+				cursor: disabled ? "not-allowed" : "pointer",
+				opacity: disabled ? 0.5 : 1,
+				transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
 			}}
 		>
 			<span

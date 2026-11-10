@@ -57,6 +57,13 @@ export function Select({
 		return () => window.removeEventListener("keydown", handleKeyDown)
 	}, [open])
 
+	// Automatically close if disabled
+	useEffect(() => {
+		if (disabled && open) {
+			setOpen(false)
+		}
+	}, [disabled, open])
+
 	const selectedOption = options.find((o) => o.value === value)
 
 	const handleSelect = useCallback(
@@ -96,7 +103,7 @@ export function Select({
 					justifyContent: "space-between",
 					gap: 8,
 					transition: "border-color 0.15s ease, background-color 0.15s ease",
-					opacity: disabled ? 0.6 : 1,
+					opacity: disabled ? 0.5 : 1,
 					userSelect: "none",
 				}}
 				onMouseEnter={(e) => {
@@ -148,7 +155,7 @@ export function Select({
 			</button>
 
 			{/* Dropdown Popover */}
-			{open && (
+			{open && !disabled && (
 				<div
 					style={{
 						position: "absolute",

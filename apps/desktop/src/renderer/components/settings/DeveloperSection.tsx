@@ -104,33 +104,31 @@ export function DeveloperSection() {
 				label="Log level"
 				description="Higher levels record more detail. Debug is a good default when reproducing a problem; Trace includes every internal step and gets noisy."
 			>
-				<div style={{ opacity: enabled ? 1 : 0.5 }}>
-					<Select
-						value={
-							config?.level && config.level !== "off" ? config.level : "info"
-						}
-						options={LEVEL_OPTIONS}
-						onChange={(v) => {
-							if (!enabled) return
-							patch({ level: v as LoggingConfig["level"] })
-						}}
-					/>
-				</div>
+				<Select
+					disabled={!enabled}
+					value={
+						config?.level && config.level !== "off" ? config.level : "info"
+					}
+					options={LEVEL_OPTIONS}
+					onChange={(v) => {
+						if (!enabled) return
+						patch({ level: v as LoggingConfig["level"] })
+					}}
+				/>
 			</SettingRow>
 
 			<SettingRow
 				label="Echo to terminal"
 				description="Also print captured console output to the terminal. Useful when the app is started from a shell; off by default to keep startup quiet."
 			>
-				<div style={{ opacity: enabled ? 1 : 0.5 }}>
-					<Toggle
-						checked={config?.consoleEcho ?? false}
-						onChange={(v) => {
-							if (!enabled) return
-							patch({ consoleEcho: v })
-						}}
-					/>
-				</div>
+				<Toggle
+					disabled={!enabled}
+					checked={config?.consoleEcho ?? false}
+					onChange={(v) => {
+						if (!enabled) return
+						patch({ consoleEcho: v })
+					}}
+				/>
 			</SettingRow>
 
 			<SectionHeader title="Log file" />
