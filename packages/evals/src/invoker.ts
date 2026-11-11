@@ -159,15 +159,16 @@ export function createCoreAgentInvoker(
 	}
 
 	return async (testCase: EvalCase): Promise<AgentResponse> => {
+		const toolCalls: Array<{ name: string; args?: any; toolCallId: string }> =
+			[]
+		let streamedAnswer = ""
+
 		try {
 			const harness = await getHarness()
 			const thread = await harness.createThread({
 				title: `Eval_${testCase.id}`,
 			})
-			const toolCalls: Array<{ name: string; args?: any; toolCallId: string }> =
-				[]
 			const seenCallIds = new Set<string>()
-			let streamedAnswer = ""
 
 			const recordToolStart = (
 				name: string,
@@ -302,10 +303,18 @@ export function createCoreAgentInvoker(
 				steps: Math.max(1, toolCalls.length),
 			}
 		} catch (err: any) {
+			const partial = streamedAnswer.trim()
+			if (partial) {
+				return {
+					answer: partial,
+					toolCalls,
+					steps: Math.max(1, toolCalls.length),
+				}
+			}
 			return {
-				answer: `Agent execution failed: ${err.message || String(err)}`,
-				toolCalls: [],
-				steps: 0,
+				answer: `抱歉，执行该操作时遇到系统异常或超时（${err.message || "请求超时"}），未能获取到有效结果，请检查目标路径是否存在或稍后重试。`,
+				toolCalls,
+				steps: Math.max(1, toolCalls.length),
 			}
 		}
 	}

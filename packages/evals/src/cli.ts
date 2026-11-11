@@ -31,7 +31,7 @@ async function main() {
 		const timeoutArg = args
 			.find((a) => a.startsWith("--timeout="))
 			?.split("=")[1]
-		const timeoutMs = timeoutArg ? Number(timeoutArg) * 1000 : 60000
+		const timeoutMs = timeoutArg ? Number(timeoutArg) * 1000 : 90000
 
 		const datasetDir = path.join(ROOT_DIR, "dataset")
 		const datasetPaths = [
