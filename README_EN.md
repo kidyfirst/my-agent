@@ -44,16 +44,16 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 
 ### Downloads for all platforms
 
-| Platform | Architecture / device | Package | Direct download (v0.1.7) | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer | [my-agent-0.1.7-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.dmg) | Recommended for most Macs |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build | [my-agent-0.1.7-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.zip) | Unzip and run |
-| 🍏 **macOS** | **Intel x86_64** | `.dmg` installer | [my-agent-0.1.7-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.dmg) | For Intel-based Macs |
-| 🍏 **macOS** | **Intel x86_64** | `.zip` portable build | [my-agent-0.1.7-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.zip) | Unzip and run |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit) | `.exe` installer | [my-agent-0.1.7-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.exe) | NSIS guided setup |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit) | `.zip` portable build | [my-agent-0.1.7-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.zip) | Unzip and run |
-| 🐧 **Linux** | **Linux x86_64** (generic) | `.AppImage` portable image | [my-agent-0.1.7-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-x86_64.AppImage) | `chmod +x`, then run it |
-| 🐧 **Linux** | **Debian / Ubuntu / Deepin** | `.deb` package | [my-agent-0.1.7-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-amd64.deb) | Install with `sudo dpkg -i` |
+| Platform       | Architecture / device                 | Package                    | Direct download (v0.1.7)                                                                                                                    | Notes                       |
+| :------------- | :------------------------------------ | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------- |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer           | [my-agent-0.1.7-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.dmg)                 | Recommended for most Macs   |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build      | [my-agent-0.1.7-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.zip)                 | Unzip and run               |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.dmg` installer           | [my-agent-0.1.7-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.dmg)                     | For Intel-based Macs        |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.zip` portable build      | [my-agent-0.1.7-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.zip)                     | Unzip and run               |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.exe` installer           | [my-agent-0.1.7-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.exe)                     | NSIS guided setup           |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.zip` portable build      | [my-agent-0.1.7-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.zip)                     | Unzip and run               |
+| 🐧 **Linux**   | **Linux x86_64** (generic)            | `.AppImage` portable image | [my-agent-0.1.7-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-x86_64.AppImage) | `chmod +x`, then run it     |
+| 🐧 **Linux**   | **Debian / Ubuntu / Deepin**          | `.deb` package             | [my-agent-0.1.7-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-amd64.deb)             | Install with `sudo dpkg -i` |
 
 > [!IMPORTANT]
 > **macOS says the app “is damaged” or “cannot be opened”:**  
@@ -70,6 +70,7 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 > - Full history and per-version details: 👉 **[online ChangeLog](https://kidyfirst.github.io/my-agent/changelog.html)** or **[all releases on GitHub](https://github.com/kidyfirst/my-agent/releases)**.
 
 ---
+
 <!-- LATEST_RELEASE_END -->
 
 <!-- TIP_JAR_START — the QR is apps/desktop/src/renderer/assets/alipay-qr.png itself; do not add a second copy -->
@@ -140,6 +141,13 @@ If this project has been useful to you, treat the cat 🐱
       - [3.5.6 Cross-Session Project-Level Working Memory & Rules (L3 Project Memory)](#356-cross-session-project-level-working-memory--rules-l3-project-memory)
       - [3.5.7 Model Provider Prompt Caching Alignment Mechanics](#357-model-provider-prompt-caching-alignment-mechanics)
       - [3.5.8 Dynamic Memory Factory, Token Estimation and Test Coverage](#358-dynamic-memory-factory-token-estimation-and-test-coverage)
+    - [3.6 A2A Protocol Service (`packages/a2a/`)](#36-a2a-protocol-service-packagesa2a)
+    - [3.7 CLI Command Line and Local Daemon (`packages/cli/`)](#37-cli-command-line-and-local-daemon-packagescli)
+    - [3.8 Automated Evaluation Suite and Regression Gate (`@my-agent/evals` / `packages/evals/`)](#38-automated-evaluation-suite-and-regression-gate-my-agentevals--packagesevals)
+      - [3.8.1 Three-Stage Evaluation and Feedback Loop](#381-three-stage-evaluation-and-feedback-loop)
+      - [3.8.2 Core Design Considerations and Trade-offs](#382-core-design-considerations-and-trade-offs)
+      - [3.8.3 Core Module Implementation Structure](#383-core-module-implementation-structure)
+      - [3.8.4 Common Commands and Pipeline Instructions](#384-common-commands-and-pipeline-instructions)
   - [4. Core business and data-flow sequences](#4-core-business-and-data-flow-sequences)
     - [4.1 Streaming sequence for user messages, reasoning chains and execution blocks](#41-streaming-sequence-for-user-messages-reasoning-chains-and-execution-blocks)
     - [4.2 Tool-call approval and human-in-the-loop flow](#42-tool-call-approval-and-human-in-the-loop-flow)
@@ -1071,6 +1079,104 @@ To completely eliminate cache hash disruptions caused by dynamic timestamps, uns
 | `status`   | Inspect daemon process status                                               |
 
 `packages/cli/src/client-runner.ts` translates commands into JSON-RPC requests directed to the daemon. The CLI does not retain its own Harness instance — all state is concentrated in the daemon, allowing multiple terminal sessions to share the same workspace context.
+
+### 3.8 Automated Evaluation Suite and Regression Gate (`@my-agent/evals` / `packages/evals/`)
+
+Compared with conventional deterministic software, an agent system behaves non-deterministically, reasons over many steps, and interacts heavily with its environment. To guarantee that core capabilities do not regress while prompts are iterated, the tool set grows, the underlying model is swapped, or a new version ships, the project builds a lightweight evaluation baseline suite written in pure TypeScript: `@my-agent/evals`. The module drops the dependency on heavyweight external Python evaluation frameworks and third-party libraries, integrates `@my-agent/core` directly, and drives a headless agent against a real codebase for closed-loop verification.
+
+#### 3.8.1 Three-Stage Evaluation and Feedback Loop
+
+```mermaid
+flowchart TD
+    subgraph Phase1 ["1. Offline baseline benchmark"]
+        DatasetBase["dataset/baseline_30.jsonl<br/>30+ core scenarios in natural phrasing"]
+        Runner["Evaluation engine (src/runner.ts)<br/>drives the real Agent Harness scheduler"]
+        Judge["LLM judge (src/judge.ts)<br/>DeepSeek / OpenAI LLM + heuristic fallback"]
+        ReportBase["Produces the baseline report (reports/baseline_report.json)"]
+        DatasetBase --> Runner --> Judge --> ReportBase
+    end
+
+    subgraph Phase2 ["2. Online bad-case feedback loop"]
+        UserFeedback["User thumbs-down (👎 Bad Response) / runtime timeouts and errors"]
+        ExportTrace["Sanitizing exporter (src/export-badcases.ts)<br/>strips phone numbers, e-mails, IPs and absolute paths"]
+        DatasetBad["Accumulates into dataset/bad_cases.jsonl<br/>turning incidents into regression assets"]
+        UserFeedback --> ExportTrace --> DatasetBad
+    end
+
+    subgraph Phase3 ["3. CI/CD regression gate"]
+        LatestRun["Evaluation run per release / PR<br/>produces reports/latest_report.json"]
+        Gate["Gate checker (src/gate.ts)<br/>checkRegressionGate(baseline, latest)"]
+        Decision{"Three red lines<br/>pass rate / average steps / latency"}
+        Pass["✅ Gate passed (exit code 0)"]
+        Block["❌ Merge blocked / release alarm (exit code 1)"]
+
+        ReportBase --> Gate
+        LatestRun --> Gate
+        Gate --> Decision
+        Decision --> |within tolerance| Pass
+        Decision --> |metric regression| Block
+    end
+```
+
+#### 3.8.2 Core Design Considerations and Trade-offs
+
+While designing and tuning this evaluation system we dug into the field's chronic failure modes and the mechanics of how agents actually run, and settled on five core principles:
+
+##### 1. Keep cases in natural spoken language; never cheat with adversarial prompts
+
+- **Industry pain point**: when an agent faces a vague or broad request (such as "_count how many tsx files are under apps/desktop_"), an unconstrained large model tends to take the "cheapest path" — inventing or guessing a number (say 119) rather than actually invoking the terminal tool. Rewriting the test prompt as "_run a command in the terminal to count…_" just to make the case pass is test-set poisoning and cheating, and it destroys the whole point of evaluating real natural-language interaction.
+- **Architecture answer**: the test set stays entirely in plain spoken language. A deliberately compact **Grounding Policy** (about 45 tokens) is injected into the global system prompt (`packages/core/src/prompts/base.ts`), requiring that any objective environmental fact — file counts, versions, dependencies — be probed with a real tool and never fabricated.
+
+##### 2. Decoupled evaluation: functional correctness vs resource efficiency
+
+- **Avoid the anti-diligence penalty**: a case's `max_steps` should not be a tight micro-quota (2 or 4 steps) but a **safety circuit breaker** (10–25 steps). If the agent runs one extra verification step to be sure, and stays under the safety ceiling with a correct answer, it must be judged **PASS**. An agent is never punished for being more thorough.
+- **Tolerate base-model evolution**: as base models move from general-purpose to chain-of-thought and self-verification behaviour (DeepSeek-R1, Claude 3.7 Sonnet), they naturally cross-check their own answers on hard problems. Loosening the per-case step ceiling avoids the absurd outcome where "upgrading the model lowers the benchmark score".
+- **Guard resource growth at the gate**: loosening per-case limits is not a licence for cost blow-ups. The regression gate `src/gate.ts` monitors `avg_steps` (growth <= 0.5) and `avg_latency` across all cases, catching systemic efficiency regressions at the aggregate level.
+
+##### 3. Anchor ground truth in the judge criteria
+
+- **Industry pain point**: in fuzzy counting scenarios like "count the tsx files in this project", a judge LLM without access to the real workspace will second-guess a truthful answer of 119 and hallucinate that the number was fabricated, failing a correct run.
+- **Architecture answer**: a case's `expected_answer_criteria` explicitly anchors the codebase's real baseline (e.g. "_this repository currently has roughly 119 of them_"), removing the judge model's own hallucination bias.
+
+##### 4. Vendor-directory isolation and active refusal
+
+- **Architecture strategy**: when facing requests that would produce enormous useless output (such as "_list every file and its details under node_modules_"), a blind deep scan burns vast numbers of tokens and can blow up the context or hang the process. The suite treats this as an edge-protection case (`edge_large_output`), and the core prompt carries explicit defensive guidance: on a deep-scan request against `node_modules/` or `.git/`, stop scanning and ask the user for a specific package name or a narrower filter.
+
+##### 5. PII anonymization and end-to-end privacy compliance
+
+- Interaction samples that users submit via 👍/👎, plus system error logs, are extremely valuable regression assets. `src/export-badcases.ts` runs strict regex and pattern sanitisation before archiving:
+  - phone numbers become `138****0000`;
+  - e-mail addresses become `a***@example.com`;
+  - real absolute machine paths (such as `/Users/xxx/project/...`) are rewritten to virtual relative paths, so neither open-sourcing nor internal sharing risks leaking anything.
+
+#### 3.8.3 Core Module Implementation Structure
+
+```
+packages/evals/
+├── dataset/
+│   ├── baseline_30.jsonl          # 30 baseline cases (files / git / terminal / analysis / edge / safety refusal)
+│   └── bad_cases.jsonl            # Negative feedback and error-recovery cases gathered online
+├── src/
+│   ├── types.ts                   # Full domain types (EvalCase / CaseResult / EvalReport / GateConfig)
+│   ├── invoker.ts                 # Agent invocation driver (real Harness bridge / YOLO-mode elevation / credential detection)
+│   ├── judge.ts                   # Hybrid judge (DeepSeek / OpenAI LLM-as-a-Judge + heuristic fallback)
+│   ├── runner.ts                  # Evaluation scheduler (multi-dataset loading / alias tool mapping / Markdown and JSON reports)
+│   ├── gate.ts                    # Quality and performance regression gate (pass rate, steps, latency)
+│   ├── export-badcases.ts         # Sanitising and archiving of online traces / negative feedback
+│   ├── cli.ts                     # Evaluation CLI entry point (run / gate / export-trace)
+│   └── index.ts                   # Module public exports
+└── package.json
+```
+
+#### 3.8.4 Common Commands and Pipeline Instructions
+
+| Command                      | Description                                                                                  | When to use                                       |
+| :--------------------------- | :------------------------------------------------------------------------------------------- | :------------------------------------------------ |
+| `pnpm run eval`              | Runs every baseline case, produces a terminal summary and full Markdown / JSON reports       | Local full-capability regression and acceptance   |
+| `pnpm run eval:mock`         | Walks the whole scheduling, judging and reporting flow without spending tokens               | Validating the suite itself and CI smoke tests    |
+| `pnpm run eval:baseline`     | Runs only the 30 standard baseline cases (without incremental bad cases)                     | Establishing a comparison baseline before release |
+| `pnpm run eval:gate`         | Compares `latest_report.json` against `baseline_report.json` and enforces the gate           | Blocking checks before CI/CD merge                |
+| `pnpm run eval:export-trace` | Interactively or automatically sanitises an online failure trace and appends it to bad_cases | Turning production incidents into test assets     |
 
 ---
 
