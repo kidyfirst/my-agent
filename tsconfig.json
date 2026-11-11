@@ -16,7 +16,8 @@
 		"paths": {
 			"@my-agent/core": ["packages/core/src/index.ts"],
 			"@my-agent/a2a": ["packages/a2a/src/index.ts"],
-			"@my-agent/cli": ["packages/cli/src/index.ts"]
+			"@my-agent/cli": ["packages/cli/src/index.ts"],
+			"@my-agent/evals": ["packages/evals/src/index.ts"]
 		}
 	},
 	"include": [

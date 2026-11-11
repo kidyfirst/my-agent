@@ -15,6 +15,10 @@
 		"preview": "electron-vite preview",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
+		"eval": "pnpm --filter @my-agent/evals run eval",
+		"eval:mock": "pnpm --filter @my-agent/evals run eval:mock",
+		"eval:gate": "pnpm --filter @my-agent/evals run gate",
+		"eval:export": "pnpm --filter @my-agent/evals run export",
 		"format": "prettier --write .",
 		"postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true && node scripts/patch-electron-plist.js",
 		"prepare": "husky"

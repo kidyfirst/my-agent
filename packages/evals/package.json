@@ -1,0 +1,31 @@
+{
+	"name": "@my-agent/evals",
+	"version": "0.1.7",
+	"description": "Offline evaluation dataset, baseline benchmarker and regression quality gate for My Agent",
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"bin": {
+		"my-agent-eval": "./src/cli.ts"
+	},
+	"scripts": {
+		"eval": "tsx src/cli.ts run",
+		"eval:mock": "tsx src/cli.ts run --mock",
+		"gate": "tsx src/cli.ts gate",
+		"export": "tsx src/cli.ts export",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*.ts"
+	},
+	"dependencies": {
+		"@my-agent/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^25.0.10",
+		"typescript": "^5.8.0",
+		"vitest": "^4.0.18"
+	}
+}
