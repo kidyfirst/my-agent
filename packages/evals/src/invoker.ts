@@ -165,18 +165,45 @@ export function createCoreAgentInvoker(
 				title: `Eval_${testCase.id}`,
 			})
 			const toolCalls: Array<{ name: string; args?: any }> = []
+			const seenKeys = new Set<string>()
 			let stepCount = 0
 			let streamedAnswer = ""
 
+			const recordToolCall = (name: string, args: any, toolCallId?: string) => {
+				if (!name) return
+				const key = toolCallId
+					? `${name}:${toolCallId}`
+					: `${name}:${toolCalls.length}`
+				if (!seenKeys.has(key)) {
+					seenKeys.add(key)
+					toolCalls.push({ name, args })
+					stepCount++
+				}
+			}
+
 			// Auto-approve any tool or plan approvals to prevent CLI stalls
 			const unsubscribe = harness.subscribe((event: any) => {
-				if (event.type === "tool_call" || event.type === "tool_execute_start") {
-					toolCalls.push({
-						name: event.toolName || event.name,
-						args: event.args || event.input,
-					})
-					stepCount++
-				} else if (event.type === "tool_approval_required") {
+				if (
+					event.type === "tool_start" ||
+					event.type === "tool_end" ||
+					event.type === "subagent_tool_start" ||
+					event.type === "tool_call" ||
+					event.type === "tool-call" ||
+					event.type === "tool_execute_start"
+				) {
+					recordToolCall(
+						event.toolName || event.name,
+						event.args || event.input,
+						event.toolCallId,
+					)
+				}
+
+				if (event.type === "tool_approval_required") {
+					recordToolCall(
+						event.toolName || event.name,
+						event.args || event.input,
+						event.toolCallId,
+					)
 					// Auto approve tool calls in headless eval runner
 					harness
 						.approveToolCall({
@@ -186,14 +213,18 @@ export function createCoreAgentInvoker(
 							approved: true,
 						})
 						.catch(() => {})
-				} else if (event.type === "plan_approval_required") {
+				}
+
+				if (event.type === "plan_approval_required") {
 					harness
 						.approvePlan?.({
 							threadId: event.threadId || thread.id,
 							approved: true,
 						})
 						.catch(() => {})
-				} else if (event.type === "text-delta" || event.type === "text_delta") {
+				}
+
+				if (event.type === "text-delta" || event.type === "text_delta") {
 					streamedAnswer += event.delta || event.text || ""
 				} else if (
 					event.type === "step_finish" ||
@@ -222,6 +253,34 @@ export function createCoreAgentInvoker(
 				clearTimeout(timeoutHandle)
 				unsubscribe()
 			}
+
+			// In case any tool call was persisted in message history
+			try {
+				const messages = await harness.listMessages({ threadId: thread.id })
+				for (const msg of messages) {
+					const parts = Array.isArray(msg.content)
+						? msg.content
+						: Array.isArray((msg as any).parts)
+							? (msg as any).parts
+							: []
+					for (const p of parts) {
+						if (p.type === "tool-call" || p.type === "tool_call") {
+							recordToolCall(
+								p.toolName || p.name,
+								p.args || p.input,
+								p.toolCallId || p.id,
+							)
+						}
+					}
+					if (msg.role === "tool" && msg.toolName) {
+						recordToolCall(
+							msg.toolName,
+							msg.args || msg.input,
+							msg.toolCallId || msg.id,
+						)
+					}
+				}
+			} catch {}
 
 			// Extract assistant answer
 			let answer = streamedAnswer.trim()

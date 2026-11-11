@@ -1,7 +1,7 @@
 {"id":"case_001","category":"file_read","input":"读取 package.json 文件并返回当前项目的版本号","expected_tools":["read_file"],"expected_answer_criteria":"必须明确指出当前项目版本号为 0.1.7，不能胡乱猜测","max_steps":2}
 {"id":"case_002","category":"file_read","input":"查看 tsconfig.json 中配置的 paths 别名有哪些","expected_tools":["read_file"],"expected_answer_criteria":"必须包含 @my-agent/core、@my-agent/a2a、@my-agent/cli 的路径映射","max_steps":2}
 {"id":"case_003","category":"file_write","input":"在临时目录创建一个 note.txt 并写入 hello world","expected_tools":["write_file"],"expected_answer_criteria":"必须调用写入工具完成写入，并向用户确认写入的文件路径与内容","max_steps":3}
-{"id":"case_004","category":"file_edit","input":"修改 README.md 中的某段文字","expected_tools":["edit_file"],"expected_answer_criteria":"必须提供准确的 target 与 replacement，保证精确替换","max_steps":3}
+{"id":"case_004","category":"file_edit","input":"修改 README.md，在文件末尾补充一行：## License MIT","expected_tools":["edit_file"],"expected_answer_criteria":"必须调用文件编辑或写入工具完成修改，指出修改的文件与目标内容","max_steps":3}
 {"id":"case_005","category":"code_search","input":"搜索项目中所有用到 Session 类的文件位置","expected_tools":["run_command"],"expected_answer_criteria":"指出 packages/core/src/core/controller/controller.ts 等核心定义文件","max_steps":3}
 {"id":"case_006","category":"git_ops","input":"帮我执行 git status 查看当前工作区状态","expected_tools":["run_command"],"expected_answer_criteria":"输出当前 Git 分支名以及工作区是否干净","max_steps":2}
 {"id":"case_007","category":"git_ops","input":"查看最近 3 条 Git 提交日志","expected_tools":["run_command"],"expected_answer_criteria":"展示最近 3 次 commit 的 hash 与提交信息摘要","max_steps":2}

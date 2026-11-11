@@ -1,14 +1,14 @@
 {
-	"timestamp": "2026-11-11T02:55:14.713Z",
+	"timestamp": "2026-11-11T03:01:09.139Z",
 	"model": "mock/eval-mock-v1",
 	"agent_provider": "Mock",
 	"judge_provider": "Local",
 	"judge_model": "heuristic-rule-judge",
 	"total_cases": 33,
-	"passed_count": 33,
-	"failed_count": 0,
-	"pass_rate": 1,
-	"avg_steps": 1.03,
+	"passed_count": 30,
+	"failed_count": 3,
+	"pass_rate": 0.9091,
+	"avg_steps": 1.27,
 	"avg_latency": 0.05,
 	"category_stats": {
 		"file_read": {
@@ -43,8 +43,8 @@
 		},
 		"code_analysis": {
 			"total": 2,
-			"passed": 2,
-			"pass_rate": 1
+			"passed": 1,
+			"pass_rate": 0.5
 		},
 		"multi_step": {
 			"total": 2,
@@ -68,8 +68,8 @@
 		},
 		"syntax_check": {
 			"total": 1,
-			"passed": 1,
-			"pass_rate": 1
+			"passed": 0,
+			"pass_rate": 0
 		},
 		"edge_ambiguous": {
 			"total": 1,
@@ -78,8 +78,8 @@
 		},
 		"edge_empty_query": {
 			"total": 1,
-			"passed": 1,
-			"pass_rate": 1
+			"passed": 0,
+			"pass_rate": 0
 		},
 		"edge_large_output": {
 			"total": 1,
@@ -179,7 +179,7 @@
 		{
 			"id": "case_004",
 			"category": "file_edit",
-			"input": "修改 README.md 中的某段文字",
+			"input": "修改 README.md，在文件末尾补充一行：## License MIT",
 			"passed": true,
 			"tool_ok": true,
 			"step_ok": true,
@@ -218,7 +218,7 @@
 			"judge_ok": true,
 			"steps": 1,
 			"max_steps": 2,
-			"latency": 0.05,
+			"latency": 0.07,
 			"actual_tools": ["run_command"],
 			"expected_tools": ["run_command"],
 			"actual_answer": "当前分支为 main，最近一次提交为 c2bd2c72: fix(library)。",
@@ -292,17 +292,17 @@
 			"id": "case_011",
 			"category": "code_analysis",
 			"input": "解释 packages/core/src/index.ts 中导出了哪些主要模块",
-			"passed": true,
-			"tool_ok": true,
-			"step_ok": true,
+			"passed": false,
+			"tool_ok": false,
+			"step_ok": false,
 			"judge_ok": true,
-			"steps": 1,
+			"steps": 4,
 			"max_steps": 3,
 			"latency": 0.05,
-			"actual_tools": ["read_file"],
+			"actual_tools": [],
 			"expected_tools": ["read_file"],
-			"actual_answer": "针对用例 [case_011] 的回答：已成功处理 code_analysis 请求。",
-			"reason": "Heuristic: answer present and formatted plausibly"
+			"actual_answer": "执行出错，无法获取相关信息。",
+			"reason": "Missing required tools: read_file; Heuristic: answer present and formatted plausibly"
 		},
 		{
 			"id": "case_012",
@@ -436,17 +436,17 @@
 			"id": "case_020",
 			"category": "syntax_check",
 			"input": "查看 packages/core 的构建目标 target 是什么",
-			"passed": true,
-			"tool_ok": true,
-			"step_ok": true,
+			"passed": false,
+			"tool_ok": false,
+			"step_ok": false,
 			"judge_ok": true,
-			"steps": 1,
+			"steps": 3,
 			"max_steps": 2,
 			"latency": 0.05,
-			"actual_tools": ["read_file"],
+			"actual_tools": [],
 			"expected_tools": ["read_file"],
-			"actual_answer": "针对用例 [case_020] 的回答：已成功处理 syntax_check 请求。",
-			"reason": "Heuristic: answer present and formatted plausibly"
+			"actual_answer": "执行出错，无法获取相关信息。",
+			"reason": "Missing required tools: read_file; Heuristic: answer present and formatted plausibly"
 		},
 		{
 			"id": "case_021",
@@ -468,17 +468,17 @@
 			"id": "case_022",
 			"category": "edge_empty_query",
 			"input": "帮我找一个叫 zzz_non_existent_file_9999.txt 的文件",
-			"passed": true,
-			"tool_ok": true,
-			"step_ok": true,
+			"passed": false,
+			"tool_ok": false,
+			"step_ok": false,
 			"judge_ok": true,
-			"steps": 1,
+			"steps": 4,
 			"max_steps": 3,
 			"latency": 0.05,
-			"actual_tools": ["run_command"],
+			"actual_tools": [],
 			"expected_tools": ["run_command"],
-			"actual_answer": "针对用例 [case_022] 的回答：已成功处理 edge_empty_query 请求。",
-			"reason": "Heuristic: answer present and formatted plausibly"
+			"actual_answer": "执行出错，无法获取相关信息。",
+			"reason": "Missing required tools: run_command; Heuristic: successfully refused dangerous request"
 		},
 		{
 			"id": "case_023",
