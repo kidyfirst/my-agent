@@ -621,6 +621,7 @@ const harness: MyAgentHarness = new Proxy(adapter, {
 #### 3.4.5 扩展工具生态与沙箱安全 (`packages/core/src/tools/`, `lsp/`, `browser/`)
 
 - **基础代码工具**：`view`（查看代码）、`grep`（内容正则搜索）、`glob`（文件匹配）、`execute_command`（受控命令执行）、`write_file`（写文件）。
+- **可逆上下文回溯**：`retrieve_folded_messages`（按需召回已被滑窗折叠的早期工具输出、编译日志、报错堆栈或历史对话）。
 - **AST 智能编辑**：`string_replace_lsp` 基于 LSP 协议实现精确的语法树级别代码替换。
 - **浏览器自动化**：`navigate-browser` 与 `computer` 基于 Playwright 驱动无头/可视化浏览器进行前端界面回归与操作。
 - **MCP 外部工具拓展**：动态挂载外部 Model Context Protocol 服务器提供的外部工具。
@@ -975,13 +976,19 @@ flowchart TD
 3. **历史工具结果渐进式折叠（Temporal Output Decay）**：
    - **最新 2 轮**：保留工具完整执行结果（上限 6,000 字符），供模型即时反思与代码修改；
    - **3 轮及以前的历史 Turn**：若工具输出超过 300 字符，自动折叠为语义占位摘要（`[Tool Result: <toolName> completed. Content folded for context economy...]`），立减 70%~85% 的历史 Token 冗余。
-4. **目标保真的滑动窗口预算机制（Goal-Preserving Sliding Window）**：
+4. **目标保真与可逆折叠机制（Goal-Preserving Reversible Context Folding）**：
    - 设定 64,000 Token 上下文安全预算；
-   - 当对话超出预算需要修剪早期轮次时，先提取第 1 条用户消息中的核心任务目标（Root Task/Goal），在修剪点头部注入结构化摘要头：
-     `[System Note: Earlier conversation history was truncated (N messages folded). Original User Task: "..."]`
-     彻底防止多轮长对话后产生的“Agent 目标漂移与遗忘”。
+   - 超出预算触发早期轮次切除时，不仅抽取第 1 条用户消息的核心任务目标（Root Goal）锚定当前轮次头部，还将切除的消息打包为带有唯一索引标识的 `FoldedRange`（如 `fold_001`）并记录入会话元数据；
+   - 生成系统提示：`[System Note: Earlier conversation history was truncated and folded into range "fold_001" (N messages folded)... If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "fold_001".]`；
+   - 模型在需要时可通过只读内置工具 `retrieve_folded_messages` 精准检索历史编译报错、代码 diff 或工具执行日志，实现“滑动窗口裁剪但细节完全可逆”。
 5. **倒序按需加载（Recent-First Paged Retrieval）**：
    - 历史消息通过 `ORDER BY createdAt DESC LIMIT 100` 从 SQLite 仅拉取最新 100 轮再在内存恢复时间正序，避免无上限加载全量历史引发的反序列化性能瓶颈。
+6. **平滑高水位 Nudge 预警（Smooth High-Watermark Nudge）**：
+   - 借鉴 `billion-context` 架构设计，在上下文容量到达 70%~100% 水位时，向模型注入非持久化的温和预警：`[Context Advisory: Context window is at ~X% capacity... Please plan your remaining edits and summarize key outcomes before automated context folding.]`；
+   - 帮助大模型主动收敛工作、保存关键进展，避免突发被动截断破坏重构逻辑；且该预警仅在当轮推理内存中可见，不写入 SQLite 数据库，避免污染长期上下文。
+7. **前缀缓存对齐保护（Prompt Cache Alignment & Tool Determinism）**：
+   - 工具集严格按字母升序排序（`sortToolsByName`），保证工具 schema 字节序列跨轮次绝对稳定；
+   - 静态系统指令与工具声明置于上下文最前端并注入 `cache_control: { type: "ephemeral" }` 断点，配合倒数第 2 轮 User 断点，实现长会话下 80%+ 的 Prompt Caching 命中率，大幅削减 API 成本与首字时延。
 
 #### 3.5.5 观察性记忆运行机制与双阈值阶梯 (L2 Observational Memory)
 
