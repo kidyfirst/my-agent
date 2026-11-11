@@ -23,6 +23,10 @@ async function main() {
 		const setBaseline =
 			args.includes("--baseline") || args.includes("--init-baseline")
 		const modelArg = args.find((a) => a.startsWith("--model="))?.split("=")[1]
+		const timeoutArg = args
+			.find((a) => a.startsWith("--timeout="))
+			?.split("=")[1]
+		const timeoutMs = timeoutArg ? Number(timeoutArg) * 1000 : 45000
 
 		const datasetDir = path.join(ROOT_DIR, "dataset")
 		const datasetPaths = [
@@ -41,7 +45,7 @@ async function main() {
 
 		const invoker = isMock
 			? createMockInvoker({ passRate: 0.95 })
-			: createCoreAgentInvoker({ modelId: modelArg })
+			: createCoreAgentInvoker({ modelId: modelArg, timeoutMs })
 
 		const report = await runEvaluation({
 			datasetPaths,

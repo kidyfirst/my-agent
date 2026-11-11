@@ -61,6 +61,7 @@ export function createCoreAgentInvoker(
 	options: {
 		modelId?: string
 		cwd?: string
+		timeoutMs?: number
 	} = {},
 ): AgentInvoker {
 	let harnessPromise: Promise<any> | null = null
@@ -68,8 +69,11 @@ export function createCoreAgentInvoker(
 	async function getHarness() {
 		if (!harnessPromise) {
 			harnessPromise = (async () => {
-				const { createMyAgent } = await import("@my-agent/core")
-				const { harness } = await createMyAgent({
+				const { createMyAgent, setRuntimeYolo } = await import("@my-agent/core")
+				// Enable process-wide YOLO permissions so tools don't stall for user confirmation
+				setRuntimeYolo(true)
+
+				const { harness, authStorage } = await createMyAgent({
 					cwd: options.cwd || process.cwd(),
 					disableMcp: true,
 					disableHooks: true,
@@ -77,9 +81,38 @@ export function createCoreAgentInvoker(
 					initialState: { yolo: true },
 				})
 				await harness.init()
-				if (options.modelId) {
-					await harness.switchModel({ modelId: options.modelId })
+
+				// Auto-detect best model if none specified
+				let targetModelId = options.modelId
+				if (!targetModelId) {
+					if (
+						authStorage.getApiKeySync("deepseek") ||
+						process.env.DEEPSEEK_API_KEY
+					) {
+						targetModelId = "deepseek/deepseek-flash"
+					} else if (
+						authStorage.getApiKeySync("openai") ||
+						process.env.OPENAI_API_KEY
+					) {
+						targetModelId = "openai/gpt-4o"
+					} else if (
+						authStorage.getApiKeySync("anthropic") ||
+						process.env.ANTHROPIC_API_KEY
+					) {
+						targetModelId = "anthropic/claude-3-5-sonnet-20241022"
+					} else if (
+						authStorage.getApiKeySync("google") ||
+						process.env.GEMINI_API_KEY
+					) {
+						targetModelId = "google/gemini-2.0-flash"
+					}
 				}
+
+				if (targetModelId) {
+					await harness.switchModel({ modelId: targetModelId })
+					console.log(`[Eval Runner] Using active model: ${targetModelId}`)
+				}
+
 				return harness
 			})()
 		}
@@ -94,8 +127,9 @@ export function createCoreAgentInvoker(
 			})
 			const toolCalls: Array<{ name: string; args?: any }> = []
 			let stepCount = 0
+			let streamedAnswer = ""
 
-			// Subscribe to execution events to capture tool calls and steps
+			// Auto-approve any tool or plan approvals to prevent CLI stalls
 			const unsubscribe = harness.subscribe((event: any) => {
 				if (event.type === "tool_call" || event.type === "tool_execute_start") {
 					toolCalls.push({
@@ -103,6 +137,25 @@ export function createCoreAgentInvoker(
 						args: event.args || event.input,
 					})
 					stepCount++
+				} else if (event.type === "tool_approval_required") {
+					// Auto approve tool calls in headless eval runner
+					harness
+						.approveToolCall({
+							threadId: event.threadId || thread.id,
+							toolCallId: event.toolCallId,
+							decision: "approve",
+							approved: true,
+						})
+						.catch(() => {})
+				} else if (event.type === "plan_approval_required") {
+					harness
+						.approvePlan?.({
+							threadId: event.threadId || thread.id,
+							approved: true,
+						})
+						.catch(() => {})
+				} else if (event.type === "text-delta" || event.type === "text_delta") {
+					streamedAnswer += event.delta || event.text || ""
 				} else if (
 					event.type === "step_finish" ||
 					event.type === "turn_finish"
@@ -111,26 +164,58 @@ export function createCoreAgentInvoker(
 				}
 			})
 
-			const result = await harness.sendMessage({
-				threadId: thread.id,
-				content: testCase.input,
-			})
+			const timeoutMs = options.timeoutMs || 45000
+			let timeoutHandle: any
 
-			unsubscribe()
+			try {
+				await Promise.race([
+					harness.sendMessage({
+						threadId: thread.id,
+						content: testCase.input,
+					}),
+					new Promise((_, reject) => {
+						timeoutHandle = setTimeout(() => {
+							reject(new Error(`Timeout after ${timeoutMs / 1000}s`))
+						}, timeoutMs)
+					}),
+				])
+			} finally {
+				clearTimeout(timeoutHandle)
+				unsubscribe()
+			}
 
-			const answer =
-				typeof result === "string"
-					? result
-					: result?.content || result?.answer || result?.text || ""
+			// Extract assistant answer
+			let answer = streamedAnswer.trim()
+			if (!answer) {
+				try {
+					const messages = await harness.listMessages({ threadId: thread.id })
+					const assistantMsg = [...messages]
+						.reverse()
+						.find((m: any) => m.role === "assistant")
+					if (assistantMsg) {
+						const content = assistantMsg.content
+						if (typeof content === "string") {
+							answer = content
+						} else if (content && typeof content === "object") {
+							answer =
+								content.content ||
+								content.text ||
+								(Array.isArray(content.parts)
+									? content.parts.map((p: any) => p.text || "").join("")
+									: "")
+						}
+					}
+				} catch {}
+			}
 
 			return {
-				answer,
+				answer: answer || "（无文本输出）",
 				toolCalls,
 				steps: Math.max(1, stepCount),
 			}
 		} catch (err: any) {
 			return {
-				answer: `Agent invocation failed: ${err.message || String(err)}`,
+				answer: `Agent execution failed: ${err.message || String(err)}`,
 				toolCalls: [],
 				steps: 0,
 			}
