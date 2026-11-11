@@ -47,8 +47,13 @@ describe("selectRecentMessages", () => {
 			{ id: "2", role: "tool", content: "y".repeat(40) },
 			{ id: "3", role: "user", content: "z".repeat(40) },
 		]
-		const { recent } = selectRecentMessages(messages, 20, counter)
-		expect(recent[0].role).toBe("user")
+		// Budget sized to admit the tool result and the user message but not the
+		// assistant turn before them, so the window genuinely starts on a tool
+		// result. A tighter budget would break before reaching it and the skip
+		// would never run; a looser one would pull in a non-tool message.
+		const { recent, folded } = selectRecentMessages(messages, 40, counter)
+		expect(recent.map((m) => m.id)).toEqual(["3"])
+		expect(folded.map((m) => m.id)).toEqual(["1", "2"])
 	})
 })
 
