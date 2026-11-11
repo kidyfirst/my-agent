@@ -28,7 +28,12 @@ import {
 	formatObservationalMemory,
 	resolveBlockAfter,
 } from "../memory/observational.js"
+import { sharedTokenCounter } from "../../memory/token-counter.js"
 import type { FoldedRange } from "../../tools/retrieve-folded.js"
+import {
+	resolveModelContextWindow,
+	computeMaxHistoryTokens,
+} from "../llm/context-window.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
 export type ToolCategory =
@@ -447,6 +452,26 @@ export class AgentController<TState = any> {
 		return undefined
 	}
 
+	async getFoldedRangesAsync(threadId: string): Promise<FoldedRange[]> {
+		for (const session of this._sessions.values()) {
+			const ranges = await (session as any).getFoldedRangesAsync?.(threadId)
+			if (ranges && ranges.length > 0) return ranges
+		}
+		if (this.storage) {
+			try {
+				const store = await this.storage.getStore("memory")
+				if (store?.getThreadById) {
+					const thread = await store.getThreadById({ threadId })
+					const storedRanges = (thread?.metadata as any)?.foldedRanges
+					if (Array.isArray(storedRanges) && storedRanges.length > 0) {
+						return storedRanges
+					}
+				}
+			} catch {}
+		}
+		return []
+	}
+
 	getFoldedRanges(threadId: string): FoldedRange[] {
 		for (const session of this._sessions.values()) {
 			const ranges = (session as any).getFoldedRanges?.(threadId)
@@ -455,8 +480,11 @@ export class AgentController<TState = any> {
 		return []
 	}
 
-	getFoldedRange(threadId: string, rangeId: string): FoldedRange | undefined {
-		const ranges = this.getFoldedRanges(threadId)
+	async getFoldedRange(
+		threadId: string,
+		rangeId: string,
+	): Promise<FoldedRange | undefined> {
+		const ranges = await this.getFoldedRangesAsync(threadId)
 		return ranges.find((r) => r.rangeId === rangeId)
 	}
 }
@@ -466,6 +494,7 @@ export interface SessionConfig<TState = any> {
 	resourceId: string
 	initialState?: Partial<TState>
 	defaultModeId?: string
+	contextWindow?: number
 }
 
 export class Session<TState = any> {
@@ -476,6 +505,8 @@ export class Session<TState = any> {
 	private _state: Record<string, any>
 	private _modeId: string
 	private _modelId: string = ""
+	private _contextWindow?: number
+	private _tokenCalibrationByThread: Map<string, number> = new Map()
 	private _currentThreadId: string = ""
 	private _subscribers: Set<(event: HarnessEvent) => void> = new Set()
 	private _categoryPolicies: Record<string, PermissionPolicy> = {}
@@ -523,15 +554,104 @@ export class Session<TState = any> {
 		return this._foldedRanges.get(threadId) || []
 	}
 
+	async getFoldedRangesAsync(
+		threadId: string,
+		store?: any,
+	): Promise<FoldedRange[]> {
+		if (
+			this._foldedRanges.has(threadId) &&
+			(this._foldedRanges.get(threadId)?.length ?? 0) > 0
+		) {
+			return this._foldedRanges.get(threadId)!
+		}
+		return await this.hydrateFoldedRanges(threadId, store)
+	}
+
+	async hydrateFoldedRanges(
+		threadId: string,
+		store?: any,
+	): Promise<FoldedRange[]> {
+		try {
+			const activeStore = store || (await this.getMemoryStore())
+			if (activeStore?.getThreadById) {
+				const thread = await activeStore.getThreadById({ threadId })
+				const stored = (thread?.metadata as any)?.foldedRanges
+				if (Array.isArray(stored) && stored.length > 0) {
+					const existing = this._foldedRanges.get(threadId) || []
+					const existingIds = new Set(existing.map((r) => r.rangeId))
+					const merged = [...existing]
+					for (const r of stored) {
+						if (!existingIds.has(r.rangeId)) {
+							merged.push(r)
+							existingIds.add(r.rangeId)
+						}
+					}
+					this._foldedRanges.set(threadId, merged)
+					return merged
+				}
+			}
+		} catch (err) {
+			console.warn("[Session] Failed to hydrate folded ranges from store:", err)
+		}
+		return this._foldedRanges.get(threadId) || []
+	}
+
 	getFoldedRange(threadId: string, rangeId: string): FoldedRange | undefined {
 		const ranges = this.getFoldedRanges(threadId)
 		return ranges.find((r) => r.rangeId === rangeId)
 	}
 
-	recordFoldedRange(threadId: string, range: FoldedRange): void {
+	async recordFoldedRange(
+		threadId: string,
+		range: FoldedRange,
+		store?: any,
+	): Promise<void> {
 		const ranges = this.getFoldedRanges(threadId)
-		ranges.push(range)
-		this._foldedRanges.set(threadId, ranges)
+		const filtered = ranges.filter((r) => r.rangeId !== range.rangeId)
+		filtered.push(range)
+		this._foldedRanges.set(threadId, filtered)
+
+		// Persist compact range metadata to thread.metadata.foldedRanges in SQLite
+		try {
+			const activeStore = store || (await this.getMemoryStore())
+			if (activeStore?.updateThread && activeStore?.getThreadById) {
+				const thread = await activeStore.getThreadById({ threadId })
+				if (thread) {
+					const metadata = (thread.metadata || {}) as any
+					const existingPersisted: FoldedRange[] = Array.isArray(
+						metadata.foldedRanges,
+					)
+						? metadata.foldedRanges
+						: []
+					const compactRange: FoldedRange = {
+						rangeId: range.rangeId,
+						threadId: range.threadId,
+						messageCount: range.messageCount,
+						startIndex: range.startIndex,
+						firstMessageId: range.firstMessageId,
+						lastMessageId: range.lastMessageId,
+						firstMessageCreatedAt: range.firstMessageCreatedAt,
+						lastMessageCreatedAt: range.lastMessageCreatedAt,
+						messageIds: range.messageIds,
+						userGoal: range.userGoal,
+						createdAt: range.createdAt,
+					}
+					const updatedList = existingPersisted.filter(
+						(r) => r.rangeId !== range.rangeId,
+					)
+					updatedList.push(compactRange)
+					await activeStore.updateThread({
+						id: threadId,
+						metadata: {
+							...metadata,
+							foldedRanges: updatedList,
+						},
+					})
+				}
+			}
+		} catch (err) {
+			console.warn("[Session] Failed to persist folded range to store:", err)
+		}
 	}
 
 	om = {
@@ -549,6 +669,7 @@ export class Session<TState = any> {
 		this.resourceId = config.resourceId
 		this._state = { ...(config.initialState || {}) }
 		this._modeId = config.defaultModeId || DEFAULT_EXECUTION_MODE
+		this._contextWindow = config.contextWindow
 	}
 
 	async init(): Promise<void> {
@@ -1820,6 +1941,18 @@ export class Session<TState = any> {
 			}
 
 			// 5. Recall message history from store: load up to 100 recent messages
+			// Hydrate folded ranges and token calibration metadata from store
+			await this.hydrateFoldedRanges(threadId, store)
+			try {
+				if (store?.getThreadById) {
+					const threadRec = await store.getThreadById({ threadId })
+					const metaRatio = (threadRec?.metadata as any)?.tokenCalibrationRatio
+					if (typeof metaRatio === "number" && metaRatio > 0) {
+						this._tokenCalibrationByThread.set(threadId, metaRatio)
+					}
+				}
+			} catch {}
+
 			const historyRes = await store.listMessages({
 				threadId,
 				limit: 100,
@@ -2018,9 +2151,19 @@ export class Session<TState = any> {
 						if (histUserText) {
 							parts.unshift({ type: "text", text: histUserText })
 						}
-						coreMessages.push({ role: "user", content: parts })
+						coreMessages.push({
+							role: "user",
+							content: parts,
+							id: m.id,
+							createdAt: m.createdAt,
+						})
 					} else if (histUserText) {
-						coreMessages.push({ role: "user", content: histUserText })
+						coreMessages.push({
+							role: "user",
+							content: histUserText,
+							id: m.id,
+							createdAt: m.createdAt,
+						})
 					}
 				} else {
 					assistantTurnCounter++
@@ -2245,32 +2388,56 @@ export class Session<TState = any> {
 					}
 
 					if (assistantContent.length > 0) {
-						coreMessages.push({ role: "assistant", content: assistantContent })
+						coreMessages.push({
+							role: "assistant",
+							content: assistantContent,
+							id: m.id,
+							createdAt: m.createdAt,
+						})
 					} else if (text) {
-						coreMessages.push({ role: "assistant", content: text })
+						coreMessages.push({
+							role: "assistant",
+							content: text,
+							id: m.id,
+							createdAt: m.createdAt,
+						})
 					}
 
 					if (validToolResults.length > 0) {
 						coreMessages.push({
 							role: "tool",
 							content: validToolResults,
+							id: m.id,
+							createdAt: m.createdAt,
 						})
 					}
 				}
 			}
+			// Resolve model context window dynamically and compute safe working history budget
+			const effectiveModel = preloadedReplayModel || model
+			const contextWindow = resolveModelContextWindow(
+				effectiveModel,
+				modelIdStr,
+				this._contextWindow ?? (this.controller.agent as any)?.contextWindow,
+			)
+			const MAX_HISTORY_TOKENS = computeMaxHistoryTokens(contextWindow)
 
-			// Token budgeting sliding window: keep recent history within MAX_HISTORY_TOKENS
-			const MAX_HISTORY_TOKENS = 64_000
-			let totalEstimatedTokens = 0
+			// Calibrate character-to-token ratio using real provider feedback if available
+			const calibrationRatio =
+				this._tokenCalibrationByThread.get(threadId) ?? 1.0
+			let rawEstimatedTokens = 0
 			const messageTokens: number[] = coreMessages.map((msg) => {
 				const str =
 					typeof msg.content === "string"
 						? msg.content
 						: JSON.stringify(msg.content)
-				const tokens = Math.ceil((str?.length || 0) / 4)
-				totalEstimatedTokens += tokens
-				return tokens
+				const baseTokens = Math.ceil((str?.length || 0) / 4)
+				rawEstimatedTokens += baseTokens
+				return baseTokens
 			})
+			const totalEstimatedTokens = Math.round(
+				rawEstimatedTokens * calibrationRatio,
+			)
 
 			// Observational memory: fold earlier turns into a rolling summary
 			// carried in the system prompt so the truncation window can drop raw
@@ -2368,7 +2535,7 @@ export class Session<TState = any> {
 				)
 				coreMessages.push({
 					role: "user",
-					content: `[Context Advisory: Context window is at ~${usagePct}% capacity (${totalEstimatedTokens}/${MAX_HISTORY_TOKENS} tokens). Please plan your remaining edits and summarize key outcomes before automated context folding.]`,
+					content: `[Context Advisory: Context window is at ~${usagePct}% capacity (${totalEstimatedTokens}/${MAX_HISTORY_TOKENS} tokens, model window: ${contextWindow}). Please plan your remaining edits and summarize key outcomes before automated context folding.]`,
 				})
 			}
 
@@ -2376,10 +2543,13 @@ export class Session<TState = any> {
 				let keptTokens = 0
 				let startIndex = coreMessages.length
 				for (let i = coreMessages.length - 1; i >= 0; i--) {
-					if (keptTokens + messageTokens[i] > MAX_HISTORY_TOKENS) {
+					const calibratedMsgTokens = Math.round(
+						messageTokens[i] * calibrationRatio,
+					)
+					if (keptTokens + calibratedMsgTokens > MAX_HISTORY_TOKENS) {
 						break
 					}
-					keptTokens += messageTokens[i]
+					keptTokens += calibratedMsgTokens
 					startIndex = i
 				}
 
@@ -2393,8 +2563,19 @@ export class Session<TState = any> {
 
 				if (startIndex > 0 && startIndex < coreMessages.length) {
 					const foldedMessages = coreMessages.slice(0, startIndex)
-					const existingRanges = this.getFoldedRanges(threadId)
-					const rangeId = `fold_${String(existingRanges.length + 1).padStart(3, "0")}`
+					const existingRanges = await this.getFoldedRangesAsync(
+						threadId,
+						store,
+					)
+					let maxIndex = 0
+					for (const r of existingRanges) {
+						const match = r.rangeId.match(/^fold_(\d+)$/)
+						if (match) {
+							const num = parseInt(match[1], 10)
+							if (!isNaN(num) && num > maxIndex) maxIndex = num
+						}
+					}
+					const rangeId = `fold_${String(maxIndex + 1).padStart(3, "0")}`
 
 					// Extract the initial user request/goal from the earliest user message before slicing
 					let initialUserGoal = ""
@@ -2411,17 +2592,29 @@ export class Session<TState = any> {
 					}
 					initialUserGoal = initialUserGoal.trim()
 
-					this.recordFoldedRange(threadId, {
-						rangeId,
+					const messageIds = Array.from(
+						new Set(foldedMessages.map((m) => m.id).filter(Boolean)),
+					)
+
+					await this.recordFoldedRange(
 						threadId,
-						messageCount: startIndex,
-						startIndex: 0,
-						firstMessageId: foldedMessages[0]?.id,
-						lastMessageId: foldedMessages[foldedMessages.length - 1]?.id,
-						userGoal: initialUserGoal,
-						createdAt: Date.now(),
-						messages: foldedMessages,
-					})
+						{
+							rangeId,
+							threadId,
+							messageCount: startIndex,
+							startIndex: 0,
+							firstMessageId: foldedMessages[0]?.id,
+							lastMessageId: foldedMessages[foldedMessages.length - 1]?.id,
+							firstMessageCreatedAt: foldedMessages[0]?.createdAt,
+							lastMessageCreatedAt:
+								foldedMessages[foldedMessages.length - 1]?.createdAt,
+							messageIds,
+							userGoal: initialUserGoal,
+							createdAt: Date.now(),
+							messages: foldedMessages,
+						},
+						store,
+					)
 
 					coreMessages.splice(0, startIndex)
 
@@ -2561,6 +2754,40 @@ export class Session<TState = any> {
 					runResult.tokenUsage.completionTokens,
 				totalTokens:
 					this._tokenUsage.totalTokens + runResult.tokenUsage.totalTokens,
+			}
+
+			// Dynamic token calibration update from actual LanguageModelUsage
+			const actualPromptTokens = runResult.tokenUsage?.promptTokens
+			let newCalibrationRatio = calibrationRatio
+			if (
+				actualPromptTokens &&
+				actualPromptTokens > 0 &&
+				rawEstimatedTokens > 0
+			) {
+				const observedRatio = actualPromptTokens / rawEstimatedTokens
+				newCalibrationRatio = Math.min(Math.max(observedRatio, 0.5), 3.0)
+				this._tokenCalibrationByThread.set(threadId, newCalibrationRatio)
+			}
+
+			// Persist usage, context window and calibration stats to thread metadata
+			if (store?.updateThread && store?.getThreadById) {
+				try {
+					const threadRec = await store.getThreadById({ threadId })
+					if (threadRec) {
+						await store.updateThread({
+							id: threadId,
+							metadata: {
+								...(threadRec.metadata || {}),
+								lastUsage: runResult.tokenUsage,
+								tokenCalibrationRatio: newCalibrationRatio,
+								contextWindow,
+								maxHistoryTokens: MAX_HISTORY_TOKENS,
+							},
+						})
+					}
+				} catch (err) {
+					console.warn("[Session] Failed to persist usage metadata:", err)
+				}
 			}
 
 			const durationMs = Date.now() - startTime

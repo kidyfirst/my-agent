@@ -11,6 +11,9 @@ export interface FoldedRange {
 	startIndex: number
 	firstMessageId?: string
 	lastMessageId?: string
+	firstMessageCreatedAt?: string | number | Date
+	lastMessageCreatedAt?: string | number | Date
+	messageIds?: string[]
 	userGoal?: string
 	createdAt: number
 	messages?: any[]
@@ -88,11 +91,15 @@ If 'rangeId' is omitted, returns a table of all available folded ranges for the 
 				}
 
 				const getFoldedRanges =
-					typeof controller.getFoldedRanges === "function"
-						? controller.getFoldedRanges.bind(controller)
-						: () => []
+					typeof (controller as any).getFoldedRangesAsync === "function"
+						? (controller as any).getFoldedRangesAsync.bind(controller)
+						: typeof controller.getFoldedRanges === "function"
+							? controller.getFoldedRanges.bind(controller)
+							: () => []
 
-				const ranges: FoldedRange[] = threadId ? getFoldedRanges(threadId) : []
+				const ranges: FoldedRange[] = threadId
+					? await getFoldedRanges(threadId)
+					: []
 
 				if (ranges.length === 0) {
 					return {
@@ -130,7 +137,57 @@ If 'rangeId' is omitted, returns a table of all available folded ranges for the 
 					}
 				}
 
-				const rawMessages: any[] = targetRange.messages || []
+				let rawMessages: any[] = targetRange.messages || []
+				// If messages are not cached in memory (e.g. after restart), restore from persistent store
+				if (rawMessages.length === 0) {
+					try {
+						const store =
+							(await session?.getMemoryStore?.()) ||
+							(await controller?.storage?.getStore?.("memory")) ||
+							reqCtx?.get?.("store")
+						if (store?.listMessages && threadId) {
+							const listRes = await store.listMessages({
+								threadId,
+								perPage: false,
+							})
+							const allThreadMsgs: any[] = listRes?.messages || []
+							if (targetRange.messageIds && targetRange.messageIds.length > 0) {
+								const idSet = new Set(targetRange.messageIds)
+								rawMessages = allThreadMsgs.filter((m) => idSet.has(m.id))
+							} else if (
+								targetRange.firstMessageId ||
+								targetRange.lastMessageId
+							) {
+								const startIdx = allThreadMsgs.findIndex(
+									(m) => m.id === targetRange.firstMessageId,
+								)
+								const endIdx = allThreadMsgs.findIndex(
+									(m) => m.id === targetRange.lastMessageId,
+								)
+								if (startIdx !== -1 && endIdx !== -1) {
+									rawMessages = allThreadMsgs.slice(
+										Math.min(startIdx, endIdx),
+										Math.max(startIdx, endIdx) + 1,
+									)
+								} else if (startIdx !== -1) {
+									rawMessages = allThreadMsgs.slice(
+										startIdx,
+										startIdx + (targetRange.messageCount || 10),
+									)
+								}
+							}
+							if (rawMessages.length > 0) {
+								targetRange.messages = rawMessages
+							}
+						}
+					} catch (loadErr: any) {
+						console.warn(
+							"[retrieve_folded_messages] Error restoring folded messages from store:",
+							loadErr,
+						)
+					}
+				}
+
 				if (rawMessages.length === 0) {
 					return {
 						content: `Folded range '${rangeId}' exists but has no cached messages available.`,

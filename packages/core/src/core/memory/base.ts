@@ -12,6 +12,7 @@ import type {
 	ObservabilityContext,
 } from "./types.js"
 import type { MyAgentDBMessage } from "../agent/types.js"
+import { sharedTokenCounter } from "../../memory/token-counter.js"
 
 export class MyAgentMemory extends CoreBase {
 	id: string
@@ -74,14 +75,13 @@ export class MyAgentMemory extends CoreBase {
 	async settled(): Promise<void> {
 		return Promise.resolve()
 	}
-
 	estimateTokens(text: string): number {
-		return Math.ceil(text.length / 4)
+		return sharedTokenCounter.estimateTokens(text)
 	}
 
 	protected createMemoryTokenCounter(): any {
 		return {
-			estimateTokens: (text: string) => Math.ceil(text.length / 4),
+			estimateTokens: (text: string) => sharedTokenCounter.estimateTokens(text),
 		}
 	}
 

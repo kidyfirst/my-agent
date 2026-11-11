@@ -64,6 +64,7 @@ export interface AgentConfig {
 	model?: AgentModel
 	tools?: AgentTools
 	memory?: AgentMemory
+	contextWindow?: number
 	[key: string]: unknown
 }
 
@@ -170,6 +171,7 @@ export class Agent {
 	model?: AgentModel
 	tools?: AgentTools
 	memory?: AgentMemory
+	contextWindow?: number
 
 	constructor(config: AgentConfig) {
 		this.id = config.id || randomUUID()
@@ -179,6 +181,7 @@ export class Agent {
 		this.model = config.model
 		this.tools = config.tools
 		this.memory = config.memory
+		this.contextWindow = config.contextWindow
 	}
 
 	async getInstructions(args?: {
