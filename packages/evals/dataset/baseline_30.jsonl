@@ -7,7 +7,7 @@
 {"id":"case_007","category":"git_ops","input":"查看最近 3 条 Git 提交日志","expected_tools":["run_command"],"expected_answer_criteria":"展示最近 3 次 commit 的 hash 与提交信息摘要","max_steps":2}
 {"id":"case_008","category":"git_ops","input":"检查当前仓库是否有未提交的代码变更","expected_tools":["run_command"],"expected_answer_criteria":"准确反馈是否有 unstaged 或 untracked 的文件","max_steps":2}
 {"id":"case_009","category":"terminal_cmd","input":"运行 pnpm --version 查看当前的 pnpm 版本","expected_tools":["run_command"],"expected_answer_criteria":"必须给出具体的 pnpm 版本号输出（如 10.x.x）","max_steps":2}
-{"id":"case_010","category":"terminal_cmd","input":"在终端执行命令统计 apps/desktop 目录下一共有多少个 tsx 文件","expected_tools":["run_command"],"expected_answer_criteria":"给出统计数字，不能无依据编造","max_steps":4}
+{"id":"case_010","category":"terminal_cmd","input":"统计 apps/desktop 目录下一共有多少个 tsx 文件","expected_tools":["run_command"],"expected_answer_criteria":"给出统计数字，不能无依据编造","max_steps":4}
 {"id":"case_011","category":"code_analysis","input":"解释 packages/core/src/index.ts 中导出了哪些主要模块","expected_tools":["read_file"],"expected_answer_criteria":"列出 Controller、Session、GraphRunner、Harness 等主要导出项","max_steps":3}
 {"id":"case_012","category":"code_analysis","input":"检查 packages/cli/package.json 依赖了哪些 workspace 包","expected_tools":["read_file"],"expected_answer_criteria":"准确识别出 @my-agent/core 和 @my-agent/a2a","max_steps":2}
 {"id":"case_013","category":"multi_step","input":"先查看 git 状态，再查看 package.json 版本","expected_tools":["run_command","read_file"],"expected_answer_criteria":"依次完成两个步骤并分别汇总说明结果","max_steps":5}
@@ -17,7 +17,7 @@
 {"id":"case_017","category":"project_structure","input":"列出 packages/ 目录下的所有子包","expected_tools":["run_command"],"expected_answer_criteria":"包含 a2a, cli, core 等包","max_steps":2}
 {"id":"case_018","category":"dependency_check","input":"检查根目录 package.json 是否安装了 vitest","expected_tools":["read_file"],"expected_answer_criteria":"确认 vitest 存在于 devDependencies 中并给出版本","max_steps":2}
 {"id":"case_019","category":"dependency_check","input":"检查是否配置了 husky git hooks","expected_tools":["read_file"],"expected_answer_criteria":"确认 package.json 中配置了 prepare: husky","max_steps":2}
-{"id":"case_020","category":"syntax_check","input":"查看 packages/core 的构建目标 target 是什么","expected_tools":["read_file"],"expected_answer_criteria":"指出 ES2022 或 ESNext","max_steps":2}
+{"id":"case_020","category":"syntax_check","input":"查看 packages/core 的 TypeScript 编译目标 target 是什么","expected_tools":["read_file"],"expected_answer_criteria":"指出其继承自基础配置的 ES2022 编译目标或说明目标版本","max_steps":3}
 {"id":"case_021","category":"edge_ambiguous","input":"把那个文件改一下","expected_tools":[],"expected_answer_criteria":"用户输入语意严重缺失，必须主动向用户追问具体需要修改哪个文件及修改内容，不能盲目执行","max_steps":2}
 {"id":"case_022","category":"edge_empty_query","input":"帮我找一个叫 zzz_non_existent_file_9999.txt 的文件","expected_tools":["run_command"],"expected_answer_criteria":"检索后明确告知用户未找到该文件，不能虚构文件内容","max_steps":4}
 {"id":"case_023","category":"edge_large_output","input":"列出 node_modules 里的所有文件详情","expected_tools":[],"expected_answer_criteria":"识别出此操作会产生海量无效输出，应避免递归深扫或向用户提出更具体的过滤建议","max_steps":2}

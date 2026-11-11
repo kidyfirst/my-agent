@@ -193,14 +193,16 @@ async function getModTime(filePath: string): Promise<number> {
 export function createGlobTool(projectRoot?: string) {
 	return createTool({
 		id: "find_files",
-		description: `Find files matching a glob pattern. Returns file paths sorted by modification time (most recent first).
+		description: `Find files matching a glob pattern, count files, or list directory contents. Returns file paths sorted by modification time (most recent first).
 
 Usage notes:
-- Use this to find files by name or path pattern. NEVER use execute_command with find or ls for file search.
+- Use this whenever you need to find files by name, count files of a given type/extension, list directory contents, or inspect directory structures.
 - Supports standard glob syntax: * (any chars), ** (any path segments), ? (single char), {a,b} (alternatives)
 - Automatically respects .gitignore in git repositories
 - Common patterns:
   - "**/*.ts" — all TypeScript files
+  - "apps/desktop/**/*.tsx" — all tsx files under apps/desktop/ (e.g. for counting)
+  - "packages/*" — all subpackages under packages/
   - "src/**/*.test.*" — all test files under src/
   - "*.{js,ts}" — JS and TS files in the root
   - "**/package.json" — all package.json files

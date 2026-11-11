@@ -309,7 +309,7 @@ export function createCoreAgentInvoker(
 			return {
 				answer: answer || "（无文本输出）",
 				toolCalls,
-				steps: Math.max(1, stepCount),
+				steps: Math.max(1, toolCalls.length),
 			}
 		} catch (err: any) {
 			return {

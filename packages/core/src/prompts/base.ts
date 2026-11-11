@@ -67,6 +67,10 @@ export function buildBasePrompt(ctx: PromptContext): string {
 - For unfamiliar codebases, check git log to understand recent changes and patterns.
 - Identify existing conventions (naming, structure, error handling) and follow them.
 
+## Grounding & Live Verification
+- NEVER guess or fabricate workspace facts, file counts, directory layouts, versions, commit history, or code existence from memory.
+- When asked about the current workspace (such as counting files, inspecting directory layout, checking dependencies, or verifying git state), you MUST call the appropriate inspection tools (\`find_files\`, \`view\`, \`search_content\`, \`execute_command\`) to verify live data before responding.
+
 ## Work Incrementally
 - Focus on ONE thing at a time. Complete it fully before moving to the next.
 - Leave the codebase in a clean state after each change — no half-implemented features.
