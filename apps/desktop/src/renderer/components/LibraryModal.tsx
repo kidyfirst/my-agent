@@ -1269,7 +1269,7 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 													display: "flex",
 													alignItems: "center",
 													justifyContent: "center",
-													boxShadow: "0 1px 3px rgba(0, 0, 0, 0.25)",
+													boxShadow: "var(--shadow-sm)",
 													transition: "all 0.15s ease",
 												}}
 												onMouseEnter={(e) => {
