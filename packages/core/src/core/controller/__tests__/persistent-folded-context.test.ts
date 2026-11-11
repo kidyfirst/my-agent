@@ -109,9 +109,13 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 		await storage.init()
 		const store = await storage.getStore("memory")
 
+		let capturedPrompts: any[] = []
 		const model = new MockLanguageModelV3({
 			modelId: "test-model",
-			doStream: async () => reply("ok"),
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return reply("ok")
+			},
 		})
 
 		const agent = new Agent({
@@ -240,6 +244,158 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 		expect(finalPersisted.length).toBe(2)
 		expect(finalPersisted[0].rangeId).toBe("fold_001")
 		expect(finalPersisted[1].rangeId).toBe("fold_002")
+
+		// 4. Verify that multiple foldings DO NOT nest [System Note:] in userGoal
+		const lastPrompt = capturedPrompts[capturedPrompts.length - 1]
+		const systemNotes = lastPrompt.filter((p: any) => {
+			if (p.role !== "user") return false
+			const text =
+				typeof p.content === "string"
+					? p.content
+					: Array.isArray(p.content)
+						? p.content.find((part: any) => part.type === "text")?.text || ""
+						: JSON.stringify(p.content)
+			return text.includes("Earlier conversation history was truncated")
+		})
+		// Exactly ONE unified system note should exist at the top
+		expect(systemNotes.length).toBe(1)
+		// The goal snippet must NOT contain nested "[System Note:"
+		const noteText =
+			typeof systemNotes[0].content === "string"
+				? systemNotes[0].content
+				: systemNotes[0].content?.find((part: any) => part.type === "text")
+						?.text || JSON.stringify(systemNotes[0].content)
+		const goalSection = noteText.match(/Original User Task: "([^"]+)"/)
+		if (goalSection) {
+			expect(goalSection[1]).not.toContain("[System Note:")
+		}
+
+		await storage.close()
+	})
+
+	it("decays retrieve_folded_messages output in older turns to prevent token oscillation", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+		const store = await storage.getStore("memory")
+
+		let capturedPrompts: any[] = []
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return reply("ok")
+			},
+		})
+
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			tools: {},
+		})
+
+		const controller = new AgentController({ storage, agent })
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "r2" })
+		const thread = await session.thread.create({ title: "Decay Test" })
+
+		// Seed a history where retrieve_folded_messages was called in Turn 1 (> 2 assistant turns ago)
+		const now = Date.now()
+		await store.saveMessages({
+			messages: [
+				// Turn 1 (Old turn): Model called retrieve_folded_messages returning 4000 chars of history
+				{
+					id: "u1",
+					role: "user",
+					content: "Check past error",
+					threadId: thread.id,
+					resourceId: "r2",
+					createdAt: new Date(now - 6000),
+				},
+				{
+					id: "a1",
+					role: "assistant",
+					content: {
+						format: 2,
+						parts: [
+							{
+								type: "tool-call",
+								toolCallId: "call_rfm_1",
+								toolName: "retrieve_folded_messages",
+								args: { rangeId: "fold_001" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "call_rfm_1",
+								toolName: "retrieve_folded_messages",
+								result:
+									"# Retrieved Folded History [fold_001]\n" +
+									"Error log detail... ".repeat(200),
+							},
+						],
+					},
+					threadId: thread.id,
+					resourceId: "r2",
+					createdAt: new Date(now - 5000),
+				},
+				// Turn 2 (Intermediate turn)
+				{
+					id: "u2",
+					role: "user",
+					content: "Got it, now fix it",
+					threadId: thread.id,
+					resourceId: "r2",
+					createdAt: new Date(now - 4000),
+				},
+				{
+					id: "a2",
+					role: "assistant",
+					content: "I have fixed it",
+					threadId: thread.id,
+					resourceId: "r2",
+					createdAt: new Date(now - 3000),
+				},
+				// Turn 3 (Recent turn)
+				{
+					id: "u3",
+					role: "user",
+					content: "Run test",
+					threadId: thread.id,
+					resourceId: "r2",
+					createdAt: new Date(now - 2000),
+				},
+				{
+					id: "a3",
+					role: "assistant",
+					content: "Tests passed",
+					threadId: thread.id,
+					resourceId: "r2",
+					createdAt: new Date(now - 1000),
+				},
+			],
+		})
+
+		// Send Turn 4
+		await session.sendMessage({
+			content: "Next step",
+			threadId: thread.id,
+		})
+
+		const latestPrompt = capturedPrompts[capturedPrompts.length - 1]
+		const toolMessage = latestPrompt.find((p: any) => p.role === "tool")
+		expect(toolMessage).toBeDefined()
+		const rfmResultPart = toolMessage.content.find(
+			(c: any) => c.toolCallId === "call_rfm_1",
+		)
+		expect(rfmResultPart).toBeDefined()
+		// The 4000-char retrieved history must have decayed to the transient eviction note
+		expect(rfmResultPart.output.value).toContain(
+			"Retrieved History (fold_001): Inspected by model in previous turn",
+		)
+		expect(rfmResultPart.output.value).toContain(
+			"Content evicted to prevent context oscillation",
+		)
 
 		await storage.close()
 	})

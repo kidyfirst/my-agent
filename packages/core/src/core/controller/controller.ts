@@ -1664,6 +1664,22 @@ export class Session<TState = any> {
 				await store.saveMessages({ messages: [userDbMessage] })
 			}
 
+			// Record root user goal on thread metadata if not already recorded
+			if (userText && store?.getThreadById && store?.updateThread) {
+				try {
+					const threadRec = await store.getThreadById({ threadId })
+					if (threadRec && !(threadRec.metadata as any)?.rootUserGoal) {
+						await store.updateThread({
+							id: threadId,
+							metadata: {
+								...(threadRec.metadata || {}),
+								rootUserGoal: userText.trim().slice(0, 500),
+							},
+						})
+					}
+				} catch {}
+			}
+
 			// Emit user message events
 			this.emit({
 				type: "message_start",
@@ -2261,7 +2277,24 @@ export class Session<TState = any> {
 								// Temporal Output Decay: for older turns (> 2 assistant turns ago),
 								// collapse verbose tool outputs (> 300 chars) into semantic summary tokens.
 								if (!isRecentAssistantTurn) {
-									if (typeof res === "string" && res.length > 300) {
+									if (toolName === "retrieve_folded_messages") {
+										// Evict verbose retrieved history from older turns to prevent context window oscillation
+										const rangeMatch =
+											typeof res === "string"
+												? res.match(/\[(fold_\w+)\]/)
+												: null
+										const matchingCall = toolCalls.find(
+											(tc) => tc.toolCallId === toolCallId,
+										)
+										const rangeId =
+											matchingCall?.args?.rangeId ||
+											matchingCall?.input?.rangeId ||
+											(p.input as any)?.rangeId ||
+											(p.args as any)?.rangeId ||
+											rangeMatch?.[1] ||
+											"folded"
+										res = `[Retrieved History (${rangeId}): Inspected by model in previous turn. Content evicted to prevent context oscillation.]`
+									} else if (typeof res === "string" && res.length > 300) {
 										res = `[Tool Result: ${toolName} completed (${res.length} chars). Content folded for context economy. Call ${toolName} again if fresh details are needed.]`
 									} else if (
 										typeof res === "object" &&
@@ -2541,17 +2574,23 @@ export class Session<TState = any> {
 
 			if (totalEstimatedTokens > MAX_HISTORY_TOKENS) {
 				let keptTokens = 0
-				let startIndex = coreMessages.length
+				// Ensure at least the last 4 messages (recent 2 turns) are immune from folding
+				const maxFoldIndex = Math.max(0, coreMessages.length - 4)
+				let startIndex = maxFoldIndex
 				for (let i = coreMessages.length - 1; i >= 0; i--) {
 					const calibratedMsgTokens = Math.round(
 						messageTokens[i] * calibrationRatio,
 					)
-					if (keptTokens + calibratedMsgTokens > MAX_HISTORY_TOKENS) {
+					if (
+						i < maxFoldIndex &&
+						keptTokens + calibratedMsgTokens > MAX_HISTORY_TOKENS
+					) {
 						break
 					}
 					keptTokens += calibratedMsgTokens
 					startIndex = i
 				}
+				startIndex = Math.min(startIndex, maxFoldIndex)
 
 				// If startIndex points to a tool result without its tool call, advance to next user message
 				while (
@@ -2577,20 +2616,42 @@ export class Session<TState = any> {
 					}
 					const rangeId = `fold_${String(maxIndex + 1).padStart(3, "0")}`
 
-					// Extract the initial user request/goal from the earliest user message before slicing
+					// Resolve initialUserGoal: prioritize persistent thread metadata,
+					// or extract the first real user message (ignoring previous [System Note] or [Context Advisory])
 					let initialUserGoal = ""
-					const firstUserMsg = coreMessages.find((m) => m.role === "user")
-					if (firstUserMsg) {
-						if (typeof firstUserMsg.content === "string") {
-							initialUserGoal = firstUserMsg.content
-						} else if (Array.isArray(firstUserMsg.content)) {
-							const textPart = firstUserMsg.content.find(
-								(p: any) => p.type === "text",
+					try {
+						const threadRec = await store.getThreadById({ threadId })
+						if ((threadRec?.metadata as any)?.rootUserGoal) {
+							initialUserGoal = (threadRec.metadata as any).rootUserGoal
+						}
+					} catch {}
+
+					if (!initialUserGoal) {
+						const firstRealUserMsg = coreMessages.find((m) => {
+							if (m.role !== "user") return false
+							const text =
+								typeof m.content === "string"
+									? m.content
+									: Array.isArray(m.content)
+										? m.content.find((p: any) => p.type === "text")?.text || ""
+										: ""
+							return (
+								!text.startsWith("[System Note:") &&
+								!text.startsWith("[Context Advisory:")
 							)
-							initialUserGoal = textPart?.text || ""
+						})
+						if (firstRealUserMsg) {
+							const rawText =
+								typeof firstRealUserMsg.content === "string"
+									? firstRealUserMsg.content
+									: Array.isArray(firstRealUserMsg.content)
+										? firstRealUserMsg.content.find(
+												(p: any) => p.type === "text",
+											)?.text || ""
+										: ""
+							initialUserGoal = rawText.trim()
 						}
 					}
-					initialUserGoal = initialUserGoal.trim()
 
 					const messageIds = Array.from(
 						new Set(foldedMessages.map((m) => m.id).filter(Boolean)),
@@ -2618,12 +2679,30 @@ export class Session<TState = any> {
 
 					coreMessages.splice(0, startIndex)
 
-					const goalSnippet =
-						initialUserGoal.slice(0, 300) +
-						(initialUserGoal.length > 300 ? "..." : "")
+					// Remove any existing [System Note] at the top of coreMessages to prevent stacking multiple notes
+					while (
+						coreMessages.length > 0 &&
+						coreMessages[0].role === "user" &&
+						typeof coreMessages[0].content === "string" &&
+						coreMessages[0].content.startsWith("[System Note:")
+					) {
+						coreMessages.shift()
+					}
+
+					const goalSnippet = initialUserGoal
+						? initialUserGoal.slice(0, 300) +
+							(initialUserGoal.length > 300 ? "..." : "")
+						: ""
+
+					// Observational Memory coordination: if OM is active, acknowledge that high-level
+					// decisions are already summarized in Observational Memory above, preventing duplicate summaries.
+					const omCoordinationHint = observationBlock
+						? " High-level decisions and constraints are preserved in Observational Memory above."
+						: ""
+
 					const summaryNote = initialUserGoal
-						? `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits. Original User Task: "${goalSnippet}". If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
-						: `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits. If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+						? `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits. Original User Task: "${goalSnippet}".${omCoordinationHint} If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+						: `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits.${omCoordinationHint} If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
 
 					coreMessages.unshift({
 						role: "user",

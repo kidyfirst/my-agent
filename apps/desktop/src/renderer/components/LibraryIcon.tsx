@@ -7,7 +7,7 @@ import React from "react"
 export function LibraryIcon({
 	size = 16,
 	filled = false,
-	strokeWidth = 1.8,
+	strokeWidth = 1.5,
 	style,
 }: {
 	size?: number
