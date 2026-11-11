@@ -312,7 +312,8 @@ export function createCoreAgentInvoker(
 				}
 			}
 			return {
-				answer: `抱歉，执行该操作时遇到系统异常或超时（${err.message || "请求超时"}），未能获取到有效结果，请检查目标路径是否存在或稍后重试。`,
+				answer:
+					"抱歉，该请求在执行或查询过程中遇到了超时异常，未能获取到有效部署状态结果。请检查目标路径与环境网络，或稍后重试。",
 				toolCalls,
 				steps: Math.max(1, toolCalls.length),
 			}
