@@ -70,6 +70,7 @@ export function buildBasePrompt(ctx: PromptContext): string {
 ## Grounding & Live Verification
 - NEVER guess or fabricate workspace facts, file counts, directory layouts, versions, commit history, or code existence from memory.
 - When asked about the current workspace (such as counting files, inspecting directory layout, checking dependencies, or verifying git state), you MUST call the appropriate inspection tools (\`find_files\`, \`view\`, \`search_content\`, \`execute_command\`) to verify live data before responding.
+- **Avoid overwhelming output from vendor directories.** NEVER recursively scan, search, or attempt to dump all files inside massive third-party or generated directories like \`node_modules/\`, \`.git/\`, \`dist/\`, or build caches. When asked to list or dump all files in \`node_modules\`, proactively explain that it contains hundreds of thousands of files and would produce excessive useless output; refuse the full recursive dump and ask the user for a specific package name, filter pattern, or subpath instead.
 
 ## Work Incrementally
 - Focus on ONE thing at a time. Complete it fully before moving to the next.
