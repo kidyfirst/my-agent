@@ -42,16 +42,16 @@
 
 ### 全平台客户端下载
 
-| 操作系统 / 平台 | 架构 / 适用机型 | 安装包格式 | 直接下载链接 (v0.1.7) | 说明 |
-| :--- | :--- | :--- | :--- | :--- |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像 | [my-agent-0.1.7-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.dmg) | 推荐 Mac 用户首选 |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包 | [my-agent-0.1.7-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.zip) | 解压即用 |
-| 🍏 **macOS** | **Intel x86_64** 芯片 | `.dmg` 安装镜像 | [my-agent-0.1.7-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.dmg) | 适配 Intel 架构 Mac |
-| 🍏 **macOS** | **Intel x86_64** 芯片 | `.zip` 免安装包 | [my-agent-0.1.7-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.zip) | 解压即用 |
-| 🪟 **Windows** | **Windows 10 / 11** (64 位) | `.exe` 安装程序 | [my-agent-0.1.7-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.exe) | NSIS 引导向导安装 |
-| 🪟 **Windows** | **Windows 10 / 11** (64 位) | `.zip` 免安装便携版 | [my-agent-0.1.7-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.zip) | 解压即可直接运行 |
-| 🐧 **Linux** | **Linux x86_64** (通用) | `.AppImage` 便携镜像 | [my-agent-0.1.7-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
-| 🐧 **Linux** | **Debian / Ubuntu / Deepin** | `.deb` 系统软件包 | [my-agent-0.1.7-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-amd64.deb) | `sudo dpkg -i` 系统级安装 |
+| 操作系统 / 平台 | 架构 / 适用机型                       | 安装包格式           | 直接下载链接 (v0.1.7)                                                                                                                       | 说明                      |
+| :-------------- | :------------------------------------ | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------ |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` 安装镜像      | [my-agent-0.1.7-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.dmg)                 | 推荐 Mac 用户首选         |
+| 🍏 **macOS**    | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` 免安装包      | [my-agent-0.1.7-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.zip)                 | 解压即用                  |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.dmg` 安装镜像      | [my-agent-0.1.7-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.dmg)                     | 适配 Intel 架构 Mac       |
+| 🍏 **macOS**    | **Intel x86_64** 芯片                 | `.zip` 免安装包      | [my-agent-0.1.7-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.zip)                     | 解压即用                  |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.exe` 安装程序      | [my-agent-0.1.7-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.exe)                     | NSIS 引导向导安装         |
+| 🪟 **Windows**  | **Windows 10 / 11** (64 位)           | `.zip` 免安装便携版  | [my-agent-0.1.7-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.zip)                     | 解压即可直接运行          |
+| 🐧 **Linux**    | **Linux x86_64** (通用)               | `.AppImage` 便携镜像 | [my-agent-0.1.7-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-x86_64.AppImage) | `chmod +x` 后直接双击执行 |
+| 🐧 **Linux**    | **Debian / Ubuntu / Deepin**          | `.deb` 系统软件包    | [my-agent-0.1.7-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-amd64.deb)             | `sudo dpkg -i` 系统级安装 |
 
 > [!IMPORTANT]
 > **macOS 首次打开提示“已损坏 / 无法验证开发者”处理方法：**  
@@ -68,6 +68,7 @@
 > - 完整更新履历与历史版本详情请参阅 👉 **[在线 ChangeLog 日志](https://kidyfirst.github.io/my-agent/changelog.html)** 或 **[GitHub Releases 全部发布归档](https://github.com/kidyfirst/my-agent/releases)**。
 
 ---
+
 <!-- LATEST_RELEASE_END -->
 
 <!-- TIP_JAR_START — 二维码就是 apps/desktop/src/renderer/assets/alipay-qr.png，同一份文件，别再放副本 -->
@@ -140,6 +141,11 @@
       - [3.5.8 动态 Memory 工厂、分词估算与测试覆盖](#358-动态-memory-工厂分词估算与测试覆盖)
     - [3.6 A2A 协议服务 (`packages/a2a/`)](#36-a2a-协议服务-packagesa2a)
     - [3.7 CLI 命令行与本地守护进程 (`packages/cli/`)](#37-cli-命令行与本地守护进程-packagescli)
+    - [3.8 自动化评测体系与回归门禁 (`@my-agent/evals` / `packages/evals/`)](#38-自动化评测体系与回归门禁-my-agentevals--packagesevals)
+      - [3.8.1 三阶段评估与反馈闭环架构](#381-三阶段评估与反馈闭环架构)
+      - [3.8.2 核心设计考量与权衡](#382-核心设计考量与权衡)
+      - [3.8.3 模块核心实现结构](#383-模块核心实现结构)
+      - [3.8.4 常用命令与流水线指令](#384-常用命令与流水线指令)
   - [4. 核心业务与数据流时序](#4-核心业务与数据流时序)
     - [4.1 用户消息、思考链与执行块流式时序](#41-用户消息思考链与执行块流式时序)
     - [4.2 工具调用审批与人机协同流程](#42-工具调用审批与人机协同流程)
@@ -153,13 +159,14 @@
 
 项目以 **pnpm workspace 多包仓库（monorepo）** 组织，分为 `apps/*`（可执行应用）与 `packages/*`（可复用库）两部分：
 
-| 包                  | 路径             | 职责                                                   |
-| :------------------ | :--------------- | :----------------------------------------------------- |
-| `my-agent`（根）    | `./`             | 构建编排、Electron 打包配置、发布脚本                  |
-| `@my-agent/desktop` | `apps/desktop/`  | Electron 桌面客户端（主进程 / preload / React 渲染层） |
-| `@my-agent/core`    | `packages/core/` | 无头智能体引擎：图调度、控制器、Harness、存储、工具集  |
-| `@my-agent/a2a`     | `packages/a2a/`  | Agent-to-Agent（A2A）JSON-RPC 服务端 / 客户端          |
-| `@my-agent/cli`     | `packages/cli/`  | 命令行入口与本地守护进程（daemon）                     |
+| 包                  | 路径              | 职责                                                         |
+| :------------------ | :---------------- | :----------------------------------------------------------- |
+| `my-agent`（根）    | `./`              | 构建编排、Electron 打包配置、发布脚本                        |
+| `@my-agent/desktop` | `apps/desktop/`   | Electron 桌面客户端（主进程 / preload / React 渲染层）       |
+| `@my-agent/core`    | `packages/core/`  | 无头智能体引擎：图调度、控制器、Harness、存储、工具集        |
+| `@my-agent/a2a`     | `packages/a2a/`   | Agent-to-Agent（A2A）JSON-RPC 服务端 / 客户端                |
+| `@my-agent/cli`     | `packages/cli/`   | 命令行入口与本地守护进程（daemon）                           |
+| `@my-agent/evals`   | `packages/evals/` | 自动化闭环评测基准体系（基线评测、线上负反馈回流、回归门禁） |
 
 在运行时，项目采用典型的 **四层分层架构**，由上至下分别为 **UI 渲染表现层**、**安全桥接层**、**主进程调度层** 以及 **Agent 运行时引擎**：
 
@@ -1116,6 +1123,104 @@ observationalMemory: {
 
 `packages/cli/src/client-runner.ts` 负责把命令翻译成 JSON-RPC 请求发给守护进程，因此 CLI 不直接持有 Harness —— 所有状态都集中在守护进程内，多个终端可以共享同一个会话上下文。
 
+### 3.8 自动化评测体系与回归门禁 (`@my-agent/evals` / `packages/evals/`)
+
+智能体（Agent）系统相较于传统确定性软件，其执行行为具有非确定性、多步推理复杂度和强环境交互特性。为了确保在提示词迭代、工具库扩充、底层模型切换或版本升级过程中核心能力不发生退化，项目构建了纯 TypeScript 原生的轻量级自动化评测基准体系 `@my-agent/evals`。该模块摆脱了外部繁复 Python 评测框架与特定三方库的依赖，直接集成 `@my-agent/core`，驱动无头智能体在真实代码库环境中进行闭环验证。
+
+#### 3.8.1 三阶段评估与反馈闭环架构
+
+```mermaid
+flowchart TD
+    subgraph Phase1 ["1. 离线基线评测 (Baseline Benchmark)"]
+        DatasetBase["dataset/baseline_30.jsonl<br/>30+ 核心场景自然口语用例"]
+        Runner["评测执行引擎 (src/runner.ts)<br/>驱动真实 Agent Harness 调度"]
+        Judge["LLM 裁判机 (src/judge.ts)<br/>DeepSeek / OpenAI LLM + 启发式保底"]
+        ReportBase["生成基线标准报告 (reports/baseline_report.json)"]
+        DatasetBase --> Runner --> Judge --> ReportBase
+    end
+
+    subgraph Phase2 ["2. 线上 Bad Case 闭环流转 (Online Feedback Loop)"]
+        UserFeedback["用户端点踩 (👎 Bad Response) / 运行时超时与异常"]
+        ExportTrace["脱敏导出工具 (src/export-badcases.ts)<br/>擦除手机号、邮箱、IP 与绝对物理路径"]
+        DatasetBad["增量沉淀至 dataset/bad_cases.jsonl<br/>自动化转化为回归测试资产"]
+        UserFeedback --> ExportTrace --> DatasetBad
+    end
+
+    subgraph Phase3 ["3. CI/CD 自动化回归门禁 (Regression Gate)"]
+        LatestRun["版本发布/PR 评测执行<br/>产出 reports/latest_report.json"]
+        Gate["门禁核验器 (src/gate.ts)<br/>checkRegressionGate(baseline, latest)"]
+        Decision{"三维红线校验<br/>通过率 / 平均步数 / 延迟"}
+        Pass["✅ 门禁通过 (Exit Code 0)"]
+        Block["❌ 阻断合流 / 发版告警 (Exit Code 1)"]
+
+        ReportBase --> Gate
+        LatestRun --> Gate
+        Gate --> Decision
+        Decision --> |符合容忍阈值| Pass
+        Decision --> |指标退化违规| Block
+    end
+```
+
+#### 3.8.2 核心设计考量与权衡（Design Considerations）
+
+在设计与调优该评测系统的过程中，我们深入剖析了大模型评测中的行业顽疾与智能体运行机理，确立了以下五大核心原则：
+
+##### 1. 坚持测试用例自然口语化，严禁对抗性 Prompt 作弊（Anti-Prompt Cheating）
+
+- **行业痛点**：当 Agent 面对模糊或宽泛的询问（如“_统计 apps/desktop 目录下有多少个 tsx 文件_”）时，大模型在没有全局约束的情况下倾向于走“计算成本最低路径”（直接臆造或猜测一个数字如 119）而偷懒不调终端工具。若为了让 Case 通过而把测试 Prompt 人为改为“_在终端执行命令统计..._”，属于测试集投毒与作弊，完全丧失了评测真实自然语言交互能力的意义。
+- **架构解法**：测试集全量保持纯自然口语提问。在全局系统提示词（`packages/core/src/prompts/base.ts`）中注入极其紧凑的 **事实落地与环境验证规范（Grounding Policy）**（约 45 tokens），强制要求凡涉及文件数量、版本、依赖等客观环境事实必须调用对应工具真实探测，严禁无依据凭空捏造。
+
+##### 2. 评测分层解耦：功能正确性 vs 资源效率（Decoupled Evaluation）
+
+- **避免严谨度惩罚（Anti-Diligence Penalty）**：单用例的 `max_steps` 不应设为严苛的“微观限额（如 2 步或 4 步）”，而应定义为 **防死循环安全熔断线（Safety Circuit Breaker）**（如 10~25 步）。若 Agent 为了确保准确性，多执行了 1 次校验步骤，只要在安全上限内且输出结果准确，必须判定为 **PASS**。严禁惩罚“做得更全面、更严谨”的智能体。
+- **包容基础模型演化（Model Evolution Tolerance）**：随着基础模型从通用模型进化到具备链式推理与反思验证能力的模型（如 DeepSeek-R1、Claude 3.7 Sonnet），模型在复杂问题上天然倾向于自我交叉核验。放宽单点步数熔断线，能避免“模型升级后 Benchmark 分数反降”的荒谬现象。
+- **全局门禁把控资源膨胀**：单点放宽不等于放任资源失控。回归门禁 `src/gate.ts` 在系统层全局监控全部 Case 的 `avg_steps`（平均步数增长 <= 0.5）和 `avg_latency`，从宏观维度拦截系统性效率劣化。
+
+##### 3. 裁判大模型真值锚定（Ground Truth in Judge Criteria）
+
+- **行业痛点**：在“统计项目内 tsx 文件数量”等模糊统计场景中，裁判 LLM 在缺乏真实工作区文件上下文时，即使 Agent 给出了真实的 119 个，裁判自身也会发生猜疑幻觉，判定“数字无依据编造”而误杀。
+- **架构解法**：在用例的 `expected_answer_criteria` 中显式锚定代码库的真实基准（Ground Truth，如“_当前代码库实际约为 119 个左右_”），消除裁判大模型自身的幻觉偏差。
+
+##### 4. 供应商目录隔离与主动拒绝（Vendor Directory Avoidance）
+
+- **架构策略**：智能体在面对海量无效输出场景（如“_列出 node_modules 里的所有文件详情_”）时，盲目执行深扫不仅会消耗天量 Token，还会造成上下文爆炸或进程挂起。评测中将其作为边缘防护（`edge_large_output`）用例，在核心提示词中明确注入兜底防御：遇到 `node_modules/` 或 `.git/` 的深扫指令，主动停止深扫并向用户建议提供具体包名或范围过滤。
+
+##### 5. 敏感数据脱敏与全流程隐私合规（PII Anonymization）
+
+- 线上用户通过 👍/👎 提供的交互样本及系统错误日志是极宝贵的回归资产。`src/export-badcases.ts` 在归档写入前执行严格的正则与模式脱敏：
+  - 手机号替换为 `138****0000`；
+  - 邮箱替换为 `a***@example.com`；
+  - 真实用户机器绝对路径（如 `/Users/xxx/project/...`）统一重写为虚拟相对路径，确保开源或内网协作时零隐私泄露风险。
+
+#### 3.8.3 模块核心实现结构
+
+```
+packages/evals/
+├── dataset/
+│   ├── baseline_30.jsonl          # 30 个基线测试用例 (文件/Git/终端/分析/边界/安全拒答)
+│   └── bad_cases.jsonl            # 线上沉淀的负反馈与错误恢复测试用例
+├── src/
+│   ├── types.ts                   # 评测体系全量领域类型 (EvalCase / CaseResult / EvalReport / GateConfig)
+│   ├── invoker.ts                 # Agent 调用驱动器 (真实 Harness 桥接 / YOLO 模式提权 / 凭证检测)
+│   ├── judge.ts                   # 混合裁判机 (DeepSeek / OpenAI LLM-as-a-Judge + 启发式保底)
+│   ├── runner.ts                  # 评测调度引擎 (多数据集加载 / 别名工具映射 / Markdown 与 JSON 报告生成)
+│   ├── gate.ts                    # 质量与性能回归门禁 (通过率、步数、延迟三维红线校验)
+│   ├── export-badcases.ts         # 线上 Trace / 负反馈脱敏清洗与归档工具
+│   ├── cli.ts                     # 评测命令行入口 (run / gate / export-trace)
+│   └── index.ts                   # 模块公共导出
+└── package.json
+```
+
+#### 3.8.4 常用命令与流水线指令
+
+| 命令                         | 描述                                                             | 使用场景                           |
+| :--------------------------- | :--------------------------------------------------------------- | :--------------------------------- |
+| `pnpm run eval`              | 执行全部基线用例，生成终端摘要与完整 Markdown / JSON 报告        | 本地全量能力回归与效果验收         |
+| `pnpm run eval:mock`         | 快速走通评测调度、裁判及报告输出全流程（无需消耗大模型 Token）   | 评测系统自身逻辑验证与 CI 冒烟测试 |
+| `pnpm run eval:baseline`     | 仅运行 30 个标准基线用例（不含增量 bad cases）                   | 建立版本发版前的对比基准线         |
+| `pnpm run eval:gate`         | 对比 `latest_report.json` 与 `baseline_report.json` 进行门禁核验 | CI/CD Pipeline 合流前阻断检查      |
+| `pnpm run eval:export-trace` | 交互式或自动化脱敏清洗线上异常 trace 并追加到 bad_cases          | 线上问题向测试资产的自动化转化     |
+
 ---
 
 ## 4. 核心业务与数据流时序
@@ -1426,13 +1531,23 @@ my-agent/
 │   │   ├── src/client/client.ts       # A2A 客户端
 │   │   └── tests/                     # 协议测试
 │   │
-│   └── cli/                       # @my-agent/cli 命令行与本地守护进程
-│       ├── bin/my-agent.js        # my-agent 可执行入口
-│       ├── src/cli.ts             # 参数解析与命令注册
-│       ├── src/daemon.ts          # 守护进程：daemon.json 写盘 + A2A 服务托管
-│       ├── src/client-runner.ts   # 客户端命令执行器
-│       ├── src/commands/          # serve / run / chat / project / thread / status
-│       └── tests/                 # CLI 与守护进程测试
+│   ├── cli/                       # @my-agent/cli 命令行与本地守护进程
+│   │   ├── bin/my-agent.js        # my-agent 可执行入口
+│   │   ├── src/cli.ts             # 参数解析与命令注册
+│   │   ├── src/daemon.ts          # 守护进程：daemon.json 写盘 + A2A 服务托管
+│   │   ├── src/client-runner.ts   # 客户端命令执行器
+│   │   ├── src/commands/          # serve / run / chat / project / thread / status
+│   │   └── tests/                 # CLI 与守护进程测试
+│   │
+│   └── evals/                     # @my-agent/evals 自动化闭环评测与回归门禁
+│       ├── dataset/               # baseline_30.jsonl / bad_cases.jsonl 数据集
+│       ├── reports/               # 评测报告 (baseline_report / latest_report)
+│       ├── src/runner.ts          # 调度引擎与报告生成
+│       ├── src/judge.ts           # LLM-as-a-Judge 与启发式混合裁判
+│       ├── src/invoker.ts         # Agent 调用驱动器
+│       ├── src/gate.ts            # 回归门禁红线拦截
+│       ├── src/export-badcases.ts # 线上 Bad Case 脱敏清洗
+│       └── src/cli.ts             # 评测命令行入口
 │
 ├── scripts/                       # 构建与发布脚本 (build-dispatch / build-local / update-readme-release)
 ├── resources/                     # 应用图标等打包资源
@@ -1451,11 +1566,13 @@ flowchart LR
     cli["packages/cli<br/>@my-agent/cli"] --> core
     cli --> a2a
     a2a --> core
+    evals["packages/evals<br/>@my-agent/evals"] --> core
 ```
 
-- `packages/core` 不依赖任何 Electron / DOM API，可在纯 Node 环境运行，这是 CLI 与 A2A 服务能复用同一引擎的前提。
+- `packages/core` 不依赖任何 Electron / DOM API，可在纯 Node 环境运行，这是 CLI、A2A 服务与 Evals 评测体系能复用同一引擎的前提。
 - `packages/a2a` 只依赖 `core`，不感知桌面端；桌面端与 CLI 通过它暴露同一套 JSON-RPC 会话能力。
 - `packages/cli` 依赖 `core` 与 `a2a`，既是命令行入口，也是守护进程宿主。
+- `packages/evals` 依赖 `core`，通过无头 Harness 实例执行端到端离线基准评测、线上负反馈回流与 CI/CD 回归门禁。
 - `apps/desktop` 同时依赖 `core` 与 `a2a`，是唯一的 GUI 消费方。
 
 <!-- 本文档由维护者持续更新，如与代码实现不一致，以代码为准。 -->
