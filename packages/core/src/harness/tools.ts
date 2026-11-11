@@ -21,6 +21,7 @@ import { astSmartEditTool } from "../tools/ast-smart-edit.js"
 import { createSubagentTool } from "../tools/subagent.js"
 import { createProjectMemoryTool } from "../tools/project-memory.js"
 import { createLibraryTool } from "../tools/library.js"
+import { createRetrieveFoldedMessagesTool } from "../tools/retrieve-folded.js"
 import { getLibraryService } from "../library/library-service.js"
 import { DEFAULT_OM_MODEL_ID } from "./state.js"
 
@@ -44,6 +45,7 @@ export const READ_TOOL_NAMES = [
 	"request_sandbox_access",
 	"assets_fetch",
 	"search_my_library",
+	"retrieve_folded_messages",
 ] as const
 
 /**
@@ -78,6 +80,7 @@ export const FAST_TOOL_NAMES = [
 	"find_files",
 	"request_sandbox_access",
 	"search_my_library",
+	"retrieve_folded_messages",
 ] as const
 
 /**
@@ -189,6 +192,7 @@ export function createDynamicTools(
 			request_sandbox_access: () => requestSandboxAccessTool,
 			assets_fetch: () => createAssetsFetchTool(projectRoot),
 			project_memory: () => createProjectMemoryTool(projectRoot),
+			retrieve_folded_messages: () => createRetrieveFoldedMessagesTool(),
 			search_my_library: () => {
 				const service = getLibraryService()
 				const harness = (requestContext.get("harness") ||

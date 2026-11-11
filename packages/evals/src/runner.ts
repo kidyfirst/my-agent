@@ -21,8 +21,26 @@ export interface RunOptions {
  * Mapping between abstract test case tools and concrete agent runtime tools.
  */
 export const TOOL_ALIASES: Record<string, string[]> = {
-	read_file: ["read_file", "view", "assets_fetch", "search_content"],
-	view: ["view", "read_file", "assets_fetch", "search_content"],
+	read_file: [
+		"read_file",
+		"view",
+		"assets_fetch",
+		"search_content",
+		"retrieve_folded_messages",
+	],
+	view: [
+		"view",
+		"read_file",
+		"assets_fetch",
+		"search_content",
+		"retrieve_folded_messages",
+	],
+	retrieve_folded_messages: [
+		"retrieve_folded_messages",
+		"view",
+		"read_file",
+		"search_content",
+	],
 	write_file: [
 		"write_file",
 		"execute_command",

@@ -28,6 +28,7 @@ import {
 	formatObservationalMemory,
 	resolveBlockAfter,
 } from "../memory/observational.js"
+import type { FoldedRange } from "../../tools/retrieve-folded.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
 export type ToolCategory =
@@ -445,6 +446,19 @@ export class AgentController<TState = any> {
 		}
 		return undefined
 	}
+
+	getFoldedRanges(threadId: string): FoldedRange[] {
+		for (const session of this._sessions.values()) {
+			const ranges = (session as any).getFoldedRanges?.(threadId)
+			if (ranges && ranges.length > 0) return ranges
+		}
+		return []
+	}
+
+	getFoldedRange(threadId: string, rangeId: string): FoldedRange | undefined {
+		const ranges = this.getFoldedRanges(threadId)
+		return ranges.find((r) => r.rangeId === rangeId)
+	}
 }
 
 export interface SessionConfig<TState = any> {
@@ -503,6 +517,22 @@ export class Session<TState = any> {
 		}
 	> = new Map()
 	private _threadQueues: Map<string, Promise<void>> = new Map()
+	private _foldedRanges: Map<string, FoldedRange[]> = new Map()
+
+	getFoldedRanges(threadId: string): FoldedRange[] {
+		return this._foldedRanges.get(threadId) || []
+	}
+
+	getFoldedRange(threadId: string, rangeId: string): FoldedRange | undefined {
+		const ranges = this.getFoldedRanges(threadId)
+		return ranges.find((r) => r.rangeId === rangeId)
+	}
+
+	recordFoldedRange(threadId: string, range: FoldedRange): void {
+		const ranges = this.getFoldedRanges(threadId)
+		ranges.push(range)
+		this._foldedRanges.set(threadId, ranges)
+	}
 
 	om = {
 		observer: {
@@ -2327,6 +2357,21 @@ export class Session<TState = any> {
 				}
 			}
 
+			// Smooth Nudge: high-watermark warning when context usage is between 70% and 100%
+			const NUDGE_THRESHOLD = Math.floor(MAX_HISTORY_TOKENS * 0.7)
+			if (
+				totalEstimatedTokens >= NUDGE_THRESHOLD &&
+				totalEstimatedTokens <= MAX_HISTORY_TOKENS
+			) {
+				const usagePct = Math.round(
+					(totalEstimatedTokens / MAX_HISTORY_TOKENS) * 100,
+				)
+				coreMessages.push({
+					role: "user",
+					content: `[Context Advisory: Context window is at ~${usagePct}% capacity (${totalEstimatedTokens}/${MAX_HISTORY_TOKENS} tokens). Please plan your remaining edits and summarize key outcomes before automated context folding.]`,
+				})
+			}
+
 			if (totalEstimatedTokens > MAX_HISTORY_TOKENS) {
 				let keptTokens = 0
 				let startIndex = coreMessages.length
@@ -2347,6 +2392,10 @@ export class Session<TState = any> {
 				}
 
 				if (startIndex > 0 && startIndex < coreMessages.length) {
+					const foldedMessages = coreMessages.slice(0, startIndex)
+					const existingRanges = this.getFoldedRanges(threadId)
+					const rangeId = `fold_${String(existingRanges.length + 1).padStart(3, "0")}`
+
 					// Extract the initial user request/goal from the earliest user message before slicing
 					let initialUserGoal = ""
 					const firstUserMsg = coreMessages.find((m) => m.role === "user")
@@ -2362,11 +2411,26 @@ export class Session<TState = any> {
 					}
 					initialUserGoal = initialUserGoal.trim()
 
+					this.recordFoldedRange(threadId, {
+						rangeId,
+						threadId,
+						messageCount: startIndex,
+						startIndex: 0,
+						firstMessageId: foldedMessages[0]?.id,
+						lastMessageId: foldedMessages[foldedMessages.length - 1]?.id,
+						userGoal: initialUserGoal,
+						createdAt: Date.now(),
+						messages: foldedMessages,
+					})
+
 					coreMessages.splice(0, startIndex)
 
+					const goalSnippet =
+						initialUserGoal.slice(0, 300) +
+						(initialUserGoal.length > 300 ? "..." : "")
 					const summaryNote = initialUserGoal
-						? `[System Note: Earlier conversation history was truncated (${startIndex} messages folded) to stay within token context limits. Original User Task: "${initialUserGoal.slice(0, 300)}${initialUserGoal.length > 300 ? "..." : ""}"]`
-						: `[System Note: Earlier conversation history was truncated (${startIndex} messages folded) to stay within token context limits.]`
+						? `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits. Original User Task: "${goalSnippet}". If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+						: `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits. If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
 
 					coreMessages.unshift({
 						role: "user",

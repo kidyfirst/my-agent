@@ -434,4 +434,61 @@ describe("Observational memory in the run loop", () => {
 
 		await storage.close()
 	})
+
+	it("creates a reversible folded range with rangeId and summaryNote when history overflows", async () => {
+		const promptsReceived: any[] = []
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				promptsReceived.push(options.prompt)
+				return reply("ok")
+			},
+		})
+
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+
+		const observe = vi.fn(async () => ({
+			activeObservations: "- Important test observation",
+			observedMessageIds: [],
+			kind: "observed" as const,
+			blocked: false,
+		}))
+		const memory = { observe, getSystemMessage: vi.fn(async () => null) }
+
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			tools: {},
+		})
+		const controller = new AgentController({ storage, agent, memory })
+		await controller.init()
+		const session = await controller.createSession({ resourceId: "r-fold" })
+		const thread = await session.thread.create({ title: "fold thread" })
+
+		// Overflow the history
+		await seedOverflowingHistory(storage, thread.id, "r-fold", "y")
+
+		await session.sendMessage({ content: "Please continue the task" })
+
+		// 1. Verify folded ranges recorded on session and controller
+		const ranges = session.getFoldedRanges(thread.id)
+		expect(ranges.length).toBeGreaterThan(0)
+		expect(ranges[0].rangeId).toBe("fold_001")
+		expect(ranges[0].messageCount).toBeGreaterThan(0)
+		expect(controller.getFoldedRange(thread.id, "fold_001")).toBeDefined()
+
+		// 2. Verify prompt received by model has folded range note with retrieve_folded_messages hint
+		const latestPrompt = promptsReceived[promptsReceived.length - 1]
+		const userMsgs = latestPrompt.filter((p: any) => p.role === "user")
+		const summaryUserMsg = userMsgs.find((m: any) =>
+			JSON.stringify(m.content).includes("retrieve_folded_messages"),
+		)
+		expect(summaryUserMsg).toBeDefined()
+		expect(JSON.stringify(summaryUserMsg)).toContain("fold_001")
+
+		await storage.close()
+	})
 })
