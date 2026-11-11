@@ -164,34 +164,32 @@ export function createCoreAgentInvoker(
 			const thread = await harness.createThread({
 				title: `Eval_${testCase.id}`,
 			})
-			const toolCalls: Array<{ name: string; args?: any }> = []
-			const seenKeys = new Set<string>()
-			let stepCount = 0
+			const toolCalls: Array<{ name: string; args?: any; toolCallId: string }> =
+				[]
+			const seenCallIds = new Set<string>()
 			let streamedAnswer = ""
 
-			const recordToolCall = (name: string, args: any, toolCallId?: string) => {
+			const recordToolStart = (
+				name: string,
+				args: any,
+				toolCallId?: string,
+			) => {
 				if (!name) return
-				const key = toolCallId
-					? `${name}:${toolCallId}`
-					: `${name}:${toolCalls.length}`
-				if (!seenKeys.has(key)) {
-					seenKeys.add(key)
-					toolCalls.push({ name, args })
-					stepCount++
+				const id = toolCallId || `${name}_call_${toolCalls.length}`
+				if (!seenCallIds.has(id)) {
+					seenCallIds.add(id)
+					toolCalls.push({ name, args, toolCallId: id })
 				}
 			}
 
 			// Auto-approve any tool or plan approvals to prevent CLI stalls
 			const unsubscribe = harness.subscribe((event: any) => {
+				// Record unique tool executions only when tool actually starts
 				if (
 					event.type === "tool_start" ||
-					event.type === "tool_end" ||
-					event.type === "subagent_tool_start" ||
-					event.type === "tool_call" ||
-					event.type === "tool-call" ||
-					event.type === "tool_execute_start"
+					event.type === "subagent_tool_start"
 				) {
-					recordToolCall(
+					recordToolStart(
 						event.toolName || event.name,
 						event.args || event.input,
 						event.toolCallId,
@@ -199,12 +197,7 @@ export function createCoreAgentInvoker(
 				}
 
 				if (event.type === "tool_approval_required") {
-					recordToolCall(
-						event.toolName || event.name,
-						event.args || event.input,
-						event.toolCallId,
-					)
-					// Auto approve tool calls in headless eval runner
+					// Auto approve tool calls in headless eval runner (do not duplicate count)
 					harness
 						.approveToolCall({
 							threadId: event.threadId || thread.id,
@@ -226,11 +219,6 @@ export function createCoreAgentInvoker(
 
 				if (event.type === "text-delta" || event.type === "text_delta") {
 					streamedAnswer += event.delta || event.text || ""
-				} else if (
-					event.type === "step_finish" ||
-					event.type === "turn_finish"
-				) {
-					stepCount++
 				}
 			})
 
@@ -254,33 +242,35 @@ export function createCoreAgentInvoker(
 				unsubscribe()
 			}
 
-			// In case any tool call was persisted in message history
-			try {
-				const messages = await harness.listMessages({ threadId: thread.id })
-				for (const msg of messages) {
-					const parts = Array.isArray(msg.content)
-						? msg.content
-						: Array.isArray((msg as any).parts)
-							? (msg as any).parts
-							: []
-					for (const p of parts) {
-						if (p.type === "tool-call" || p.type === "tool_call") {
-							recordToolCall(
-								p.toolName || p.name,
-								p.args || p.input,
-								p.toolCallId || p.id,
+			// In case streaming missed tool calls, fallback to message history
+			if (toolCalls.length === 0) {
+				try {
+					const messages = await harness.listMessages({ threadId: thread.id })
+					for (const msg of messages) {
+						const parts = Array.isArray(msg.content)
+							? msg.content
+							: Array.isArray((msg as any).parts)
+								? (msg as any).parts
+								: []
+						for (const p of parts) {
+							if (p.type === "tool-call" || p.type === "tool_call") {
+								recordToolStart(
+									p.toolName || p.name,
+									p.args || p.input,
+									p.toolCallId || p.id,
+								)
+							}
+						}
+						if (msg.role === "tool" && msg.toolName) {
+							recordToolStart(
+								msg.toolName,
+								msg.args || msg.input,
+								msg.toolCallId || msg.id,
 							)
 						}
 					}
-					if (msg.role === "tool" && msg.toolName) {
-						recordToolCall(
-							msg.toolName,
-							msg.args || msg.input,
-							msg.toolCallId || msg.id,
-						)
-					}
-				}
-			} catch {}
+				} catch {}
+			}
 
 			// Extract assistant answer
 			let answer = streamedAnswer.trim()
