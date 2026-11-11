@@ -10,8 +10,61 @@ export interface RunOptions {
 	invoker: AgentInvoker
 	judgeOptions?: JudgeOptions
 	modelName?: string
+	agentProvider?: string
+	judgeProvider?: string
+	judgeModel?: string
 	onCaseStart?: (c: EvalCase, index: number, total: number) => void
 	onCaseComplete?: (result: CaseResult, index: number, total: number) => void
+}
+
+/**
+ * Mapping between abstract test case tools and concrete agent runtime tools.
+ */
+export const TOOL_ALIASES: Record<string, string[]> = {
+	read_file: ["read_file", "view", "assets_fetch"],
+	view: ["view", "read_file", "assets_fetch"],
+	write_file: ["write_file"],
+	edit_file: [
+		"edit_file",
+		"string_replace_lsp",
+		"ast_smart_edit",
+		"write_file",
+	],
+	string_replace_lsp: [
+		"string_replace_lsp",
+		"ast_smart_edit",
+		"edit_file",
+		"write_file",
+	],
+	ast_smart_edit: [
+		"ast_smart_edit",
+		"string_replace_lsp",
+		"edit_file",
+		"write_file",
+	],
+	run_command: ["run_command", "execute_command", "exec", "terminal"],
+	execute_command: ["execute_command", "run_command", "exec", "terminal"],
+	find_files: ["find_files", "search_content", "glob"],
+	search_content: ["search_content", "find_files", "grep"],
+	search_my_library: ["search_my_library", "assets_fetch"],
+	subagent: ["subagent"],
+	submit_plan: ["submit_plan"],
+}
+
+export function isToolSatisfied(
+	expectedTool: string,
+	actualTools: string[],
+): boolean {
+	if (actualTools.includes(expectedTool)) return true
+	const aliases = TOOL_ALIASES[expectedTool] || []
+	return aliases.some((a) => actualTools.includes(a))
+}
+
+export function getMissingTools(
+	expectedTools: string[],
+	actualTools: string[],
+): string[] {
+	return expectedTools.filter((exp) => !isToolSatisfied(exp, actualTools))
 }
 
 /**
@@ -46,7 +99,10 @@ export function generateMarkdownReport(report: EvalReport): string {
 		`# 📊 Agent Evaluation Benchmark Report`,
 		``,
 		`- **Timestamp**: ${report.timestamp}`,
-		`- **Model**: ${report.model || "Default"}`,
+		`- **Agent Provider**: ${report.agent_provider || "Unknown"}`,
+		`- **Agent Model**: \`${report.model || "Default"}\``,
+		`- **Judge Provider**: ${report.judge_provider || "Unknown"}`,
+		`- **Judge Model**: \`${report.judge_model || "heuristic"}\``,
 		`- **Overall Pass Rate**: **${passPercent}%** (${report.passed_count}/${report.total_cases})`,
 		`- **Average Steps**: ${report.avg_steps}`,
 		`- **Average Latency**: ${report.avg_latency}s`,
@@ -70,9 +126,8 @@ export function generateMarkdownReport(report: EvalReport): string {
 
 	for (const d of report.details) {
 		const icon = d.passed ? "✅ PASS" : "❌ FAIL"
-		const toolsText = d.tool_ok
-			? "OK"
-			: `Missing [${d.expected_tools.filter((t) => !d.actual_tools.includes(t)).join(",")}]`
+		const missing = getMissingTools(d.expected_tools, d.actual_tools)
+		const toolsText = d.tool_ok ? "OK" : `Missing [${missing.join(",")}]`
 		lines.push(
 			`| \`${d.id}\` | ${d.category} | ${icon} | ${toolsText} | ${d.steps}/${d.max_steps} | ${d.latency}s | ${d.reason.replace(/\|/g, "/")} |`,
 		)
@@ -109,7 +164,8 @@ export async function runEvaluation(options: RunOptions): Promise<EvalReport> {
 
 		const actualTools = agentOut.toolCalls.map((t) => t.name)
 		const expectedTools = c.expected_tools ?? []
-		const toolOk = expectedTools.every((t) => actualTools.includes(t))
+		const missingTools = getMissingTools(expectedTools, actualTools)
+		const toolOk = missingTools.length === 0
 		const maxSteps = c.max_steps ?? 6
 		const stepOk = agentOut.steps <= maxSteps
 
@@ -124,8 +180,7 @@ export async function runEvaluation(options: RunOptions): Promise<EvalReport> {
 
 		let finalReason = judgeRes.reason
 		if (!toolOk) {
-			const missing = expectedTools.filter((t) => !actualTools.includes(t))
-			finalReason = `Missing required tools: ${missing.join(", ")}; ${judgeRes.reason}`
+			finalReason = `Missing required tools: ${missingTools.join(", ")}; ${judgeRes.reason}`
 		} else if (!stepOk) {
 			finalReason = `Exceeded max allowed steps (${agentOut.steps} > ${maxSteps}); ${judgeRes.reason}`
 		}
@@ -172,6 +227,9 @@ export async function runEvaluation(options: RunOptions): Promise<EvalReport> {
 	const report: EvalReport = {
 		timestamp: new Date().toISOString(),
 		model: options.modelName,
+		agent_provider: options.agentProvider,
+		judge_provider: options.judgeProvider,
+		judge_model: options.judgeModel,
 		total_cases: total,
 		passed_count: passedCount,
 		failed_count: total - passedCount,

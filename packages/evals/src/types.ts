@@ -48,6 +48,9 @@ export interface CategoryStat {
 export interface EvalReport {
 	timestamp: string
 	model?: string
+	agent_provider?: string
+	judge_provider?: string
+	judge_model?: string
 	total_cases: number
 	passed_count: number
 	failed_count: number

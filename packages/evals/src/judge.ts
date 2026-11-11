@@ -4,6 +4,8 @@ export interface JudgeOptions {
 	apiKey?: string
 	baseURL?: string
 	model?: string
+	provider?: string
+	preferredProvider?: string
 	mock?: boolean
 }
 
@@ -104,6 +106,107 @@ export function heuristicJudge(
 	}
 }
 
+export interface JudgeConfig {
+	provider: string
+	model: string
+	baseURL: string
+	apiKey?: string
+	isHeuristicOnly: boolean
+}
+
+/**
+ * Resolves judge provider, model and API endpoint from env or auth storage.
+ */
+export async function resolveJudgeConfig(
+	options: JudgeOptions = {},
+): Promise<JudgeConfig> {
+	if (
+		options.mock ||
+		process.env.MOCK_JUDGE === "true" ||
+		process.env.MOCK_JUDGE === "1"
+	) {
+		return {
+			provider: "Local",
+			model: "heuristic-rule-judge",
+			baseURL: "local://heuristic",
+			isHeuristicOnly: true,
+		}
+	}
+
+	let apiKey = options.apiKey || process.env.JUDGE_API_KEY
+	let baseURL = options.baseURL || process.env.JUDGE_BASE_URL
+	let model = options.model || process.env.JUDGE_MODEL
+	let provider = options.provider || "OpenAI"
+
+	const requestedProvider = (
+		options.provider ||
+		process.env.JUDGE_PROVIDER ||
+		options.preferredProvider ||
+		""
+	).toLowerCase()
+
+	if (!apiKey) {
+		let deepseekKey = process.env.DEEPSEEK_API_KEY
+		let openaiKey = process.env.OPENAI_API_KEY
+		try {
+			const { AuthStorage } = await import("@my-agent/core")
+			const auth = new AuthStorage()
+			auth.reload()
+			auth.syncCredentials()
+			deepseekKey = deepseekKey || auth.getApiKeySync("deepseek")
+			openaiKey = openaiKey || auth.getApiKeySync("openai")
+		} catch {}
+
+		// Prioritize based on requested/preferred provider, or default to DeepSeek if available
+		const preferDeepseek =
+			requestedProvider === "deepseek" ||
+			(!requestedProvider && Boolean(deepseekKey))
+
+		if (preferDeepseek && deepseekKey) {
+			apiKey = deepseekKey
+			baseURL =
+				baseURL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
+			model = model || "deepseek-chat"
+			provider = "DeepSeek"
+		} else if (openaiKey) {
+			apiKey = openaiKey
+			baseURL =
+				baseURL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
+			model = model || "gpt-4o-mini"
+			provider = "OpenAI"
+		} else if (deepseekKey) {
+			apiKey = deepseekKey
+			baseURL =
+				baseURL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
+			model = model || "deepseek-chat"
+			provider = "DeepSeek"
+		}
+	}
+
+	if (!apiKey) {
+		return {
+			provider: "Local",
+			model: "heuristic-rule-judge",
+			baseURL: "local://heuristic",
+			isHeuristicOnly: true,
+		}
+	}
+
+	if (baseURL?.includes("deepseek") || model?.includes("deepseek")) {
+		provider = "DeepSeek"
+		baseURL = baseURL || "https://api.deepseek.com"
+		model = model || "deepseek-chat"
+	}
+
+	return {
+		provider,
+		model: model || "gpt-4o",
+		baseURL: baseURL || "https://api.openai.com/v1",
+		apiKey,
+		isHeuristicOnly: false,
+	}
+}
+
 /**
  * Evaluates agent response against expected criteria using an LLM judge.
  */
@@ -113,32 +216,10 @@ export async function evaluateWithJudge(
 	actualAnswer: string,
 	options: JudgeOptions = {},
 ): Promise<JudgeVerdict> {
-	if (
-		options.mock ||
-		process.env.MOCK_JUDGE === "true" ||
-		process.env.MOCK_JUDGE === "1"
-	) {
+	const config = await resolveJudgeConfig(options)
+	if (config.isHeuristicOnly || !config.apiKey) {
 		return heuristicJudge(criteria, actualAnswer)
 	}
-
-	const apiKey =
-		options.apiKey ||
-		process.env.JUDGE_API_KEY ||
-		process.env.OPENAI_API_KEY ||
-		process.env.DEEPSEEK_API_KEY
-
-	if (!apiKey) {
-		// Graceful fallback to heuristic judge if no key provided
-		return heuristicJudge(criteria, actualAnswer)
-	}
-
-	const baseURL =
-		options.baseURL ||
-		process.env.JUDGE_BASE_URL ||
-		process.env.OPENAI_BASE_URL ||
-		"https://api.openai.com/v1"
-
-	const model = options.model || process.env.JUDGE_MODEL || "gpt-4o"
 
 	const prompt = `你是一名专业严谨的 AI 评测裁判。请基于以下评估标准，判定 AI 助手的回答是否通过。
 
@@ -161,34 +242,38 @@ ${actualAnswer}
 }`
 
 	try {
-		const res = await fetch(`${baseURL.replace(/\/+$/, "")}/chat/completions`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${apiKey}`,
+		const res = await fetch(
+			`${config.baseURL.replace(/\/+$/, "")}/chat/completions`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${config.apiKey}`,
+				},
+				body: JSON.stringify({
+					model: config.model,
+					messages: [
+						{
+							role: "system",
+							content:
+								"You are an objective, strict AI evaluation judge. Always output valid JSON only.",
+						},
+						{ role: "user", content: prompt },
+					],
+					response_format: { type: "json_object" },
+					temperature: 0,
+				}),
+				signal: AbortSignal.timeout(30000),
 			},
-			body: JSON.stringify({
-				model,
-				messages: [
-					{
-						role: "system",
-						content:
-							"You are an objective, strict AI evaluation judge. Always output valid JSON only.",
-					},
-					{ role: "user", content: prompt },
-				],
-				response_format: { type: "json_object" },
-				temperature: 0,
-			}),
-			signal: AbortSignal.timeout(30000),
-		})
+		)
 
 		if (!res.ok) {
 			const err = await res.text()
+			// Gracefully fallback to heuristic judge if remote judge returns 401 or error
+			const fallback = heuristicJudge(criteria, actualAnswer)
 			return {
-				passed: false,
-				reason: `Judge request failed (${res.status}): ${err.slice(0, 100)}`,
-				score: 0,
+				...fallback,
+				reason: `[Judge Fallback] (${config.provider} HTTP ${res.status}): ${fallback.reason}`,
 			}
 		}
 
@@ -196,10 +281,10 @@ ${actualAnswer}
 		const text = data?.choices?.[0]?.message?.content || ""
 		return extractJsonFromResponse(text)
 	} catch (err: any) {
+		const fallback = heuristicJudge(criteria, actualAnswer)
 		return {
-			passed: false,
-			reason: `Judge call error: ${err.message || String(err)}`,
-			score: 0,
+			...fallback,
+			reason: `[Judge Fallback] (${err.message}): ${fallback.reason}`,
 		}
 	}
 }

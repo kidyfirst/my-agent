@@ -54,6 +54,73 @@ export function createMockInvoker(
 	}
 }
 
+export interface AgentModelInfo {
+	provider: string
+	modelId: string
+	modelName: string
+}
+
+/**
+ * Detects the active or configured LLM provider and model for the core agent.
+ */
+export async function detectAgentModelInfo(
+	options: {
+		modelId?: string
+		cwd?: string
+	} = {},
+): Promise<AgentModelInfo> {
+	let targetModelId = options.modelId
+
+	try {
+		const { AuthStorage } = await import("@my-agent/core")
+		const authStorage = new AuthStorage()
+		authStorage.reload()
+		authStorage.syncCredentials()
+
+		if (!targetModelId) {
+			if (
+				authStorage.getApiKeySync("deepseek") ||
+				process.env.DEEPSEEK_API_KEY
+			) {
+				targetModelId = "deepseek/deepseek-flash"
+			} else if (
+				authStorage.getApiKeySync("openai") ||
+				process.env.OPENAI_API_KEY
+			) {
+				targetModelId = "openai/gpt-4o"
+			} else if (
+				authStorage.getApiKeySync("anthropic") ||
+				process.env.ANTHROPIC_API_KEY
+			) {
+				targetModelId = "anthropic/claude-3-5-sonnet-20241022"
+			} else if (
+				authStorage.getApiKeySync("google") ||
+				process.env.GEMINI_API_KEY
+			) {
+				targetModelId = "google/gemini-2.0-flash"
+			}
+		}
+	} catch {}
+
+	if (!targetModelId) {
+		targetModelId = "deepseek/deepseek-flash"
+	}
+
+	let provider = "DeepSeek"
+	let modelName = targetModelId
+	if (targetModelId.includes("/")) {
+		const parts = targetModelId.split("/")
+		provider = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+		modelName = parts.slice(1).join("/")
+	}
+
+	return {
+		provider,
+		modelId: targetModelId,
+		modelName,
+	}
+}
+
 /**
  * Real agent harness invoker that initializes `@my-agent/core`.
  */
@@ -73,7 +140,7 @@ export function createCoreAgentInvoker(
 				// Enable process-wide YOLO permissions so tools don't stall for user confirmation
 				setRuntimeYolo(true)
 
-				const { harness, authStorage } = await createMyAgent({
+				const { harness } = await createMyAgent({
 					cwd: options.cwd || process.cwd(),
 					disableMcp: true,
 					disableHooks: true,
@@ -82,36 +149,8 @@ export function createCoreAgentInvoker(
 				})
 				await harness.init()
 
-				// Auto-detect best model if none specified
-				let targetModelId = options.modelId
-				if (!targetModelId) {
-					if (
-						authStorage.getApiKeySync("deepseek") ||
-						process.env.DEEPSEEK_API_KEY
-					) {
-						targetModelId = "deepseek/deepseek-flash"
-					} else if (
-						authStorage.getApiKeySync("openai") ||
-						process.env.OPENAI_API_KEY
-					) {
-						targetModelId = "openai/gpt-4o"
-					} else if (
-						authStorage.getApiKeySync("anthropic") ||
-						process.env.ANTHROPIC_API_KEY
-					) {
-						targetModelId = "anthropic/claude-3-5-sonnet-20241022"
-					} else if (
-						authStorage.getApiKeySync("google") ||
-						process.env.GEMINI_API_KEY
-					) {
-						targetModelId = "google/gemini-2.0-flash"
-					}
-				}
-
-				if (targetModelId) {
-					await harness.switchModel({ modelId: targetModelId })
-					console.log(`[Eval Runner] Using active model: ${targetModelId}`)
-				}
+				const modelInfo = await detectAgentModelInfo(options)
+				await harness.switchModel({ modelId: modelInfo.modelId })
 
 				return harness
 			})()

@@ -9,7 +9,12 @@ import {
 	appendBadCasesToJsonl,
 	type RawBadTrace,
 } from "./export-badcases.js"
-import { createCoreAgentInvoker, createMockInvoker } from "./invoker.js"
+import {
+	createCoreAgentInvoker,
+	createMockInvoker,
+	detectAgentModelInfo,
+} from "./invoker.js"
+import { resolveJudgeConfig } from "./judge.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = path.resolve(__dirname, "..")
@@ -35,24 +40,52 @@ async function main() {
 		]
 
 		const outputPath = path.join(ROOT_DIR, "reports/latest_report.json")
-		console.log(`\n🔍 [Eval Runner] Starting evaluation...`)
+
+		const agentInfo = isMock
+			? {
+					provider: "Mock",
+					modelId: "mock/eval-mock-v1",
+					modelName: "eval-mock-v1",
+				}
+			: await detectAgentModelInfo({ modelId: modelArg })
+
+		const judgeConfig = await resolveJudgeConfig({
+			preferredProvider: agentInfo.provider.toLowerCase(),
+			mock: isMock,
+		})
+
+		console.log(`\n======================================================`)
+		console.log(`🔍 [Eval Runner] Starting Benchmark Evaluation`)
+		console.log(`======================================================`)
 		console.log(
-			`Mode: ${isMock ? "Mock Invoker (Dry-run)" : "Core Agent Invoker"}`,
+			`📦 Mode      : ${isMock ? "Mock Invoker (Dry-run)" : "Core Agent Harness"}`,
 		)
 		console.log(
-			`Datasets: ${datasetPaths.map((p) => path.basename(p)).join(", ")}`,
+			`📂 Datasets  : ${datasetPaths.map((p) => path.basename(p)).join(", ")}`,
 		)
+		console.log(`🤖 Agent     : [${agentInfo.provider}] ${agentInfo.modelId}`)
+		console.log(
+			`⚖️  Judge     : [${judgeConfig.provider}] ${judgeConfig.model} (${judgeConfig.isHeuristicOnly ? "Heuristic Rules" : judgeConfig.baseURL})`,
+		)
+		console.log(`⏱️  Timeout   : ${timeoutMs / 1000}s per case`)
+		console.log(`======================================================\n`)
 
 		const invoker = isMock
 			? createMockInvoker({ passRate: 0.95 })
-			: createCoreAgentInvoker({ modelId: modelArg, timeoutMs })
+			: createCoreAgentInvoker({ modelId: agentInfo.modelId, timeoutMs })
 
 		const report = await runEvaluation({
 			datasetPaths,
 			outputPath,
 			invoker,
-			modelName:
-				modelArg || (isMock ? "mock-eval-model" : "default-agent-model"),
+			modelName: agentInfo.modelId,
+			agentProvider: agentInfo.provider,
+			judgeProvider: judgeConfig.provider,
+			judgeModel: judgeConfig.model,
+			judgeOptions: {
+				preferredProvider: agentInfo.provider.toLowerCase(),
+				mock: isMock,
+			},
 			onCaseStart: (c, idx, total) => {
 				process.stdout.write(
 					`[${idx + 1}/${total}] ${c.id.padEnd(14)} (${c.category}) ... `,
@@ -70,6 +103,8 @@ async function main() {
 		})
 
 		console.log(`\n================ EVALUATION SUMMARY ================`)
+		console.log(`Agent Model : [${agentInfo.provider}] ${agentInfo.modelId}`)
+		console.log(`Judge Model : [${judgeConfig.provider}] ${judgeConfig.model}`)
 		console.log(`Total Cases : ${report.total_cases}`)
 		console.log(
 			`Pass Rate   : ${(report.pass_rate * 100).toFixed(1)}% (${report.passed_count}/${report.total_cases})`,
