@@ -1,629 +1,1956 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>版本更新日志 (Changelog) - My Agent</title>
-  <meta name="description" content="My Agent 版本更新历史、新功能发布记录、重大架构升级与问题修复清单。">
-  <link rel="icon" type="image/svg+xml" href="./assets/icon.svg">
-  <link rel="alternate icon" type="image/png" href="./assets/icon.png">
-  <link rel="stylesheet" href="./assets/style.css">
-</head>
-<body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>版本更新日志 (Changelog) - My Agent</title>
+		<meta
+			name="description"
+			content="My Agent 版本更新历史、新功能发布记录、重大架构升级与问题修复清单。"
+		/>
+		<link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
+		<link rel="alternate icon" type="image/png" href="./assets/icon.png" />
+		<link rel="stylesheet" href="./assets/style.css" />
+	</head>
+	<body>
+		<!-- Top Navigation -->
+		<nav class="navbar">
+			<div class="nav-container">
+				<a href="./index.html" class="brand">
+					<img src="./assets/icon.svg" alt="My Agent Logo" class="brand-icon" />
+					<span class="brand-title">My Agent</span>
+				</a>
 
-  <!-- Top Navigation -->
-  <nav class="navbar">
-    <div class="nav-container">
-      <a href="./index.html" class="brand">
-        <img src="./assets/icon.svg" alt="My Agent Logo" class="brand-icon">
-        <span class="brand-title">My Agent</span>
-      </a>
+				<ul class="nav-links">
+					<li><a href="./index.html#features" class="nav-link">功能特性</a></li>
+					<li>
+						<a href="./index.html#downloads" class="nav-link">客户端下载</a>
+					</li>
+					<li>
+						<a href="./changelog.html" class="nav-link active">更新日志</a>
+					</li>
+					<li>
+						<a href="./index.html#install-guide" class="nav-link">安装指引</a>
+					</li>
+				</ul>
 
-      <ul class="nav-links">
-        <li><a href="./index.html#features" class="nav-link">功能特性</a></li>
-        <li><a href="./index.html#downloads" class="nav-link">客户端下载</a></li>
-        <li><a href="./changelog.html" class="nav-link active">更新日志</a></li>
-        <li><a href="./index.html#install-guide" class="nav-link">安装指引</a></li>
-      </ul>
+				<div style="display: flex; align-items: center; gap: 12px">
+					<a
+						href="https://github.com/kidyfirst/my-agent"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="nav-cta"
+						title="GitHub 源码仓库"
+					>
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+							<path
+								d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+							/>
+						</svg>
+						<span>GitHub</span>
+					</a>
+				</div>
+			</div>
+		</nav>
 
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <a href="https://github.com/kidyfirst/my-agent" target="_blank" rel="noopener noreferrer" class="nav-cta" title="GitHub 源码仓库">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-          <span>GitHub</span>
-        </a>
-      </div>
-    </div>
-  </nav>
+		<!-- Changelog Content -->
+		<main class="changelog-page">
+			<div class="changelog-header">
+				<div>
+					<div class="section-tag">Release Notes</div>
+					<h1
+						style="
+							font-size: 2.25rem;
+							font-weight: 800;
+							letter-spacing: -0.02em;
+							margin-bottom: 8px;
+						"
+					>
+						版本更新日志
+					</h1>
+					<p style="color: var(--text-secondary); font-size: 1rem">
+						记录 My Agent 的每一次架构重构、功能演进与版本迭代。
+					</p>
+				</div>
 
-  <!-- Changelog Content -->
-  <main class="changelog-page">
-    <div class="changelog-header">
-      <div>
-        <div class="section-tag">Release Notes</div>
-        <h1 style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px;">版本更新日志</h1>
-        <p style="color: var(--text-secondary); font-size: 1rem;">记录 My Agent 的每一次架构重构、功能演进与版本迭代。</p>
-      </div>
+				<div style="display: flex; gap: 12px; align-self: flex-end">
+					<a
+						href="./index.html#downloads"
+						class="btn-primary-download"
+						style="padding: 10px 18px; font-size: 0.875rem"
+					>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+							<path
+								d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"
+							/>
+						</svg>
+						<span>下载最新客户端</span>
+					</a>
+					<a
+						href="https://github.com/kidyfirst/my-agent/releases"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="nav-cta"
+						style="padding: 10px 16px"
+					>
+						<span>GitHub Releases 归档</span>
+					</a>
+				</div>
+			</div>
 
-      <div style="display: flex; gap: 12px; align-self: flex-end;">
-        <a href="./index.html#downloads" class="btn-primary-download" style="padding: 10px 18px; font-size: 0.875rem;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
-          </svg>
-          <span>下载最新客户端</span>
-        </a>
-        <a href="https://github.com/kidyfirst/my-agent/releases" target="_blank" rel="noopener noreferrer" class="nav-cta" style="padding: 10px 16px;">
-          <span>GitHub Releases 归档</span>
-        </a>
-      </div>
-    </div>
+			<!-- Timeline Wrapper -->
+			<div id="dynamic-timeline" class="timeline">
+				<!-- Version 0.1.8 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.8</span>
+							<span class="release-date">2026-11-12</span>
+							<span class="badge-latest">Latest</span>
+						</div>
 
-    <!-- Timeline Wrapper -->
-    <div id="dynamic-timeline" class="timeline">
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🧠 上下文管理与 Token 校准 (Context &amp; Token Calibration)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>动态模型上下文窗口与阶梯历史预算</strong>：内置
+									<code>resolveModelContextWindow</code> 与
+									<code>computeMaxHistoryTokens</code
+									>，根据当前底层模型自适应计算安全工作区与保留余量（16k 模型留
+									35%、32k 预算 72%、64k 预算 75%、128k~200k 预算 80%、超大模型
+									256k 封顶），彻底取代单一定值硬编码。
+								</li>
+								<li>
+									<strong>多态与结构感知 Token 分词估算体系</strong>：实现
+									<code>estimateTextTokens</code> 细粒度分词算法，CJK 字符按
+									<code>codePoints / 1.3</code> 精准统计（消除中文低估 3
+									倍问题）；结构化 JSON 及工具 Schema 按
+									<code>asciiChars / 2.85</code> 计算（消除 29%
+									系统性低估）；多模态图片按 1,200 tokens 固定封顶。
+								</li>
+								<li>
+									<strong
+										>零内存分配 JSON 快速探测 (<code>isJsonLike</code>)</strong
+									>：高内聚双指针扫描，准确区分合法 JSON 结构与 Markdown
+									引用及系统提示（如 <code>[System Note:]</code>）。
+								</li>
+								<li>
+									<strong>静态基线隔离与 50/50 EMA 纯对话校准环</strong
+									>：完全剔除静态系统提示词与工具 Schema
+									常量，仅对动态对话及观察摘要应用闭环反馈校准；激活门槛下调至
+									80 tokens，校准比率在语言突变时 1~2 轮内稳定收敛至 1.0 附近。
+								</li>
+								<li>
+									<strong>平滑高水位 Nudge 预警</strong>：当上下文用量进入
+									70%~100%
+									水位时，自动注入非持久化温和预警，引导模型在截断前主动收尾并总结关键代码进展。
+								</li>
+								<li>
+									<strong>持久化可逆折叠与防震荡检索机制</strong
+									>：超出预算时自动打包为 <code>FoldedRange</code> 并持久化至
+									SQLite 元数据；保留末尾 4 条消息免疫保护与首轮目标锚定；开放
+									<code>retrieve_folded_messages</code>
+									只读召回工具，并在再次逼近上限时优先驱逐临时召回记录以杜绝上下文震荡。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.7 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.7</span>
-            <span class="release-date">2026-11-10</span>
-            <span class="badge-latest">Latest</span>
-          </div>
+							<h4 class="release-category-title">
+								💡 深度思维链与交互体验 (Thinking &amp; Execution UX)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>Thinking 结构化引导与智能分段</strong>：注入 Agent
+									Instructions 规范模型思维输出结构；在
+									<code>ExecutionBlock</code>
+									中对思考过程增加智能分段断行与样式支持。
+								</li>
+								<li>
+									<strong>工具执行交错流式渲染</strong
+									>：将全局长链思考拆解并下沉到每一个具体工具执行步骤中，实现更直观的思考/执行交替呈现。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">📚 本地个人知识库 (Personal Library)</h4>
-            <ul class="release-list">
-              <li><strong>个人知识库面板</strong>：新增侧边栏 <code>MY Library</code> 模块，集中管理与索引个人文档、图表、学习资料与多媒体资源，支持推荐、收藏、文件夹、图片等智能分类与全文字符级检索。</li>
-              <li><strong>全格式富文本本地预览</strong>：
-                <ul>
-                  <li><strong>Office 文档原生预览</strong>：完整支持 Word (<code>.docx</code>) 格式排版与段落结构渲染、Excel (<code>.xlsx</code> / <code>.csv</code>) 结构化表格自适应布局、PowerPoint (<code>.pptx</code>) 幻灯片原稿演示。</li>
-                  <li><strong>Chromium PDF 渲染深度修复</strong>：解决 Electron 沙箱与跨源策略拦截 <code>data:application/pdf</code> 造成预览空白的问题，采用同源 <code>Blob URL</code> 桥接 Chromium 原生 PDFium 引擎，实现毫秒级高清渲染与缩放。</li>
-                  <li><strong>代码与标记语言高亮</strong>：完整支持 Markdown、JSON、YAML、TypeScript/JavaScript、Python 等语法高亮与目录提纲索引。</li>
-                  <li><strong>高清图片与视觉解析</strong>：图片文件默认自适应窗口最佳展示（Fit to Window），深度打通模型视觉提取能力。</li>
-                </ul>
-              </li>
-              <li><strong>统一外部应用打开 (Open In)</strong>：梳理整合 OpenIn 操作逻辑，统一提供在 Finder/资源管理器、Cursor、VS Code、Terminal 或系统默认应用中一键定位与打开文件。</li>
-              <li><strong>Agent 上下文智能引用</strong>：内置 <code>query_library</code> 工具，Agent 在多轮推理中能够自动检索并精准引用个人知识库中的文档片段与数据。</li>
-            </ul>
+							<h4 class="release-category-title">
+								🎨 界面组件与图标体系模块化 (UI &amp; Modular Icons)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>模块化 SVG 图标库</strong>：全面重构桌面端内联 SVG
+									为独立的组件化图标（<code>components/icons/</code>），统一规范
+									viewBox、尺寸与样式 tokens。
+								</li>
+								<li>
+									<strong>浏览器面板图标尺寸校准</strong>：还原
+									<code>PanelBrowser</code> 顶部 Tab
+									关闭按钮（9x9）与导航控制按钮（13x13）的精细视觉比例。
+								</li>
+							</ul>
+						</div>
 
-            <h4 class="release-category-title">🎨 界面体验优化 (UI Polish)</h4>
-            <ul class="release-list">
-              <li><strong>预览工具栏去冗余</strong>：精简 Word、PPT、图片等模态框顶部冗余的切换按钮行，默认呈现自适应窗口的最佳阅读视图。</li>
-              <li><strong>特性主站与文档升级</strong>：官方 Landing Page 同步更新产品全景工作台主图，新增本地知识库核心特性卡片与双语介绍。</li>
-            </ul>
+						<div class="release-assets-box">
+							<div class="assets-title">📦 下载安装包 (Release Assets)</div>
+							<div class="assets-chips">
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-arm64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-mac-arm64.dmg</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-arm64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-mac-arm64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-x64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-mac-x64.dmg</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-mac-x64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-win-x64.exe"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-win-x64.exe</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-win-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-win-x64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-linux-x86_64.AppImage"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-linux-x86_64.AppImage</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-linux-amd64.deb"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.8-linux-amd64.deb</span>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            <h4 class="release-category-title">🛠️ 发布与稳定性修复 (Release &amp; Fixes)</h4>
-            <ul class="release-list">
-              <li><strong>修复版本号回退 Bug</strong>：彻底解决 GitHub API 匿名限频（403）或网络波动时，前端客户端脚本因硬编码 fallback 导致版本号意外覆盖回退到 0.1.1 的历史问题。</li>
-              <li><strong>发布脚本全链路同步</strong>：完善 <code>update-readme-release.js</code>，保证版本号与多平台安装包映射在各端及自动化脚本中全局同步。</li>
-            </ul>
-          </div>
+				<!-- Version 0.1.7 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.7</span>
+							<span class="release-date">2026-11-10</span>
+						</div>
 
-          <div class="release-assets-box">
-            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
-            <div class="assets-chips">
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-mac-arm64.dmg</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-mac-arm64.zip</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-mac-x64.dmg</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-mac-x64.zip</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.exe" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-win-x64.exe</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-win-x64.zip</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-x86_64.AppImage" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-linux-x86_64.AppImage</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-amd64.deb" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.7-linux-amd64.deb</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								📚 本地个人知识库 (Personal Library)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>个人知识库面板</strong>：新增侧边栏
+									<code>MY Library</code>
+									模块，集中管理与索引个人文档、图表、学习资料与多媒体资源，支持推荐、收藏、文件夹、图片等智能分类与全文字符级检索。
+								</li>
+								<li>
+									<strong>全格式富文本本地预览</strong>：
+									<ul>
+										<li>
+											<strong>Office 文档原生预览</strong>：完整支持 Word
+											(<code>.docx</code>) 格式排版与段落结构渲染、Excel (<code
+												>.xlsx</code
+											>
+											/ <code>.csv</code>) 结构化表格自适应布局、PowerPoint
+											(<code>.pptx</code>) 幻灯片原稿演示。
+										</li>
+										<li>
+											<strong>Chromium PDF 渲染深度修复</strong>：解决 Electron
+											沙箱与跨源策略拦截
+											<code>data:application/pdf</code>
+											造成预览空白的问题，采用同源 <code>Blob URL</code> 桥接
+											Chromium 原生 PDFium 引擎，实现毫秒级高清渲染与缩放。
+										</li>
+										<li>
+											<strong>代码与标记语言高亮</strong>：完整支持
+											Markdown、JSON、YAML、TypeScript/JavaScript、Python
+											等语法高亮与目录提纲索引。
+										</li>
+										<li>
+											<strong>高清图片与视觉解析</strong
+											>：图片文件默认自适应窗口最佳展示（Fit to
+											Window），深度打通模型视觉提取能力。
+										</li>
+									</ul>
+								</li>
+								<li>
+									<strong>统一外部应用打开 (Open In)</strong>：梳理整合 OpenIn
+									操作逻辑，统一提供在 Finder/资源管理器、Cursor、VS
+									Code、Terminal 或系统默认应用中一键定位与打开文件。
+								</li>
+								<li>
+									<strong>Agent 上下文智能引用</strong>：内置
+									<code>query_library</code> 工具，Agent
+									在多轮推理中能够自动检索并精准引用个人知识库中的文档片段与数据。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.6 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.6</span>
-            <span class="release-date">2026-11-06</span>
-          </div>
+							<h4 class="release-category-title">
+								🎨 界面体验优化 (UI Polish)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>预览工具栏去冗余</strong>：精简
+									Word、PPT、图片等模态框顶部冗余的切换按钮行，默认呈现自适应窗口的最佳阅读视图。
+								</li>
+								<li>
+									<strong>特性主站与文档升级</strong>：官方 Landing Page
+									同步更新产品全景工作台主图，新增本地知识库核心特性卡片与双语介绍。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">🧠 观察式记忆真正生效 (Observational Memory)</h4>
-            <ul class="release-list">
-              <li><strong>四处静默失效一次修完</strong>：记录写入时 <code>ON CONFLICT</code> 只更新三列，第二次观察就把前一次的 <code>observedMessageIds</code>、<code>generationCount</code> 与缓冲全部丢弃——OM 在首次成功之后彻底失效，且不报任何错。读写与并发三条路径对 <code>resourceId</code> 的归一化各不相同（<code>""</code> / <code>null</code> / 原始 <code>undefined</code>），拼出的查找键互不相同，记录写进去便再也读不回来。</li>
-              <li><strong>缓冲是延迟而非丢弃</strong>：<code>bufferActivation</code> 改为按整行切分的绝对 token 预算，未激活部分存进 <code>bufferedObservations</code> 列，下次越线时合并激活。原先按字符硬切会把一条事实劈成两半，两半都不可用。</li>
-              <li><strong>并发写入加乐观锁</strong>：两轮请求同时越线会互相覆盖观察到的消息列表，同一批对话被反复观察、日志不断膨胀。以 <code>generationCount</code> 做 CAS 串行化写入，且在调用 Observer 模型<strong>之前</strong>抢占，避免抢占失败的一方白付一次模型调用。</li>
-              <li><strong>进度上报补全</strong>：<code>loadOMProgress()</code> 原先返回空对象，token 追踪器读到的字段始终缺失，组件因此永久隐藏。现在返回真实阈值与进度，从未触发过观察的会话也能显示距离触发还有多远。</li>
-            </ul>
+							<h4 class="release-category-title">
+								🛠️ 发布与稳定性修复 (Release &amp; Fixes)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>修复版本号回退 Bug</strong>：彻底解决 GitHub API
+									匿名限频（403）或网络波动时，前端客户端脚本因硬编码 fallback
+									导致版本号意外覆盖回退到 0.1.1 的历史问题。
+								</li>
+								<li>
+									<strong>发布脚本全链路同步</strong>：完善
+									<code>update-readme-release.js</code
+									>，保证版本号与多平台安装包映射在各端及自动化脚本中全局同步。
+								</li>
+							</ul>
+						</div>
 
-            <h4 class="release-category-title">📎 附件改为资源引用 (Asset-backed Attachments)</h4>
-            <ul class="release-list">
-              <li><strong>不再把 base64 塞进消息体</strong>：图片附件写入 <code>&lt;projectRoot&gt;/.myagent/assets</code>，消息里只保留 <code>assetId</code> 与 <code>url</code>。此前每次重放对话都要连带搬运整份图片数据，主进程还得全程驻留内存。</li>
-            </ul>
+						<div class="release-assets-box">
+							<div class="assets-title">📦 下载安装包 (Release Assets)</div>
+							<div class="assets-chips">
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-mac-arm64.dmg</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-arm64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-mac-arm64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-mac-x64.dmg</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-mac-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-mac-x64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.exe"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-win-x64.exe</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-win-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-win-x64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-x86_64.AppImage"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-linux-x86_64.AppImage</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.7/my-agent-0.1.7-linux-amd64.deb"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.7-linux-amd64.deb</span>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            <h4 class="release-category-title">📌 项目级约定跨会话持久化 (Project Memory)</h4>
-            <ul class="release-list">
-              <li><strong>记住这个仓库的规矩</strong>：偏好、约定与架构说明存入 <code>.myagent/project-context.json</code>，较长的规范放在 <code>rules/*.md</code>，全部是 Git 友好的文本，队友拉取即继承。此前每开一个新会话都得重新交代「用 pnpm」「共享组件放 components/ui」。</li>
-            </ul>
+				<!-- Version 0.1.6 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.6</span>
+							<span class="release-date">2026-11-06</span>
+						</div>
 
-            <h4 class="release-category-title">🔍 全链路 Trace (Trace Correlation)</h4>
-            <ul class="release-list">
-              <li><strong>一行日志就能回溯到根因</strong>：基于 <code>AsyncLocalStorage</code> 的 trace 上下文让数百处既有日志调用点无需改动即可带上 <code>traceId</code> / <code>spanId</code>，从用户看到的报错一路走回具体那次工具调用。</li>
-            </ul>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🧠 观察式记忆真正生效 (Observational Memory)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>四处静默失效一次修完</strong>：记录写入时
+									<code>ON CONFLICT</code> 只更新三列，第二次观察就把前一次的
+									<code>observedMessageIds</code>、<code>generationCount</code>
+									与缓冲全部丢弃——OM
+									在首次成功之后彻底失效，且不报任何错。读写与并发三条路径对
+									<code>resourceId</code> 的归一化各不相同（<code>""</code> /
+									<code>null</code> / 原始
+									<code>undefined</code
+									>），拼出的查找键互不相同，记录写进去便再也读不回来。
+								</li>
+								<li>
+									<strong>缓冲是延迟而非丢弃</strong>：<code
+										>bufferActivation</code
+									>
+									改为按整行切分的绝对 token 预算，未激活部分存进
+									<code>bufferedObservations</code>
+									列，下次越线时合并激活。原先按字符硬切会把一条事实劈成两半，两半都不可用。
+								</li>
+								<li>
+									<strong>并发写入加乐观锁</strong
+									>：两轮请求同时越线会互相覆盖观察到的消息列表，同一批对话被反复观察、日志不断膨胀。以
+									<code>generationCount</code> 做 CAS 串行化写入，且在调用
+									Observer
+									模型<strong>之前</strong>抢占，避免抢占失败的一方白付一次模型调用。
+								</li>
+								<li>
+									<strong>进度上报补全</strong>：<code>loadOMProgress()</code>
+									原先返回空对象，token
+									追踪器读到的字段始终缺失，组件因此永久隐藏。现在返回真实阈值与进度，从未触发过观察的会话也能显示距离触发还有多远。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">⚡ Prompt 缓存脱离单一 provider (Prompt Caching)</h4>
-            <ul class="release-list">
-              <li><strong>任何 provider 都能吃到缓存</strong>：缓存断点原先写死在 Claude Max provider 内部，其他路径享受不到，也无法脱离整个 provider 单独测试。抽出为 provider 无关的中间件并补上测试，Anthropic 与 Google 均可挂载；工具的确定性排序一并迁入——schema 哈希在轮次间漂移会静默让缓存全部失效。</li>
-            </ul>
+							<h4 class="release-category-title">
+								📎 附件改为资源引用 (Asset-backed Attachments)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>不再把 base64 塞进消息体</strong>：图片附件写入
+									<code>&lt;projectRoot&gt;/.myagent/assets</code>，消息里只保留
+									<code>assetId</code> 与
+									<code>url</code
+									>。此前每次重放对话都要连带搬运整份图片数据，主进程还得全程驻留内存。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🧭 长会话任务跳转 (Task Navigator)</h4>
-            <ul class="release-list">
-              <li><strong>几百条消息里直接跳回某一次请求</strong>：会话右侧新增任务导航条，索引每个用户轮次并支持点击跳转，滚动时自动高亮当前任务。此前长会话中任务列表滚出视野，想找一条早期请求只能一路手动翻滚。</li>
-            </ul>
+							<h4 class="release-category-title">
+								📌 项目级约定跨会话持久化 (Project Memory)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>记住这个仓库的规矩</strong>：偏好、约定与架构说明存入
+									<code>.myagent/project-context.json</code>，较长的规范放在
+									<code>rules/*.md</code>，全部是 Git
+									友好的文本，队友拉取即继承。此前每开一个新会话都得重新交代「用
+									pnpm」「共享组件放 components/ui」。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🔒 计划模式不再能执行命令 (Plan Mode Toolset)</h4>
-            <ul class="release-list">
-              <li><strong>堵住一次越权</strong>：<code>execute_command</code> 原本被列进 <code>READ_TOOL_NAMES</code>，因此「只读」的计划模式也能跑任意 shell——足够在计划批准之前就 <code>git commit</code> 和 <code>git push</code>。它是否只读完全取决于命令行内容，任何按名字分类的清单都无法判定安全，现单独拆出只发给可写模式。</li>
-            </ul>
+							<h4 class="release-category-title">
+								🔍 全链路 Trace (Trace Correlation)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>一行日志就能回溯到根因</strong>：基于
+									<code>AsyncLocalStorage</code> 的 trace
+									上下文让数百处既有日志调用点无需改动即可带上
+									<code>traceId</code> /
+									<code>spanId</code
+									>，从用户看到的报错一路走回具体那次工具调用。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🧩 其它打磨 (Polish)</h4>
-            <ul class="release-list">
-              <li>任务导航条的悬浮阴影改用统一的 <code>--shadow-popover</code> token，修正深色模式下的偏差。</li>
-              <li>README 澄清 <code>bufferActivation</code> 是绝对 token 数而非比例，并如实标注 <code>reflection.*</code> 配置当前尚未生效。</li>
-            </ul>
-          </div>
+							<h4 class="release-category-title">
+								⚡ Prompt 缓存脱离单一 provider (Prompt Caching)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>任何 provider 都能吃到缓存</strong
+									>：缓存断点原先写死在 Claude Max provider
+									内部，其他路径享受不到，也无法脱离整个 provider
+									单独测试。抽出为 provider 无关的中间件并补上测试，Anthropic 与
+									Google 均可挂载；工具的确定性排序一并迁入——schema
+									哈希在轮次间漂移会静默让缓存全部失效。
+								</li>
+							</ul>
 
-          <div class="release-assets-box">
-            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
-            <div class="assets-chips">
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-arm64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-mac-arm64.dmg</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-arm64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-mac-arm64.zip</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-x64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-mac-x64.dmg</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-mac-x64.zip</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-win-x64.exe" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-win-x64.exe</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-win-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-win-x64.zip</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-linux-x86_64.AppImage" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-linux-x86_64.AppImage</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-linux-amd64.deb" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.6-linux-amd64.deb</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								🧭 长会话任务跳转 (Task Navigator)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>几百条消息里直接跳回某一次请求</strong
+									>：会话右侧新增任务导航条，索引每个用户轮次并支持点击跳转，滚动时自动高亮当前任务。此前长会话中任务列表滚出视野，想找一条早期请求只能一路手动翻滚。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.5 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.5</span>
-            <span class="release-date">2026-11-05</span>
-          </div>
+							<h4 class="release-category-title">
+								🔒 计划模式不再能执行命令 (Plan Mode Toolset)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>堵住一次越权</strong>：<code>execute_command</code>
+									原本被列进
+									<code>READ_TOOL_NAMES</code>，因此「只读」的计划模式也能跑任意
+									shell——足够在计划批准之前就 <code>git commit</code> 和
+									<code>git push</code
+									>。它是否只读完全取决于命令行内容，任何按名字分类的清单都无法判定安全，现单独拆出只发给可写模式。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">🗂️ 右侧栏全面 Tab 化 (Tabbed Right Sidebar)</h4>
-            <ul class="release-list">
-              <li><strong>五个面板并列成 tab</strong>：Files / Review / Terminal / Browser / Overview 收进同一条 tab 条，支持拖拽调宽；每个会话独立记忆自己开着哪些 tab、是否可见、是否最大化，切回来就是离开时的样子。</li>
-              <li><strong>最大化与隐藏</strong>：右上角新增两个图标——最大化用 <code>flex-basis</code> 插值动画向左铺满会话区（<code>⇧⌘M</code> 同效），再点还原；隐藏按钮位于面板右缘，面板收起后由会话窗口右侧的按钮接回，两处互斥不重叠。</li>
-              <li><strong>Overview 下拉菜单脱离裁剪</strong>：菜单改为 portal 到 <code>body</code> + <code>position: fixed</code>，不再被 38px 高、带 <code>overflow: hidden</code> 的标题栏切掉。</li>
-            </ul>
+							<h4 class="release-category-title">🧩 其它打磨 (Polish)</h4>
+							<ul class="release-list">
+								<li>
+									任务导航条的悬浮阴影改用统一的
+									<code>--shadow-popover</code> token，修正深色模式下的偏差。
+								</li>
+								<li>
+									README 澄清 <code>bufferActivation</code> 是绝对 token
+									数而非比例，并如实标注
+									<code>reflection.*</code> 配置当前尚未生效。
+								</li>
+							</ul>
+						</div>
 
-            <h4 class="release-category-title">🌐 内嵌浏览器面板 (Embedded Browser Panel)</h4>
-            <ul class="release-list">
-              <li><strong>webview 多标签</strong>：Browser tab 内自带标签条，agent 导航时自动接管跟随页或新开一页，用户手动打开的页面不会被 agent 覆盖。</li>
-              <li><strong>快照卡改在面板内打开</strong>：computer use 快照卡右上角按钮不再唤起系统浏览器，而是把 URL 送到右侧 Browser 面板；隐藏的 webview 用 <code>visibility</code> 保活，重新显示不会白屏。</li>
-            </ul>
+						<div class="release-assets-box">
+							<div class="assets-title">📦 下载安装包 (Release Assets)</div>
+							<div class="assets-chips">
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-arm64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-mac-arm64.dmg</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-arm64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-mac-arm64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-x64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-mac-x64.dmg</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-mac-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-mac-x64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-win-x64.exe"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-win-x64.exe</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-win-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-win-x64.zip</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-linux-x86_64.AppImage"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-linux-x86_64.AppImage</span>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.6/my-agent-0.1.6-linux-amd64.deb"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.6-linux-amd64.deb</span>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            <h4 class="release-category-title">🖱️ Computer Use 重写为纯函数工具 (Text-first Computer Use)</h4>
-            <ul class="release-list">
-              <li><strong>所有 provider 都能调用</strong>：放弃只被部分厂商识别的 provider 定义式 computer tool，改造成普通 function tool，DeepSeek 等模型同样可以驱动浏览器，并重新走统一的审批与 <code>tool_start</code> / <code>tool_end</code> 事件。</li>
-              <li><strong><code>screenshot</code> 返回文本快照</strong>：遍历 DOM 取出最多 120 个可交互元素（编号 + 中心点坐标 + 可见文本），而不是把 base64 图片塞进 tool result 里烧 token。</li>
-              <li><strong>动作帧另行推送</strong>：每次动作后把 JPEG 帧镜像到桌面端预览卡（400ms 节流、无订阅者不拍、异常不影响工具执行）。</li>
-            </ul>
+				<!-- Version 0.1.5 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.5</span>
+							<span class="release-date">2026-11-05</span>
+						</div>
 
-            <h4 class="release-category-title">⌨️ 快捷键与标题栏提示 (Shortcuts & Tooltips)</h4>
-            <ul class="release-list">
-              <li><strong>自定义快捷键气泡</strong>：左侧栏 <code>⌘B</code>、右侧面板 <code>⇧⌘B</code>、会话搜索 <code>⌘K</code>、命令面板 <code>⇧⌘P</code>、Overview <code>⌥⌘O</code>，hover 即显示「动作 + 键位」；同步写入 Electron 菜单 accelerator，避免菜单抢占后收不到按键。</li>
-              <li><strong>光标语义修正</strong>：会话标题只在点击真能切回对话时才显示手型，会话已在前台时是普通箭头。</li>
-            </ul>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🗂️ 右侧栏全面 Tab 化 (Tabbed Right Sidebar)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>五个面板并列成 tab</strong>：Files / Review / Terminal
+									/ Browser / Overview 收进同一条 tab
+									条，支持拖拽调宽；每个会话独立记忆自己开着哪些
+									tab、是否可见、是否最大化，切回来就是离开时的样子。
+								</li>
+								<li>
+									<strong>最大化与隐藏</strong>：右上角新增两个图标——最大化用
+									<code>flex-basis</code> 插值动画向左铺满会话区（<code
+										>⇧⌘M</code
+									>
+									同效），再点还原；隐藏按钮位于面板右缘，面板收起后由会话窗口右侧的按钮接回，两处互斥不重叠。
+								</li>
+								<li>
+									<strong>Overview 下拉菜单脱离裁剪</strong>：菜单改为 portal 到
+									<code>body</code> + <code>position: fixed</code>，不再被 38px
+									高、带 <code>overflow: hidden</code> 的标题栏切掉。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🧩 其它打磨 (Polish)</h4>
-            <ul class="release-list">
-              <li>Terminal 收敛为单 shell，去掉整条 header 与 tab；移除 xterm 6 自带的 SmoothScrollableElement 滚动条。</li>
-              <li>diff 头部改用统一的 <code>Open in…</code> 下拉，不再各自实现一套。</li>
-              <li>文件与会话 tab 不再换行，超长省略并在 hover 时给出完整路径。</li>
-              <li>Subagent 迁移到多核 worker thread 模型，重文件与检索类工具离线执行，主进程不再掉帧。</li>
-            </ul>
-          </div>
+							<h4 class="release-category-title">
+								🌐 内嵌浏览器面板 (Embedded Browser Panel)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>webview 多标签</strong>：Browser tab
+									内自带标签条，agent
+									导航时自动接管跟随页或新开一页，用户手动打开的页面不会被 agent
+									覆盖。
+								</li>
+								<li>
+									<strong>快照卡改在面板内打开</strong>：computer use
+									快照卡右上角按钮不再唤起系统浏览器，而是把 URL 送到右侧
+									Browser 面板；隐藏的 webview 用
+									<code>visibility</code> 保活，重新显示不会白屏。
+								</li>
+							</ul>
 
-          <div class="release-assets-box">
-            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
-            <div class="assets-chips">
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-mac-arm64.dmg</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(159.4 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-mac-arm64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(152.7 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-mac-x64.dmg</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(164.5 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-mac-x64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(157.8 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.exe" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-win-x64.exe</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(138.2 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-win-x64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(188.1 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-x86_64.AppImage" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-linux-x86_64.AppImage</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(165.0 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-amd64.deb" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.5-linux-amd64.deb</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(124.9 MB)</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								🖱️ Computer Use 重写为纯函数工具 (Text-first Computer Use)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>所有 provider 都能调用</strong
+									>：放弃只被部分厂商识别的 provider 定义式 computer
+									tool，改造成普通 function tool，DeepSeek
+									等模型同样可以驱动浏览器，并重新走统一的审批与
+									<code>tool_start</code> / <code>tool_end</code> 事件。
+								</li>
+								<li>
+									<strong><code>screenshot</code> 返回文本快照</strong>：遍历
+									DOM 取出最多 120 个可交互元素（编号 + 中心点坐标 +
+									可见文本），而不是把 base64 图片塞进 tool result 里烧 token。
+								</li>
+								<li>
+									<strong>动作帧另行推送</strong>：每次动作后把 JPEG
+									帧镜像到桌面端预览卡（400ms
+									节流、无订阅者不拍、异常不影响工具执行）。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.4 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.4</span>
-            <span class="release-date">2026-11-03</span>
-          </div>
+							<h4 class="release-category-title">
+								⌨️ 快捷键与标题栏提示 (Shortcuts & Tooltips)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>自定义快捷键气泡</strong>：左侧栏
+									<code>⌘B</code>、右侧面板 <code>⇧⌘B</code>、会话搜索
+									<code>⌘K</code>、命令面板 <code>⇧⌘P</code>、Overview
+									<code>⌥⌘O</code>，hover 即显示「动作 + 键位」；同步写入
+									Electron 菜单 accelerator，避免菜单抢占后收不到按键。
+								</li>
+								<li>
+									<strong>光标语义修正</strong
+									>：会话标题只在点击真能切回对话时才显示手型，会话已在前台时是普通箭头。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">🏗️ Monorepo 架构重构 (Monorepo Refactor)</h4>
-            <ul class="release-list">
-              <li>代码库拆分为 <code>packages/core</code>（调度引擎与工具）、<code>packages/a2a</code>（A2A 协议）、<code>packages/cli</code>（守护进程）与 <code>apps/desktop</code>（Electron 客户端），移除遗留的根 <code>src/</code>，各端共享同一套核心。</li>
-            </ul>
+							<h4 class="release-category-title">🧩 其它打磨 (Polish)</h4>
+							<ul class="release-list">
+								<li>
+									Terminal 收敛为单 shell，去掉整条 header 与 tab；移除 xterm 6
+									自带的 SmoothScrollableElement 滚动条。
+								</li>
+								<li>
+									diff 头部改用统一的
+									<code>Open in…</code> 下拉，不再各自实现一套。
+								</li>
+								<li>
+									文件与会话 tab 不再换行，超长省略并在 hover 时给出完整路径。
+								</li>
+								<li>
+									Subagent 迁移到多核 worker thread
+									模型，重文件与检索类工具离线执行，主进程不再掉帧。
+								</li>
+							</ul>
+						</div>
 
-            <h4 class="release-category-title">🔐 工具授权重设计 (Tool Approval Redesign)</h4>
-            <ul class="release-list">
-              <li>授权请求从对话框改为内联卡片，支持一次性 / 会话内 / 项目级多档作用域；审批记录落 SQLite 审计表，可回溯。</li>
-              <li>Electron 由 40 升级至 45，随之上调原生能力与安全基线。</li>
-            </ul>
+						<div class="release-assets-box">
+							<div class="assets-title">📦 下载安装包 (Release Assets)</div>
+							<div class="assets-chips">
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-mac-arm64.dmg</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(159.4 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-arm64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-mac-arm64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(152.7 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-mac-x64.dmg</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(164.5 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-mac-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-mac-x64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(157.8 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.exe"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-win-x64.exe</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(138.2 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-win-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-win-x64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(188.1 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-x86_64.AppImage"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-linux-x86_64.AppImage</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(165.0 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.5/my-agent-0.1.5-linux-amd64.deb"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.5-linux-amd64.deb</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(124.9 MB)</span
+									>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            <h4 class="release-category-title">🤖 多 Agent 与 Subagent (Multi-Agent)</h4>
-            <ul class="release-list">
-              <li><code>subagent</code> 工具接入动态工具集与 harness，按角色派发独立上下文与工具子集。</li>
-              <li>执行卡重做：应用重启后仍能从持久化的 <code>&lt;subagent-meta&gt;</code> 标签还原工具调用历史、模型与耗时。</li>
-            </ul>
+				<!-- Version 0.1.4 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.4</span>
+							<span class="release-date">2026-11-03</span>
+						</div>
 
-            <h4 class="release-category-title">🎛️ 运行期纠偏与稳定性 (Steering & Stability)</h4>
-            <ul class="release-list">
-              <li><strong>Steering</strong>：工具审批期间与任务运行期间都可插入 steering prompt，不必中断再重开一轮。</li>
-              <li><strong>流式看门狗</strong>：连续 120s 无增量即判定为死流并显式失败，避免「服务繁忙」这类只建连不响应的服务把任务挂死；工具执行期间自动停表，不会误杀长时间运行的 subagent。</li>
-            </ul>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🏗️ Monorepo 架构重构 (Monorepo Refactor)
+							</h4>
+							<ul class="release-list">
+								<li>
+									代码库拆分为
+									<code>packages/core</code
+									>（调度引擎与工具）、<code>packages/a2a</code>（A2A
+									协议）、<code>packages/cli</code>（守护进程）与
+									<code>apps/desktop</code>（Electron 客户端），移除遗留的根
+									<code>src/</code>，各端共享同一套核心。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🐛 修复与体验 (Fixes & UX)</h4>
-            <ul class="release-list">
-              <li>任务结束后未清除 <code>isStreaming</code>，导致时间戳与反馈按钮消失。</li>
-              <li>审批卡中的长命令改为中间截断，作用域后缀始终可见。</li>
-              <li>thinking 滑块旋钮垂直居中，激活填充延伸到旋钮右缘。</li>
-              <li>DeepSeek 图片 part 被序列化成 <code>[object Object]</code>、base64 data URL 格式错误。</li>
-              <li>A2A 项目操作与桌面会话切换、侧边栏刷新联动。</li>
-              <li>聊天区新增 sticky header 渐隐、底部渐隐与「回到最新」按钮。</li>
-            </ul>
-          </div>
+							<h4 class="release-category-title">
+								🔐 工具授权重设计 (Tool Approval Redesign)
+							</h4>
+							<ul class="release-list">
+								<li>
+									授权请求从对话框改为内联卡片，支持一次性 / 会话内 /
+									项目级多档作用域；审批记录落 SQLite 审计表，可回溯。
+								</li>
+								<li>Electron 由 40 升级至 45，随之上调原生能力与安全基线。</li>
+							</ul>
 
-          <div class="release-assets-box">
-            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
-            <div class="assets-chips">
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-arm64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-mac-arm64.dmg</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(159.4 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-arm64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-mac-arm64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(152.7 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-x64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-mac-x64.dmg</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(164.5 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-mac-x64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(157.8 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-win-x64.exe" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-win-x64.exe</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(138.1 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-win-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-win-x64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(188.1 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-linux-x86_64.AppImage" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-linux-x86_64.AppImage</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(165.0 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-linux-amd64.deb" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.4-linux-amd64.deb</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(124.4 MB)</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								🤖 多 Agent 与 Subagent (Multi-Agent)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<code>subagent</code> 工具接入动态工具集与
+									harness，按角色派发独立上下文与工具子集。
+								</li>
+								<li>
+									执行卡重做：应用重启后仍能从持久化的
+									<code>&lt;subagent-meta&gt;</code>
+									标签还原工具调用历史、模型与耗时。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.3 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.3</span>
-            <span class="release-date">2026-11-02</span>
-          </div>
+							<h4 class="release-category-title">
+								🎛️ 运行期纠偏与稳定性 (Steering & Stability)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>Steering</strong>：工具审批期间与任务运行期间都可插入
+									steering prompt，不必中断再重开一轮。
+								</li>
+								<li>
+									<strong>流式看门狗</strong>：连续 120s
+									无增量即判定为死流并显式失败，避免「服务繁忙」这类只建连不响应的服务把任务挂死；工具执行期间自动停表，不会误杀长时间运行的
+									subagent。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">↩️ 任务回滚 (Task Rollback)</h4>
-            <ul class="release-list">
-              <li>任务开始时对工作区打 git tree 快照作为基线，中断后可在提示条上直接回滚：新增文件删除，被改动或删除的文件还原到基线内容；基线状态持久化到 <code>active-baselines.json</code>，重启后仍可回滚。</li>
-            </ul>
+							<h4 class="release-category-title">🐛 修复与体验 (Fixes & UX)</h4>
+							<ul class="release-list">
+								<li>
+									任务结束后未清除
+									<code>isStreaming</code>，导致时间戳与反馈按钮消失。
+								</li>
+								<li>审批卡中的长命令改为中间截断，作用域后缀始终可见。</li>
+								<li>thinking 滑块旋钮垂直居中，激活填充延伸到旋钮右缘。</li>
+								<li>
+									DeepSeek 图片 part 被序列化成
+									<code>[object Object]</code>、base64 data URL 格式错误。
+								</li>
+								<li>A2A 项目操作与桌面会话切换、侧边栏刷新联动。</li>
+								<li>
+									聊天区新增 sticky header 渐隐、底部渐隐与「回到最新」按钮。
+								</li>
+							</ul>
+						</div>
 
-            <h4 class="release-category-title">🧠 多线程执行稳定性 (Multi-thread Stability)</h4>
-            <ul class="release-list">
-              <li>控制器引入按线程的运行表与串行队列，<code>abort</code> 支持只终止指定线程；侧边栏会话行显示运行中与「等待工具授权」徽标，多个线程并行时状态不再互相覆盖。</li>
-            </ul>
+						<div class="release-assets-box">
+							<div class="assets-title">📦 下载安装包 (Release Assets)</div>
+							<div class="assets-chips">
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-arm64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-mac-arm64.dmg</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(159.4 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-arm64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-mac-arm64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(152.7 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-x64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-mac-x64.dmg</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(164.5 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-mac-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-mac-x64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(157.8 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-win-x64.exe"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-win-x64.exe</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(138.1 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-win-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-win-x64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(188.1 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-linux-x86_64.AppImage"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-linux-x86_64.AppImage</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(165.0 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.4/my-agent-0.1.4-linux-amd64.deb"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.4-linux-amd64.deb</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(124.4 MB)</span
+									>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            <h4 class="release-category-title">🛡️ 退出保护 (Window Close Safety)</h4>
-            <ul class="release-list">
-              <li>有任务正在执行时关闭窗口或退出应用，会先弹确认框，可选「继续等待」或「终止任务并退出」；后者先 abort 所有运行中的 harness 再退出。</li>
-            </ul>
+				<!-- Version 0.1.3 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.3</span>
+							<span class="release-date">2026-11-02</span>
+						</div>
 
-            <h4 class="release-category-title">🌐 Provider 列表健壮性 (Provider Catalog Robustness)</h4>
-            <ul class="release-list">
-              <li>models.dev 与 Netlify AI Gateway 的模型目录拉取加 10s 超时与结构容错，网络异常时降级为空目录，而不是抛错阻塞启动。</li>
-            </ul>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								↩️ 任务回滚 (Task Rollback)
+							</h4>
+							<ul class="release-list">
+								<li>
+									任务开始时对工作区打 git tree
+									快照作为基线，中断后可在提示条上直接回滚：新增文件删除，被改动或删除的文件还原到基线内容；基线状态持久化到
+									<code>active-baselines.json</code>，重启后仍可回滚。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🐛 修复 (Fixes)</h4>
-            <ul class="release-list">
-              <li>执行上下文不再泄漏到模型自行构造的 tool 参数里。</li>
-              <li>提示词补充：URL 之后的标点应放在链接之外。</li>
-            </ul>
-          </div>
+							<h4 class="release-category-title">
+								🧠 多线程执行稳定性 (Multi-thread Stability)
+							</h4>
+							<ul class="release-list">
+								<li>
+									控制器引入按线程的运行表与串行队列，<code>abort</code>
+									支持只终止指定线程；侧边栏会话行显示运行中与「等待工具授权」徽标，多个线程并行时状态不再互相覆盖。
+								</li>
+							</ul>
 
-          <div class="release-assets-box">
-            <div class="assets-title">📦 下载安装包 (Release Assets)</div>
-            <div class="assets-chips">
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-arm64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-mac-arm64.dmg</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(151.3 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-arm64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-mac-arm64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(144.5 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-x64.dmg" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-mac-x64.dmg</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(156.9 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-mac-x64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(150.0 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-win-x64.exe" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-win-x64.exe</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(120.1 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-win-x64.zip" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-win-x64.zip</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(168.6 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-linux-x86_64.AppImage" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-linux-x86_64.AppImage</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(156.1 MB)</span>
-              </a>
-              <a href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-linux-amd64.deb" class="asset-chip" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>my-agent-0.1.3-linux-amd64.deb</span>
-                <span style="color:var(--text-muted);font-size:0.75rem;">(114.7 MB)</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								🛡️ 退出保护 (Window Close Safety)
+							</h4>
+							<ul class="release-list">
+								<li>
+									有任务正在执行时关闭窗口或退出应用，会先弹确认框，可选「继续等待」或「终止任务并退出」；后者先
+									abort 所有运行中的 harness 再退出。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.2 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.2</span>
-            <span class="release-date">2026-10-30</span>
-          </div>
+							<h4 class="release-category-title">
+								🌐 Provider 列表健壮性 (Provider Catalog Robustness)
+							</h4>
+							<ul class="release-list">
+								<li>
+									models.dev 与 Netlify AI Gateway 的模型目录拉取加 10s
+									超时与结构容错，网络异常时降级为空目录，而不是抛错阻塞启动。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">🧭 三种执行模式 (Execution Modes)</h4>
-            <ul class="release-list">
-              <li>新增 ReAct / Plan &amp; Solve / Fast 三档执行模式，统一跑在可组合的 graph 调度器上；Fast 模式用只读工具子集换取更短的往返，每个线程各自维护模式与记忆。</li>
-            </ul>
+							<h4 class="release-category-title">🐛 修复 (Fixes)</h4>
+							<ul class="release-list">
+								<li>执行上下文不再泄漏到模型自行构造的 tool 参数里。</li>
+								<li>提示词补充：URL 之后的标点应放在链接之外。</li>
+							</ul>
+						</div>
 
-            <h4 class="release-category-title">⏺️ 会话录制与离线回放 (Session Recording &amp; Replay)</h4>
-            <ul class="release-list">
-              <li>完整记录一次会话的事件流，可在没有模型、没有网络的情况下回放，用于复现问题与调试；录制器支持重复回放与逐段跳读。</li>
-            </ul>
+						<div class="release-assets-box">
+							<div class="assets-title">📦 下载安装包 (Release Assets)</div>
+							<div class="assets-chips">
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-arm64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-mac-arm64.dmg</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(151.3 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-arm64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-mac-arm64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(144.5 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-x64.dmg"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-mac-x64.dmg</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(156.9 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-mac-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-mac-x64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(150.0 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-win-x64.exe"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-win-x64.exe</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(120.1 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-win-x64.zip"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-win-x64.zip</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(168.6 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-linux-x86_64.AppImage"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-linux-x86_64.AppImage</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(156.1 MB)</span
+									>
+								</a>
+								<a
+									href="https://github.com/kidyfirst/my-agent/releases/download/v0.1.3/my-agent-0.1.3-linux-amd64.deb"
+									class="asset-chip"
+									download
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									<span>my-agent-0.1.3-linux-amd64.deb</span>
+									<span style="color: var(--text-muted); font-size: 0.75rem"
+										>(114.7 MB)</span
+									>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
 
-            <h4 class="release-category-title">👥 侧边栏多项目会话 (Multi-project Sessions)</h4>
-            <ul class="release-list">
-              <li>同一项目下并行多个会话，worktree 支持重命名；新增全局搜索，跨项目检索历史会话。</li>
-            </ul>
+				<!-- Version 0.1.2 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.2</span>
+							<span class="release-date">2026-10-30</span>
+						</div>
 
-            <h4 class="release-category-title">💬 社区与反馈 (Community &amp; Feedback)</h4>
-            <ul class="release-list">
-              <li>侧边栏社区卡片：Star、赞助、分享三个入口。</li>
-              <li>每条回复下方新增 copy / helpful / bad-response 反馈条，bad-response 可附说明，反馈计数持久化。</li>
-            </ul>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🧭 三种执行模式 (Execution Modes)
+							</h4>
+							<ul class="release-list">
+								<li>
+									新增 ReAct / Plan &amp; Solve / Fast
+									三档执行模式，统一跑在可组合的 graph 调度器上；Fast
+									模式用只读工具子集换取更短的往返，每个线程各自维护模式与记忆。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🔌 平台能力与文档 (Platform &amp; Docs)</h4>
-            <ul class="release-list">
-              <li>内置 MCP server 配置与热重载、静默执行模式（quiet exec，git 探测失败不再往终端刷 <code>fatal: not a git repository</code>）、结构化日志处理器与数据库迁移框架。</li>
-              <li>README 提供中英双语版本与赞助入口，发布脚本自动把版本号与下载矩阵同步到 GitHub Pages 站点。</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								⏺️ 会话录制与离线回放 (Session Recording &amp; Replay)
+							</h4>
+							<ul class="release-list">
+								<li>
+									完整记录一次会话的事件流，可在没有模型、没有网络的情况下回放，用于复现问题与调试；录制器支持重复回放与逐段跳读。
+								</li>
+							</ul>
 
-      <!-- Version 0.1.1 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.1</span>
-            <span class="release-date">2026-10-27</span>
-          </div>
+							<h4 class="release-category-title">
+								👥 侧边栏多项目会话 (Multi-project Sessions)
+							</h4>
+							<ul class="release-list">
+								<li>
+									同一项目下并行多个会话，worktree
+									支持重命名；新增全局搜索，跨项目检索历史会话。
+								</li>
+							</ul>
 
-          <div class="release-content">
-            <h4 class="release-category-title">🚀 多模态视觉与消息交互体验 (Multimodal Vision & Chat UX)</h4>
-            <ul class="release-list">
-              <li><strong>多模态视觉模型全面放开</strong>：修正模型视觉支持识别逻辑，放开对 <code>deepseek-flash</code> 等多模态模型的图片输入通道；采用 <code>wrapLanguageModel</code> 中间件消除 AI SDK v4 文件参数序列化为 <code>null</code> 导致的 400 异常。</li>
-              <li><strong>纯净消息交互体验</strong>：彻底移除服务端向用户提问注入提示文本的侵入式逻辑，保持用户气泡与数据库存储纯净一致。</li>
-              <li><strong>乐观消息对齐与防重击穿</strong>：升级消息对齐算法并加入时间戳判定，彻底修复大模型答复后用户消息重复追加到底部的显示缺陷。</li>
-              <li><strong>任务完成耗时统一感知</strong>：优化回复顶部指示，统一显示 <code>Worked for x.xs</code> 耗时信息，多步任务支持展开查看每个步骤细节。</li>
-            </ul>
+							<h4 class="release-category-title">
+								💬 社区与反馈 (Community &amp; Feedback)
+							</h4>
+							<ul class="release-list">
+								<li>侧边栏社区卡片：Star、赞助、分享三个入口。</li>
+								<li>
+									每条回复下方新增 copy / helpful / bad-response
+									反馈条，bad-response 可附说明，反馈计数持久化。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🌐 官网文档与真实 UI 展现 (Documentation & Features)</h4>
-            <ul class="release-list">
-              <li><strong>真实产品 UI 局部特性图</strong>：官网 5 大核心特性卡片全面升级为基于最新真实 UI 渲染的高清 16:9 拟物图。</li>
-              <li><strong>特性结构精简聚焦</strong>：移除冗余的 Codex 同心圆环说明，聚焦呈现专业自主 AI 底座。</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								🔌 平台能力与文档 (Platform &amp; Docs)
+							</h4>
+							<ul class="release-list">
+								<li>
+									内置 MCP server 配置与热重载、静默执行模式（quiet exec，git
+									探测失败不再往终端刷
+									<code>fatal: not a git repository</code
+									>）、结构化日志处理器与数据库迁移框架。
+								</li>
+								<li>
+									README
+									提供中英双语版本与赞助入口，发布脚本自动把版本号与下载矩阵同步到
+									GitHub Pages 站点。
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
 
-      <!-- Version 0.1.0 -->
-      <div class="timeline-item">
-        <div class="timeline-dot"></div>
-        <div class="release-card">
-          <div class="release-header">
-            <span class="release-tag">v0.1.0</span>
-            <span class="release-date">2026-10-26</span>
-          </div>
+				<!-- Version 0.1.1 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.1</span>
+							<span class="release-date">2026-10-27</span>
+						</div>
 
-          <div class="release-content">
-            <h4 class="release-category-title">🚀 核心架构与功能特性 (Core Features & Architecture)</h4>
-            <ul class="release-list">
-              <li><strong>全新自主独立架构</strong>：自研核心调度引擎与 Agent 控制器，全面解耦第三方高依赖框架，提供轻量、高效的纯原生 AI 体验。</li>
-              <li><strong>自主 ReAct 执行闭环</strong>：支持大模型自主推理、规划步骤、受控调用工具、校验结果与自我修正。</li>
-              <li><strong>原生 MCP (Model Context Protocol) 支持</strong>：自研实现标准 MCP 协议客户端，支持 Stdio 子进程与 HTTP/JSON-RPC 传输通道，实现服务器动态发现、工具注入与生命周期管理。</li>
-              <li><strong>多模型生态接入</strong>：原生兼容并优化 Gemini (Gemini 2.5/3.8)、DeepSeek、Claude、OpenAI Codex 等主流模型，支持 API Key 零泄露本地安全存储。</li>
-              <li><strong>Git Worktree 隔离工作空间</strong>：支持在独立 Git 工作树分支中运行 Agent 任务，零污染开发者当前主工作区代码，方便随时比对 Diff 与一键合并。</li>
-              <li><strong>原生内置全套工程工具</strong>：主 Agent 原生内置终端命令执行（<code>execute_command</code>）、文件受控操作（<code>read_file</code>, <code>write_file</code>, <code>find_files</code>, <code>search_content</code>）及精确 AST 语法替换（<code>string_replace_lsp</code>）。</li>
-              <li><strong>观察性记忆与会话秒级恢复</strong>：基于本地 SQLite（<code>myagent.db</code>）持久化管理历史会话与上下文记忆摘要，启动和切换项目时自动无缝恢复历史会话。</li>
-            </ul>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🚀 多模态视觉与消息交互体验 (Multimodal Vision & Chat UX)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>多模态视觉模型全面放开</strong
+									>：修正模型视觉支持识别逻辑，放开对
+									<code>deepseek-flash</code> 等多模态模型的图片输入通道；采用
+									<code>wrapLanguageModel</code> 中间件消除 AI SDK v4
+									文件参数序列化为 <code>null</code> 导致的 400 异常。
+								</li>
+								<li>
+									<strong>纯净消息交互体验</strong
+									>：彻底移除服务端向用户提问注入提示文本的侵入式逻辑，保持用户气泡与数据库存储纯净一致。
+								</li>
+								<li>
+									<strong>乐观消息对齐与防重击穿</strong
+									>：升级消息对齐算法并加入时间戳判定，彻底修复大模型答复后用户消息重复追加到底部的显示缺陷。
+								</li>
+								<li>
+									<strong>任务完成耗时统一感知</strong
+									>：优化回复顶部指示，统一显示
+									<code>Worked for x.xs</code>
+									耗时信息，多步任务支持展开查看每个步骤细节。
+								</li>
+							</ul>
 
-            <h4 class="release-category-title">🛠️ 桌面客户端体验与系统优化 (Desktop App & UX)</h4>
-            <ul class="release-list">
-              <li><strong>品牌与原生桌面支持</strong>：正式确立 <strong>My Agent</strong> 品牌名，应用安装后在 macOS 访达、启动台与程序坞中均正式显示为 <code>My Agent</code>。</li>
-              <li><strong>Codex 风格同心圆环更新进度</strong>：应用内置自动更新系统，侧边栏更新按钮呈现类似 Codex 的同心动态圆环流光与精准进度指示。</li>
-              <li><strong>原生交互提示优化</strong>：优化侧边栏按钮悬停提示，采用原生 HTML <code>title</code> 属性彻底避免复杂浮窗被父容器裁剪遮挡。</li>
-              <li><strong>工作区幽灵项与空仓库修复</strong>：彻底修复工作区仅有一个项目时多出空白根目录的显示缺陷。</li>
-              <li><strong>全平台并行构建流水线</strong>：GitHub Actions 矩阵全自动发布 macOS (Apple Silicon & Intel)、Windows (x64) 以及 Linux (AppImage & deb) 安装包。</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+							<h4 class="release-category-title">
+								🌐 官网文档与真实 UI 展现 (Documentation & Features)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>真实产品 UI 局部特性图</strong>：官网 5
+									大核心特性卡片全面升级为基于最新真实 UI 渲染的高清 16:9
+									拟物图。
+								</li>
+								<li>
+									<strong>特性结构精简聚焦</strong>：移除冗余的 Codex
+									同心圆环说明，聚焦呈现专业自主 AI 底座。
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
 
-    </div>
-  </main>
+				<!-- Version 0.1.0 -->
+				<div class="timeline-item">
+					<div class="timeline-dot"></div>
+					<div class="release-card">
+						<div class="release-header">
+							<span class="release-tag">v0.1.0</span>
+							<span class="release-date">2026-10-26</span>
+						</div>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="footer-container">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="./assets/icon.svg" alt="My Agent Logo" width="22" height="22">
-        <span>My Agent © 2026. Released under the Apache-2.0 License.</span>
-      </div>
-      <div class="footer-links">
-        <a href="https://github.com/kidyfirst/my-agent" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
-        <a href="https://github.com/kidyfirst/my-agent/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
-        <a href="./changelog.html">Changelog</a>
-      </div>
-    </div>
-  </footer>
+						<div class="release-content">
+							<h4 class="release-category-title">
+								🚀 核心架构与功能特性 (Core Features & Architecture)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>全新自主独立架构</strong>：自研核心调度引擎与 Agent
+									控制器，全面解耦第三方高依赖框架，提供轻量、高效的纯原生 AI
+									体验。
+								</li>
+								<li>
+									<strong>自主 ReAct 执行闭环</strong
+									>：支持大模型自主推理、规划步骤、受控调用工具、校验结果与自我修正。
+								</li>
+								<li>
+									<strong>原生 MCP (Model Context Protocol) 支持</strong
+									>：自研实现标准 MCP 协议客户端，支持 Stdio 子进程与
+									HTTP/JSON-RPC
+									传输通道，实现服务器动态发现、工具注入与生命周期管理。
+								</li>
+								<li>
+									<strong>多模型生态接入</strong>：原生兼容并优化 Gemini (Gemini
+									2.5/3.8)、DeepSeek、Claude、OpenAI Codex 等主流模型，支持 API
+									Key 零泄露本地安全存储。
+								</li>
+								<li>
+									<strong>Git Worktree 隔离工作空间</strong>：支持在独立 Git
+									工作树分支中运行 Agent
+									任务，零污染开发者当前主工作区代码，方便随时比对 Diff
+									与一键合并。
+								</li>
+								<li>
+									<strong>原生内置全套工程工具</strong>：主 Agent
+									原生内置终端命令执行（<code>execute_command</code>）、文件受控操作（<code>read_file</code>,
+									<code>write_file</code>, <code>find_files</code>,
+									<code>search_content</code>）及精确 AST
+									语法替换（<code>string_replace_lsp</code>）。
+								</li>
+								<li>
+									<strong>观察性记忆与会话秒级恢复</strong>：基于本地
+									SQLite（<code>myagent.db</code>）持久化管理历史会话与上下文记忆摘要，启动和切换项目时自动无缝恢复历史会话。
+								</li>
+							</ul>
 
-  <script src="./assets/changelog.js"></script>
-</body>
+							<h4 class="release-category-title">
+								🛠️ 桌面客户端体验与系统优化 (Desktop App & UX)
+							</h4>
+							<ul class="release-list">
+								<li>
+									<strong>品牌与原生桌面支持</strong>：正式确立
+									<strong>My Agent</strong> 品牌名，应用安装后在 macOS
+									访达、启动台与程序坞中均正式显示为 <code>My Agent</code>。
+								</li>
+								<li>
+									<strong>Codex 风格同心圆环更新进度</strong
+									>：应用内置自动更新系统，侧边栏更新按钮呈现类似 Codex
+									的同心动态圆环流光与精准进度指示。
+								</li>
+								<li>
+									<strong>原生交互提示优化</strong
+									>：优化侧边栏按钮悬停提示，采用原生 HTML
+									<code>title</code> 属性彻底避免复杂浮窗被父容器裁剪遮挡。
+								</li>
+								<li>
+									<strong>工作区幽灵项与空仓库修复</strong
+									>：彻底修复工作区仅有一个项目时多出空白根目录的显示缺陷。
+								</li>
+								<li>
+									<strong>全平台并行构建流水线</strong>：GitHub Actions
+									矩阵全自动发布 macOS (Apple Silicon & Intel)、Windows (x64)
+									以及 Linux (AppImage & deb) 安装包。
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<!-- Footer -->
+		<footer class="footer">
+			<div class="footer-container">
+				<div style="display: flex; align-items: center; gap: 10px">
+					<img
+						src="./assets/icon.svg"
+						alt="My Agent Logo"
+						width="22"
+						height="22"
+					/>
+					<span>My Agent © 2026. Released under the Apache-2.0 License.</span>
+				</div>
+				<div class="footer-links">
+					<a
+						href="https://github.com/kidyfirst/my-agent"
+						target="_blank"
+						rel="noopener noreferrer"
+						>GitHub Repository</a
+					>
+					<a
+						href="https://github.com/kidyfirst/my-agent/releases"
+						target="_blank"
+						rel="noopener noreferrer"
+						>GitHub Releases</a
+					>
+					<a href="./changelog.html">Changelog</a>
+				</div>
+			</div>
+		</footer>
+
+		<script src="./assets/changelog.js"></script>
+	</body>
 </html>

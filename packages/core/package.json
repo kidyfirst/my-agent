@@ -1,6 +1,6 @@
 {
 	"name": "@my-agent/core",
-	"version": "0.1.7",
+	"version": "0.1.8",
 	"description": "Headless agent engine for My Agent: LLM graphs, controller, harness, storage, and tools",
 	"type": "module",
 	"main": "./src/index.ts",
