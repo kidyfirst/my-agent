@@ -1,6 +1,30 @@
 import { useState, useEffect, useRef, memo } from "react"
+import Markdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { ToolExecution } from "./ToolExecution"
 import { CaretRightIcon } from "./icons"
+
+/**
+ * Formats unstructured thinking streams into readable Markdown with clear paragraph boundaries.
+ */
+export function formatThinkingText(raw: string): string {
+	if (!raw) return ""
+	let text = raw.trim()
+
+	// 1. Break before common Chinese and English phase markers
+	text = text.replace(
+		/([.。！？!?])\s*(关键点[：:]|现在开始|先确认|先看|按预期[，,]|总结[：:]|结论[：:]|步骤\s*\d+[：:]|验证[：:]|\*\*\[|\b(?:Now|Next|First|Finally|Note that|Let's|Then)\b)/g,
+		"$1\n\n$2",
+	)
+
+	// 2. Break before markdown headers or bracketed phases
+	text = text.replace(
+		/([^\n])\s*(\*\*\[[A-Za-z\u4e00-\u9fa5\s]+\]\*\*|###+\s)/g,
+		"$1\n\n$2",
+	)
+
+	return text
+}
 
 export interface ExecutionTool {
 	id: string
@@ -127,26 +151,99 @@ function ThoughtStepItem({
 				{step.text && <Chevron open={isExpanded} />}
 			</div>
 
-			{/* Expanded thought reasoning text (matches Screenshot 1) */}
+			{/* Expanded thought reasoning text with paragraph spacing and inline code highlighting */}
 			{isExpanded && step.text && (
 				<div
+					className="thinking-content-body"
 					style={{
 						marginTop: 6,
 						marginBottom: 10,
-						padding: "8px 12px",
+						padding: "10px 14px",
 						background: "var(--bg-surface)",
 						border: "1px solid var(--border-muted)",
 						borderRadius: 6,
 						color: "var(--text)",
-						fontSize: 13,
-						lineHeight: 1.6,
-						whiteSpace: "pre-wrap",
-						wordBreak: "break-word",
-						maxHeight: 360,
+						fontSize: 12.5,
+						lineHeight: 1.68,
+						maxHeight: 380,
 						overflowY: "auto",
 					}}
 				>
-					{step.text}
+					<Markdown
+						remarkPlugins={[remarkGfm]}
+						components={{
+							p({ children }) {
+								return (
+									<p
+										style={{
+											margin: "0 0 10px 0",
+											whiteSpace: "pre-wrap",
+											wordBreak: "break-word",
+										}}
+									>
+										{children}
+									</p>
+								)
+							},
+							code({ children }) {
+								return (
+									<code
+										style={{
+											padding: "1.5px 5px",
+											margin: "0 2px",
+											background: "var(--bg-hover)",
+											border: "1px solid var(--border-muted)",
+											borderRadius: 4,
+											fontSize: "0.9em",
+											color: "var(--accent)",
+											fontFamily:
+												"ui-monospace, SFMono-Regular, Menlo, monospace",
+										}}
+									>
+										{children}
+									</code>
+								)
+							},
+							ul({ children }) {
+								return (
+									<ul
+										style={{
+											margin: "4px 0 10px 0",
+											paddingLeft: 18,
+										}}
+									>
+										{children}
+									</ul>
+								)
+							},
+							ol({ children }) {
+								return (
+									<ol
+										style={{
+											margin: "4px 0 10px 0",
+											paddingLeft: 18,
+										}}
+									>
+										{children}
+									</ol>
+								)
+							},
+							strong({ children }) {
+								return (
+									<strong
+										style={{
+											fontWeight: 600,
+											color: "var(--text)",
+										}}
+									>
+										{children}
+									</strong>
+								)
+							},
+						}}
+					>
+						{formatThinkingText(step.text)}
+					</Markdown>
 				</div>
 			)}
 		</div>

@@ -129,6 +129,7 @@ export function buildMessageParts(
 	assistantText: string,
 	reasoningText: string,
 	executedTools: ExecutedToolItem[],
+	lastCapturedReasoningIdx: number = 0,
 ): {
 	parts: any[]
 	cleanText: string
@@ -173,13 +174,15 @@ export function buildMessageParts(
 			.trim()
 	}
 
-	if (activeThinking) {
+	const anyToolHasThought = executedTools.some((t) => Boolean(t.thought))
+	if (!anyToolHasThought && activeThinking) {
 		parts.push({
 			type: "thinking",
 			thinking: activeThinking,
 			text: activeThinking,
 		})
 	}
+
 	const seenToolIds = new Set<string>()
 	for (const t of executedTools) {
 		const tid = t.id || `call_${parts.length}`
@@ -206,6 +209,16 @@ export function buildMessageParts(
 			continue
 		}
 		seenToolIds.add(tid)
+
+		// Attach step-specific reasoning right before its tool call
+		if (t.thought) {
+			parts.push({
+				type: "thinking",
+				thinking: t.thought,
+				text: t.thought,
+			})
+		}
+
 		parts.push({
 			type: "tool-call",
 			toolCallId: tid,
@@ -223,6 +236,19 @@ export function buildMessageParts(
 			})
 		}
 	}
+
+	// Any trailing thought after the last tool call before final text
+	if (anyToolHasThought) {
+		const trailingThought = reasoningText.slice(lastCapturedReasoningIdx).trim()
+		if (trailingThought) {
+			parts.push({
+				type: "thinking",
+				thinking: trailingThought,
+				text: trailingThought,
+			})
+		}
+	}
+
 	if (finalCleanText) {
 		parts.push({
 			type: "text",
@@ -352,8 +378,14 @@ export async function executeStreamLLM(
 		abortSignal,
 	})
 
+	let lastCapturedReasoningIdx = 0
 	const buildCurrentContent = () =>
-		buildMessageParts(assistantText, reasoningText, executedTools)
+		buildMessageParts(
+			assistantText,
+			reasoningText,
+			executedTools,
+			lastCapturedReasoningIdx,
+		)
 
 	for await (const chunk of stallWatchdog(streamRes.fullStream)) {
 		if (abortSignal.aborted) break
@@ -432,10 +464,15 @@ export async function executeStreamLLM(
 			const args = (chunk as any).input ?? (chunk as any).args
 			const existing = executedTools.find((t) => t.id === toolCallId)
 			if (!existing) {
+				const toolThought = reasoningText.slice(lastCapturedReasoningIdx).trim()
+				if (toolThought) {
+					lastCapturedReasoningIdx = reasoningText.length
+				}
 				executedTools.push({
 					id: toolCallId,
 					name: (chunk as any).toolName,
 					args,
+					thought: toolThought || undefined,
 				})
 			} else if (args && Object.keys(args).length > 0) {
 				existing.args = args

@@ -252,6 +252,13 @@ ${toolsetSection}${librarySection}${webAccessSection}${mcpSetupSection}${mcpFail
 - Do NOT use tools to communicate with the user. All text you output is displayed directly.
 - Prioritize technical accuracy over validating the user's beliefs. Be direct and objective. Respectful correction is more valuable than false agreement.
 
+# Thinking Process & Reasoning Format
+When generating internal reasoning, thoughts, or chain-of-thought content (inside thinking blocks or tags):
+- Structure your thoughts cleanly: break complex reasoning into distinct logical steps or phases with bold headings (e.g. **[Analysis]**, **[Plan]**, **[Verification]**).
+- Insert double line breaks between distinct thoughts or stages to maintain visual separation.
+- Use bullet points for parallel observations, file lists, or options instead of long run-on sentences.
+- Avoid unformatted stream-of-consciousness monologues. Keep internal thinking structured, concise, and focused on decisions.
+
 ## Links
 The renderer swallows trailing punctuation into the URL, so a link glued to a
 bracket or a full stop points at the wrong page. Put the URL inside angle

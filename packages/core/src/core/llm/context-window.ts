@@ -155,6 +155,45 @@ export function estimateToolsSchemaTokens(tools?: Record<string, any>): number {
 	return Math.ceil(totalChars / 3.8)
 }
 
+const NON_ASCII_RE = /[^\x00-\x7f]/
+
+/**
+ * Fixed-ratio text token estimator.
+ *
+ * A flat `length / 4` assumes ~4 characters per token, which only holds for
+ * ASCII prose. BPE vocabularies encode CJK at roughly 1.3 characters per token,
+ * so a flat /4 underestimates Chinese by ~3x and can let a session blow past the
+ * model's real context window before folding ever triggers.
+ *
+ * This walks code points once (same cost class as `length / 4`, no BPE lookup)
+ * and weights ASCII and non-ASCII separately. Rounding is left to the caller so
+ * that many small fragments don't each round up and accumulate bias.
+ */
+export function estimateTextTokens(text: string): number {
+	if (!text) return 0
+	// 纯 ASCII: every code unit is < 128, so the weighted result collapses to
+	// length / 4. A regex scan is far cheaper than a per-character JS loop.
+	if (!NON_ASCII_RE.test(text)) return text.length / 4
+
+	let asciiChars = 0
+	let nonAsciiChars = 0
+	for (let i = 0; i < text.length; i++) {
+		const code = text.charCodeAt(i)
+		if (code < 128) {
+			asciiChars++
+		} else {
+			// Count a surrogate pair as one code point. Lone surrogates are
+			// still counted once, which is fine for an estimate.
+			if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
+				const next = text.charCodeAt(i + 1)
+				if (next >= 0xdc00 && next <= 0xdfff) i++
+			}
+			nonAsciiChars++
+		}
+	}
+	return asciiChars / 4 + nonAsciiChars / 1.3
+}
+
 /**
  * Structural message token estimator that properly accounts for vision tokens
  * without letting massive base64 image strings inflate token counts to hundreds of thousands.
@@ -162,28 +201,28 @@ export function estimateToolsSchemaTokens(tools?: Record<string, any>): number {
 export function estimateMessageTokens(msg: any): number {
 	if (!msg) return 0
 	if (typeof msg.content === "string") {
-		return Math.ceil(msg.content.length / 4)
+		return Math.ceil(estimateTextTokens(msg.content))
 	}
 	if (!Array.isArray(msg.content)) {
-		return Math.ceil(JSON.stringify(msg.content || "").length / 4)
+		return Math.ceil(estimateTextTokens(JSON.stringify(msg.content || "")))
 	}
 
 	let tokens = 0
 	for (const part of msg.content) {
 		if (!part) continue
 		if (part.type === "text" && typeof part.text === "string") {
-			tokens += Math.ceil(part.text.length / 4)
+			tokens += estimateTextTokens(part.text)
 		} else if (part.type === "image") {
 			// Standard vision token cost: ~1200 tokens per image
 			// (prevents raw base64 payloads from inflating token counts by hundreds of thousands)
 			tokens += 1_200
 		} else if (part.type === "tool-call") {
 			const inputStr = JSON.stringify(part.args || part.input || {})
-			tokens += Math.ceil(((part.toolName?.length || 0) + inputStr.length) / 4)
+			tokens += estimateTextTokens(`${part.toolName || ""}${inputStr}`)
 		} else if (part.type === "tool-result") {
 			const res = part.output !== undefined ? part.output : part.result
 			const resStr = typeof res === "string" ? res : JSON.stringify(res || "")
-			tokens += Math.ceil(resStr.length / 4)
+			tokens += estimateTextTokens(resStr)
 		} else {
 			// Strip large base64/data payloads before stringifying arbitrary parts
 			const clone = { ...part }
@@ -195,10 +234,10 @@ export function estimateMessageTokens(msg: any): number {
 			) {
 				delete clone.data
 			}
-			tokens += Math.ceil(JSON.stringify(clone).length / 4)
+			tokens += estimateTextTokens(JSON.stringify(clone))
 		}
 	}
-	return tokens
+	return Math.ceil(tokens)
 }
 
 /**

@@ -88,6 +88,7 @@ export interface ExecutedToolItem {
 	 */
 	startedAt?: number
 	endedAt?: number
+	thought?: string
 }
 
 /**
