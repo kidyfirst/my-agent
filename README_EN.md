@@ -153,6 +153,7 @@ If this project has been useful to you, treat the cat 🐱
     - [4.2 Tool-call approval and human-in-the-loop flow](#42-tool-call-approval-and-human-in-the-loop-flow)
     - [4.3 Git Worktree multi-session isolation](#43-git-worktree-multi-session-isolation)
   - [5. Source directory map](#5-source-directory-map)
+  - [6. Acknowledgements](#6-acknowledgements)
 
 ---
 
@@ -1562,5 +1563,13 @@ flowchart LR
 - `packages/a2a` only depends on `core`, agnostic to desktop GUI; both desktop and CLI expose the same JSON-RPC session capabilities through it.
 - `packages/cli` depends on `core` and `a2a`, acting both as a CLI entry and daemon host.
 - `apps/desktop` depends on `core` and `a2a`, serving as the sole GUI consumer.
+
+## 6. Acknowledgements
+
+During architectural evolution, context memory governance, and product UX design, this project was deeply inspired by and benefited from the following open-source projects and innovations. We express our sincere gratitude to the authors and open-source communities:
+
+- **[billion-context](https://github.com/ranxianglei/billion-context)**: Provided invaluable engineering paradigms for large-scale context window budgeting, Smooth High-Watermark Nudge advisories, and reversible context folding mechanisms.
+- **[SAG (Smart Agent Gateway)](https://github.com/Zleap-AI/SAG)**: An open-source high-performance agent gateway and multi-agent protocol architecture by Zleap-AI, providing essential inspiration for our agent routing, tool call chains, and extensible ecosystem.
+- **[mastra-code-ui](https://github.com/mastra-ai/mastra-code-ui)**: Mastra AI's pioneering open-source desktop agent UI paradigm and coding workbench, which laid a strong foundation for our desktop client layout and code interaction workflows.
 
 <!-- This document is continuously maintained; in case of discrepancy with the code, the code takes precedence. -->

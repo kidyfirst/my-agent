@@ -152,6 +152,7 @@
     - [4.3 Git Worktree 多会话隔离机制](#43-git-worktree-多会话隔离机制)
     - [4.4 A2A 远程会话驱动桌面工作区](#44-a2a-远程会话驱动桌面工作区)
   - [5. 多包目录结构映射](#5-多包目录结构映射)
+  - [6. 致谢 (Acknowledgements)](#6-致谢-acknowledgements)
 
 ---
 
@@ -1618,5 +1619,13 @@ flowchart LR
 - `packages/cli` 依赖 `core` 与 `a2a`，既是命令行入口，也是守护进程宿主。
 - `packages/evals` 依赖 `core`，通过无头 Harness 实例执行端到端离线基准评测、线上负反馈回流与 CI/CD 回归门禁。
 - `apps/desktop` 同时依赖 `core` 与 `a2a`，是唯一的 GUI 消费方。
+
+## 6. 致谢 (Acknowledgements)
+
+本项目在架构演进、上下文记忆治理与产品交互设计过程中，深受以下优秀开源项目与创新实现的启发并借鉴了其核心设计，特此向原作者与开源社区表达由衷的感谢：
+
+- **[billion-context](https://github.com/ranxianglei/billion-context)**：在大上下文安全预算管理、平滑高水位 Nudge 预警（Smooth High-Watermark Nudge）以及可逆折叠机制的设计上提供了极具价值的工程思路。
+- **[SAG (Smart Agent Gateway)](https://github.com/Zleap-AI/SAG)**：由 Zleap-AI 发起的高性能智能体网关与多 Agent 协议体系，为本项目的 Agent 路由、工具调用链路与扩展生态提供了重要启发。
+- **[mastra-code-ui](https://github.com/mastra-ai/mastra-code-ui)**：Mastra AI 团队优秀的桌面 Agent 界面与交互范式探索，为本项目桌面端工作台设计与代码交互界面奠定了坚实基础。
 
 <!-- 本文档由维护者持续更新，如与代码实现不一致，以代码为准。 -->
