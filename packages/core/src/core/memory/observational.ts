@@ -32,6 +32,7 @@
 
 import type { ObservationalMemoryConfig } from "../../memory/types.js"
 import { TokenCounter } from "../../memory/token-counter.js"
+import { truncateStringForTokenEstimate } from "../../utils/token-estimator.js"
 
 /** Shape of the observations row, kept loose to match the store's own type. */
 export interface ObservationalRecord {
@@ -371,21 +372,25 @@ export function splitByTokenBudget(
 	}
 }
 
+export const DEFAULT_MAX_OBSERVATIONAL_TOKENS = 4_000
+
 /**
  * Wraps the observation log for injection into the system prompt.
  *
  * The wrapper states that the log is a summary, because a model told nothing
  * will treat a partially-remembered detail as ground truth and act on a stale
  * file path instead of re-reading it.
+ *
+ * Enforces an upper-bound token cap (default 4,000 tokens) to prevent
+ * unbounded observation growth from blowing the model's context window.
  */
 export function formatObservationalMemory(
 	observations: string | null,
+	maxTokens: number = DEFAULT_MAX_OBSERVATIONAL_TOKENS,
 ): string | null {
 	const text = observations?.trim()
 	if (!text) return null
-	return `# Observational Memory
-
-The following is a compacted record of earlier work in this session. It is a summary, not a verbatim transcript: re-read files before editing them rather than trusting a path or line number from memory.
-
-${text}`
+	const header = `# Observational Memory\n\nThe following is a compacted record of earlier work in this session. It is a summary, not a verbatim transcript: re-read files before editing them rather than trusting a path or line number from memory.\n\n`
+	const full = `${header}${text}`
+	return truncateStringForTokenEstimate(full, maxTokens, false)
 }

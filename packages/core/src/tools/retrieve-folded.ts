@@ -2,7 +2,7 @@ import { createTool } from "../core/index.js"
 import { z } from "zod/v3"
 import { truncateStringForTokenEstimate } from "../utils/token-estimator.js"
 
-const MAX_RETRIEVE_TOKENS = 3_000
+const MAX_RETRIEVE_TOKENS = 2_000
 
 export interface FoldedRange {
 	rangeId: string

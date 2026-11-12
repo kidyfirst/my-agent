@@ -26,9 +26,11 @@ import { setRuntimeCategoryPolicy } from "../../permissions.js"
 import { sortToolsByName } from "../llm/prompt-cache.js"
 import {
 	formatObservationalMemory,
+	DEFAULT_MAX_OBSERVATIONAL_TOKENS,
 	resolveBlockAfter,
 } from "../memory/observational.js"
 import { sharedTokenCounter } from "../../memory/token-counter.js"
+import { truncateStringForTokenEstimate } from "../../utils/token-estimator.js"
 import type { FoldedRange } from "../../tools/retrieve-folded.js"
 import {
 	resolveModelContextWindow,
@@ -2037,9 +2039,17 @@ export class Session<TState = any> {
 			let assistantTurnCounter = 0
 			const globalSeenToolCallIds = new Set<string>()
 
+			// Hydrate folded ranges from persistent storage
+			const existingRanges = await this.getFoldedRangesAsync(threadId, store)
+			const allAlreadyFoldedIds = new Set(
+				existingRanges.flatMap((r) => r.messageIds || []),
+			)
+
 			const coreMessages: any[] = []
 			for (const m of historyMessages) {
 				if (m.role !== "user" && m.role !== "assistant") continue
+				// Exclude messages that have already been compacted/folded into persistent ranges
+				if (m.id && allAlreadyFoldedIds.has(m.id)) continue
 				const role = m.role
 				if (role === "user") {
 					const parts: any[] = []
@@ -2274,11 +2284,14 @@ export class Session<TState = any> {
 								const toolCallId = p.toolCallId || p.id
 								const toolName = p.toolName || p.name || "tool"
 
-								// Temporal Output Decay: for older turns (> 2 assistant turns ago),
-								// collapse verbose tool outputs (> 300 chars) into semantic summary tokens.
-								if (!isRecentAssistantTurn) {
-									if (toolName === "retrieve_folded_messages") {
-										// Evict verbose retrieved history from older turns to prevent context window oscillation
+								// Temporal Output Decay:
+								// 1. For retrieve_folded_messages: evict immediately in all replayed turns from past assistant steps
+								//    to prevent retrieved history from re-overflowing the context window in subsequent turns.
+								// 2. For other tools: collapse verbose tool outputs (> 300 chars) for older turns (> 2 assistant turns ago).
+								const isRfm = toolName === "retrieve_folded_messages"
+								if (isRfm || !isRecentAssistantTurn) {
+									if (isRfm) {
+										// Evict verbose retrieved history from past turns to prevent context window oscillation
 										const rangeMatch =
 											typeof res === "string"
 												? res.match(/\[(fold_\w+)\]/)
@@ -2446,6 +2459,44 @@ export class Session<TState = any> {
 					}
 				}
 			}
+
+			// Prepend consolidated folded range note if earlier messages were folded
+			if (existingRanges.length > 0) {
+				const totalFoldedCount = existingRanges.reduce(
+					(sum, r) => sum + (r.messageCount || r.messageIds?.length || 0),
+					0,
+				)
+				let initialUserGoal = ""
+				try {
+					const threadRec = await store.getThreadById?.({ threadId })
+					if ((threadRec?.metadata as any)?.rootUserGoal) {
+						initialUserGoal = (threadRec.metadata as any).rootUserGoal
+					}
+				} catch {}
+				if (!initialUserGoal) {
+					for (const r of existingRanges) {
+						if (r.userGoal) {
+							initialUserGoal = r.userGoal
+							break
+						}
+					}
+				}
+				const lastRange = existingRanges[existingRanges.length - 1]
+				const rangeId = lastRange?.rangeId || "fold_001"
+				const goalSnippet = initialUserGoal
+					? initialUserGoal.slice(0, 300) +
+						(initialUserGoal.length > 300 ? "..." : "")
+					: ""
+				const summaryNote = goalSnippet
+					? `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${totalFoldedCount} messages folded) to stay within token context limits. Original User Task: "${goalSnippet}". If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+					: `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${totalFoldedCount} messages folded) to stay within token context limits. If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+
+				coreMessages.unshift({
+					role: "user",
+					content: summaryNote,
+				})
+			}
+
 			// Resolve model context window dynamically and compute safe working history budget
 			const effectiveModel = preloadedReplayModel || model
 			const contextWindow = resolveModelContextWindow(
@@ -2468,14 +2519,33 @@ export class Session<TState = any> {
 				rawEstimatedTokens += baseTokens
 				return baseTokens
 			})
+
+			// Pre-fetch existing observations from memory if available, so they are properly budgeted
+			let observationBlock: string | null = null
+			if (memory && typeof (memory as any).getSystemMessage === "function") {
+				try {
+					observationBlock =
+						(await (memory as any).getSystemMessage({
+							threadId,
+							resourceId,
+						})) ?? null
+				} catch {}
+			}
+
+			const baseSystemPromptTokens = instructions
+				? Math.ceil(instructions.length / 4)
+				: 0
+			let observationTokens = observationBlock
+				? Math.ceil(observationBlock.length / 4)
+				: 0
 			const totalEstimatedTokens = Math.round(
-				rawEstimatedTokens * calibrationRatio,
+				(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
+					calibrationRatio,
 			)
 
 			// Observational memory: fold earlier turns into a rolling summary
 			// carried in the system prompt so the truncation window can drop raw
 			// messages without discarding durable decisions, paths, and constraints.
-			let observationBlock: string | null = null
 			if (memory) {
 				const omConfig =
 					typeof (memory as any).resolveObservationalConfig === "function"
@@ -2520,9 +2590,17 @@ export class Session<TState = any> {
 							requestContext,
 						})
 						if (step && step.kind !== "none") {
+							const omMaxTokens = Math.min(
+								DEFAULT_MAX_OBSERVATIONAL_TOKENS,
+								Math.floor(MAX_HISTORY_TOKENS * 0.15),
+							)
 							observationBlock = formatObservationalMemory(
 								step.activeObservations,
+								omMaxTokens,
 							)
+							observationTokens = observationBlock
+								? Math.ceil(observationBlock.length / 4)
+								: 0
 						}
 					} catch {
 						// Observation is best-effort: on failure the plain token window
@@ -2561,16 +2639,40 @@ export class Session<TState = any> {
 								threadId,
 								resourceId,
 							})) ?? null
+						observationTokens = observationBlock
+							? Math.ceil(observationBlock.length / 4)
+							: 0
 					} catch {}
 				}
 			}
 
-			// Include observationBlock tokens in the total estimated context tokens
-			const observationTokens = observationBlock
-				? Math.ceil(observationBlock.length / 4)
-				: 0
-			const calibratedContextTokens = Math.round(
-				(rawEstimatedTokens + observationTokens) * calibrationRatio,
+			// Ensure observationBlock is safely formatted and capped within token budget
+			const omMaxTokens = Math.min(
+				DEFAULT_MAX_OBSERVATIONAL_TOKENS,
+				Math.max(1_000, Math.floor(MAX_HISTORY_TOKENS * 0.15)),
+			)
+			if (observationBlock) {
+				if (!observationBlock.startsWith("# Observational Memory")) {
+					observationBlock = formatObservationalMemory(
+						observationBlock,
+						omMaxTokens,
+					)
+				} else {
+					observationBlock = truncateStringForTokenEstimate(
+						observationBlock,
+						omMaxTokens,
+						false,
+					)
+				}
+				observationTokens = observationBlock
+					? Math.ceil(observationBlock.length / 4)
+					: 0
+			}
+
+			// Include observationBlock and system prompt tokens in the total estimated context tokens
+			let calibratedContextTokens = Math.round(
+				(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
+					calibrationRatio,
 			)
 
 			// Smooth Nudge: high-watermark warning when context usage is between 70% and 100%
@@ -2592,7 +2694,52 @@ export class Session<TState = any> {
 			}
 
 			if (calibratedContextTokens > MAX_HISTORY_TOKENS) {
-				let keptTokens = Math.round(observationTokens * calibrationRatio)
+				// Anti-oscillation: Before folding real conversation messages,
+				// check if any unevicted retrieve_folded_messages tool results exist in coreMessages.
+				let evictedAnyRfm = false
+				for (const msg of coreMessages) {
+					if (msg.role === "tool" && Array.isArray(msg.content)) {
+						for (const part of msg.content) {
+							if (
+								part.type === "tool-result" &&
+								(part.toolName === "retrieve_folded_messages" ||
+									part.name === "retrieve_folded_messages")
+							) {
+								if (
+									typeof part.result === "string" &&
+									!part.result.startsWith("[Retrieved History")
+								) {
+									part.result = `[Retrieved History: Inspected by model. Content evicted to prevent context oscillation.]`
+									evictedAnyRfm = true
+								}
+							}
+						}
+					}
+				}
+				if (evictedAnyRfm) {
+					// Re-estimate tokens after evicting retrieved content
+					rawEstimatedTokens = 0
+					for (let i = 0; i < coreMessages.length; i++) {
+						const msg = coreMessages[i]
+						const str =
+							typeof msg.content === "string"
+								? msg.content
+								: JSON.stringify(msg.content)
+						const baseTokens = Math.ceil((str?.length || 0) / 4)
+						messageTokens[i] = baseTokens
+						rawEstimatedTokens += baseTokens
+					}
+					calibratedContextTokens = Math.round(
+						(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
+							calibrationRatio,
+					)
+				}
+			}
+
+			if (calibratedContextTokens > MAX_HISTORY_TOKENS) {
+				let keptTokens = Math.round(
+					(observationTokens + baseSystemPromptTokens) * calibrationRatio,
+				)
 				// Ensure at least the last 4 messages (recent 2 turns) are immune from folding
 				const maxFoldIndex = Math.max(0, coreMessages.length - 4)
 				let startIndex = maxFoldIndex
@@ -2627,10 +2774,6 @@ export class Session<TState = any> {
 
 				if (startIndex > 0 && startIndex < coreMessages.length) {
 					const foldedMessages = coreMessages.slice(0, startIndex)
-					const existingRanges = await this.getFoldedRangesAsync(
-						threadId,
-						store,
-					)
 
 					// Resolve initialUserGoal: prioritize persistent thread metadata,
 					// or extract the first real user message (ignoring previous [System Note] or [Context Advisory])
@@ -2670,12 +2813,26 @@ export class Session<TState = any> {
 					}
 
 					// Collect all message IDs already covered by existing folded ranges to prevent duplication
-					const allAlreadyFoldedIds = new Set(
-						existingRanges.flatMap((r) => r.messageIds || []),
-					)
-					const newlyFoldedMessages = foldedMessages.filter(
-						(m) => m.id && !allAlreadyFoldedIds.has(m.id),
-					)
+					const newlyFoldedMessages = foldedMessages.filter((m) => {
+						if (!m.id) return false
+						if (allAlreadyFoldedIds.has(m.id)) return false
+						if (
+							m.role === "user" &&
+							typeof m.content === "string" &&
+							m.content.startsWith("[System Note:")
+						) {
+							return false
+						}
+						if (m.role === "tool" && Array.isArray(m.content)) {
+							const hasRfm = m.content.some(
+								(p: any) =>
+									p.toolName === "retrieve_folded_messages" ||
+									p.name === "retrieve_folded_messages",
+							)
+							if (hasRfm) return false
+						}
+						return true
+					})
 
 					let rangeId: string
 					if (newlyFoldedMessages.length === 0 && existingRanges.length > 0) {
@@ -2694,7 +2851,15 @@ export class Session<TState = any> {
 						const targetFolded =
 							newlyFoldedMessages.length > 0
 								? newlyFoldedMessages
-								: foldedMessages
+								: foldedMessages.filter(
+										(m) =>
+											m.id &&
+											!(
+												m.role === "user" &&
+												typeof m.content === "string" &&
+												m.content.startsWith("[System Note:")
+											),
+									)
 						const messageIds = Array.from(
 							new Set(targetFolded.map((m) => m.id).filter(Boolean)),
 						)
@@ -2718,6 +2883,10 @@ export class Session<TState = any> {
 							},
 							store,
 						)
+
+						for (const mid of messageIds) {
+							allAlreadyFoldedIds.add(mid)
+						}
 					}
 
 					coreMessages.splice(0, startIndex)
@@ -2743,9 +2912,16 @@ export class Session<TState = any> {
 						? " High-level decisions and constraints are preserved in Observational Memory above."
 						: ""
 
+					const totalFoldedCount =
+						existingRanges.reduce(
+							(acc, r) => acc + (r.messageCount || r.messageIds?.length || 0),
+							0,
+						) +
+						(newlyFoldedMessages.length > 0 ? newlyFoldedMessages.length : 0)
+
 					const summaryNote = initialUserGoal
-						? `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits. Original User Task: "${goalSnippet}".${omCoordinationHint} If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
-						: `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${startIndex} messages folded) to stay within token context limits.${omCoordinationHint} If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+						? `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${totalFoldedCount > 0 ? totalFoldedCount : startIndex} messages folded) to stay within token context limits. Original User Task: "${goalSnippet}".${omCoordinationHint} If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
+						: `[System Note: Earlier conversation history was truncated and folded into range "${rangeId}" (${totalFoldedCount > 0 ? totalFoldedCount : startIndex} messages folded) to stay within token context limits.${omCoordinationHint} If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "${rangeId}".]`
 
 					coreMessages.unshift({
 						role: "user",

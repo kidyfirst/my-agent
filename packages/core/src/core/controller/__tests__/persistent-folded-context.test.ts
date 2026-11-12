@@ -457,4 +457,250 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 
 		await storage.close()
 	})
+
+	it("does not re-fold already folded messages across subsequent turns, preventing range accumulation in SQLite metadata", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+		const store = await storage.getStore("memory")
+
+		let capturedPrompts: any[] = []
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return reply("ok")
+			},
+		})
+
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			contextWindow: 4_000,
+			tools: {},
+		})
+
+		const controller = new AgentController({ storage, agent })
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "r-accum",
+			contextWindow: 4_000,
+		})
+		const thread = await session.thread.create({
+			title: "Range Accumulation Guard",
+		})
+
+		// Seed 8 messages of 2000 chars each (~4000 tokens > 2600 budget)
+		const seeded: any[] = []
+		for (let i = 0; i < 8; i++) {
+			const text = `Seeded message ${i}: ` + "M".repeat(2_000)
+			seeded.push({
+				id: `seed_${i}`,
+				role: i % 2 === 0 ? "user" : "assistant",
+				content: { format: 2, parts: [{ type: "text", text }], content: text },
+				threadId: thread.id,
+				resourceId: "r-accum",
+				createdAt: new Date(Date.now() - (10 - i) * 1000),
+			})
+		}
+		await store.saveMessages({ messages: seeded })
+
+		// Turn 1: Triggers initial folding of older messages -> fold_001
+		await session.sendMessage({ content: "Turn 1" })
+		const ranges1 = await session.getFoldedRangesAsync(thread.id)
+		expect(ranges1.length).toBe(1)
+		expect(ranges1[0].rangeId).toBe("fold_001")
+		const fold001Ids = new Set(ranges1[0].messageIds || [])
+
+		// Send 3 subsequent small turns: none should re-fold or create fold_002, fold_003, etc.
+		for (let turn = 2; turn <= 4; turn++) {
+			await session.sendMessage({ content: `Small follow-up turn ${turn}` })
+			const currentRanges = await session.getFoldedRangesAsync(thread.id)
+			expect(currentRanges.length).toBe(1)
+			expect(currentRanges[0].rangeId).toBe("fold_001")
+
+			// Check SQLite persisted metadata: foldedRanges must have exactly 1 entry
+			const threadInDb = await store.getThreadById({ threadId: thread.id })
+			const dbRanges = (threadInDb?.metadata as any)?.foldedRanges || []
+			expect(dbRanges.length).toBe(1)
+			expect(dbRanges[0].rangeId).toBe("fold_001")
+
+			// Verify in prompt: earlier folded messages (seed_0, etc.) are NOT in active coreMessages
+			const latestPrompt = capturedPrompts[capturedPrompts.length - 1]
+			for (const foldedId of fold001Ids) {
+				const idInPrompt = latestPrompt.some((p: any) =>
+					JSON.stringify(p).includes(
+						`Seeded message ${foldedId.replace("seed_", "")}:`,
+					),
+				)
+				expect(idInPrompt).toBe(false)
+			}
+		}
+
+		await storage.close()
+	})
+
+	it("accounts for observational memory block in prompt budget and caps formatObservationalMemory size", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+
+		let capturedPrompts: any[] = []
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return reply("ok")
+			},
+		})
+
+		// A huge observation log (> 20,000 chars)
+		const hugeObservations = "- Observation item: ".repeat(1_000)
+		const memory = {
+			observe: vi.fn(async () => ({
+				activeObservations: hugeObservations,
+				observedMessageIds: [],
+				kind: "observed" as const,
+				blocked: false,
+			})),
+			getSystemMessage: vi.fn(async () => hugeObservations),
+		}
+
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base instructions",
+			model: () => model,
+			contextWindow: 10_000,
+			tools: {},
+		})
+
+		const controller = new AgentController({ storage, agent, memory })
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "r-om-budget",
+			contextWindow: 10_000,
+		})
+		const thread = await session.thread.create({ title: "OM Budget Test" })
+
+		await session.sendMessage({ content: "Hello with huge OM" })
+
+		// Verify that huge observations injected via formatObservationalMemory were truncated to safe bounds
+		const latestPrompt = capturedPrompts[capturedPrompts.length - 1]
+		const systemMessage = latestPrompt.find((p: any) => p.role === "system")
+		expect(systemMessage).toBeDefined()
+		// Must not exceed safe token budget (should be bounded by ~4,000 tokens / 16,000 chars)
+		expect(systemMessage.content.length).toBeLessThan(hugeObservations.length)
+		expect(systemMessage.content).toContain("[Truncated")
+
+		await storage.close()
+	})
+
+	it("evicts retrieve_folded_messages output on the immediately following turn to prevent oscillation loops", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+		const store = await storage.getStore("memory")
+
+		let capturedPrompts: any[] = []
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async (options) => {
+				capturedPrompts.push(options.prompt)
+				return reply("ok")
+			},
+		})
+
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			contextWindow: 4_000,
+			tools: {},
+		})
+
+		const controller = new AgentController({ storage, agent })
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "r-rfm-evict",
+			contextWindow: 4_000,
+		})
+		const thread = await session.thread.create({
+			title: "Immediate RFM Eviction",
+		})
+
+		const now = Date.now()
+		// Seed Turn 1 where retrieve_folded_messages was called and returned 5000 chars of folded history
+		await store.saveMessages({
+			messages: [
+				{
+					id: "u1",
+					role: "user",
+					content: "Show past logs",
+					threadId: thread.id,
+					resourceId: "r-rfm-evict",
+					createdAt: new Date(now - 2000),
+				},
+				{
+					id: "a1",
+					role: "assistant",
+					content: {
+						format: 2,
+						parts: [
+							{
+								type: "tool-call",
+								toolCallId: "call_rfm_immediate",
+								toolName: "retrieve_folded_messages",
+								args: { rangeId: "fold_001" },
+							},
+							{
+								type: "tool-result",
+								toolCallId: "call_rfm_immediate",
+								toolName: "retrieve_folded_messages",
+								result:
+									"# Retrieved Folded History [fold_001]\n" +
+									"Large past logs detail line... ".repeat(300),
+							},
+							{
+								type: "text",
+								text: "I inspected the past logs and identified the error.",
+							},
+						],
+					},
+					threadId: thread.id,
+					resourceId: "r-rfm-evict",
+					createdAt: new Date(now - 1000),
+				},
+			],
+		})
+
+		// Now send Turn 2 (IMMEDIATELY following turn 1)
+		await session.sendMessage({
+			content: "Now please apply the fix",
+			threadId: thread.id,
+		})
+
+		// In Turn 2's prompt, retrieve_folded_messages MUST ALREADY BE EVICTED
+		// rather than waiting 2 full assistant turns, so it does not trigger an immediate re-fold!
+		const turn2Prompt = capturedPrompts[capturedPrompts.length - 1]
+		const toolMessage = turn2Prompt.find((p: any) => p.role === "tool")
+		expect(toolMessage).toBeDefined()
+		const rfmResultPart = toolMessage.content.find(
+			(c: any) => c.toolCallId === "call_rfm_immediate",
+		)
+		expect(rfmResultPart).toBeDefined()
+		expect(rfmResultPart.output.value).toContain(
+			"Retrieved History (fold_001): Inspected by model in previous turn. Content evicted to prevent context oscillation.",
+		)
+		// The 5,000+ chars dump must NOT be present
+		expect(rfmResultPart.output.value).not.toContain(
+			"Large past logs detail line",
+		)
+
+		// Verify no new redundant range was generated
+		const ranges = await session.getFoldedRangesAsync(thread.id)
+		expect(ranges.length).toBe(0) // No ranges folded in this thread yet
+
+		await storage.close()
+	})
 })

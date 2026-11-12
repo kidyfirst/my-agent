@@ -40,6 +40,7 @@ export {
 	BaseMemory,
 	filterSystemReminderMessages,
 	formatObservationalMemory,
+	DEFAULT_MAX_OBSERVATIONAL_TOKENS,
 	runObservationStep,
 	resolveObservationModel,
 	resolveBlockAfter,
