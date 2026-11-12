@@ -1,5 +1,3 @@
-import { Icon } from "./Icon"
-
 export interface WindowToggleIconProps {
 	side: "left" | "right"
 	open: boolean
@@ -21,15 +19,15 @@ export function WindowToggleIcon({
 	className,
 	soft = false,
 }: WindowToggleIconProps) {
-	// Each element carries its own weight: this glyph is drawn on the 16 grid
-	// at a small size, so the shared 1.5 default would read too heavy here.
-	const stroke = soft ? 1 : 1.3
+	const stroke = soft ? "1" : "1.3"
 	return (
-		<Icon
-			size={size}
-			strokeWidth={stroke}
+		<svg
+			width={size}
+			height={size}
 			viewBox="0 0 16 16"
+			fill="none"
 			className={className}
+			style={{ flexShrink: 0, display: "block" }}
 		>
 			{/* Filled solid section when sidebar is open */}
 			{open && (
@@ -67,6 +65,6 @@ export function WindowToggleIcon({
 				stroke="currentColor"
 				strokeWidth={stroke}
 			/>
-		</Icon>
+		</svg>
 	)
 }

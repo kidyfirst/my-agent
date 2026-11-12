@@ -1,5 +1,4 @@
 import React from "react"
-import { Icon } from "./Icon"
 
 /**
  * Library icon: three books standing on a shelf with the rightmost book leaning.
@@ -17,11 +16,17 @@ export function LibraryIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
-			filled={filled}
-			strokeWidth={strokeWidth}
-			style={style}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill={filled ? "currentColor" : "none"}
+			stroke={filled ? "none" : "currentColor"}
+			strokeWidth={filled ? 0 : strokeWidth}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			{/* Book 1 (Left, upright) */}
 			<rect x="3.5" y="4" width="4" height="16" rx="1.6" />
@@ -36,7 +41,7 @@ export function LibraryIcon({
 				rx="1.6"
 				transform="rotate(10.5 17.5 12)"
 			/>
-		</Icon>
+		</svg>
 	)
 }
 
@@ -46,7 +51,7 @@ export function LibraryIcon({
  */
 export function ImageIcon({
 	size = 18,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	style,
 }: {
@@ -56,16 +61,22 @@ export function ImageIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
 			strokeWidth={strokeWidth}
-			color={color}
-			style={style}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			<rect x="3" y="3" width="18" height="18" rx="4" />
 			<circle cx="16" cy="8.5" r="1.5" />
 			<path d="M3.5 17.5c2.5-3.5 5.5-4 7.5-1 2 3 4 2 6.5-2.5 1.5-2.5 2.5-1.5 3.5 1.5" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -75,7 +86,7 @@ export function ImageIcon({
  */
 export function DocumentIcon({
 	size = 18,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	style,
 }: {
@@ -85,11 +96,17 @@ export function DocumentIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
 			strokeWidth={strokeWidth}
-			color={color}
-			style={style}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			{/* Outer page outline with bottom-right dog-ear cut */}
 			<path d="M14 21H6a2.5 2.5 0 0 1-2.5-2.5v-13A2.5 2.5 0 0 1 6 3h12a2.5 2.5 0 0 1 2.5 2.5v9a1 1 0 0 1-.5.8L15 20.5a1 1 0 0 1-.8.5z" />
@@ -100,7 +117,7 @@ export function DocumentIcon({
 			<line x1="11" y1="7.5" x2="16.5" y2="7.5" />
 			{/* Text line 2 */}
 			<line x1="7.5" y1="11.5" x2="13.5" y2="11.5" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -112,7 +129,7 @@ export const NoteIcon = DocumentIcon
  */
 export function FolderIcon({
 	size = 18,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	style,
 }: {
@@ -122,15 +139,21 @@ export function FolderIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
 			strokeWidth={strokeWidth}
-			color={color}
-			style={style}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			<path d="M3 8V6.5A1.5 1.5 0 0 1 4.5 5h4a1.5 1.5 0 0 1 1.2.6L11 7.4a1 1 0 0 0 .8.6H19.5A1.5 1.5 0 0 1 21 9.5v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z" />
 			<line x1="3" y1="11" x2="21" y2="11" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -140,7 +163,7 @@ export function FolderIcon({
  */
 export function SpreadsheetIcon({
 	size = 18,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	style,
 }: {
@@ -150,16 +173,22 @@ export function SpreadsheetIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
 			strokeWidth={strokeWidth}
-			color={color}
-			style={style}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			<rect x="3" y="3" width="18" height="18" rx="4" />
 			<line x1="3" y1="10" x2="21" y2="10" />
 			<line x1="11" y1="10" x2="11" y2="21" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -169,7 +198,7 @@ export function SpreadsheetIcon({
  */
 export function PresentationIcon({
 	size = 18,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	style,
 }: {
@@ -179,15 +208,21 @@ export function PresentationIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
 			strokeWidth={strokeWidth}
-			color={color}
-			style={style}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			<line x1="7.5" y1="3.5" x2="16.5" y2="3.5" />
 			<rect x="3" y="6" width="18" height="14" rx="4" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -197,7 +232,7 @@ export function PresentationIcon({
  */
 export function TrashIcon({
 	size = 14,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	style,
 }: {
@@ -207,15 +242,21 @@ export function TrashIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon
-			size={size}
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
 			strokeWidth={strokeWidth}
-			color={color}
-			style={style}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
 		>
 			<polyline points="3 6 5 6 21 6" />
 			<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -223,10 +264,6 @@ export const DeleteIcon = TrashIcon
 
 /**
  * Star icon for favorites.
- *
- * Not built on `Icon`: the filled state paints with `var(--warning)` rather
- * than `currentColor`, and it keeps its outline in both states, so the shared
- * shell's fill/stroke switch would drop the star's edge.
  */
 export function StarIcon({
 	size = 14,
@@ -246,7 +283,7 @@ export function StarIcon({
 			viewBox="0 0 24 24"
 			fill={filled ? color || "var(--warning)" : "none"}
 			stroke={color || (filled ? "var(--warning)" : "currentColor")}
-			strokeWidth="1.5"
+			strokeWidth="1.8"
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			style={{ flexShrink: 0, ...style }}
@@ -270,11 +307,22 @@ export function OpenFolderIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon size={size} color={color} style={style}>
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke={color || "currentColor"}
+			strokeWidth="1.8"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
+		>
 			<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
 			<polyline points="15 3 21 3 21 9" />
 			<line x1="10" y1="14" x2="21" y2="3" />
-		</Icon>
+		</svg>
 	)
 }
 
@@ -284,7 +332,7 @@ export function OpenFolderIcon({
  */
 export function OcrIcon({
 	size = 14,
-	strokeWidth = 1.5,
+	strokeWidth = 1.8,
 	color,
 	textColor = "var(--error)",
 	style,
@@ -296,10 +344,18 @@ export function OcrIcon({
 	style?: React.CSSProperties
 }) {
 	return (
-		<Icon size={size} color={color} style={style}>
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			style={{ flexShrink: 0, ...style }}
+			aria-hidden="true"
+		>
 			{/* Top-left corner */}
 			<path
 				d="M3 8V3h5"
+				stroke={color || "currentColor"}
 				strokeWidth={strokeWidth}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -307,6 +363,7 @@ export function OcrIcon({
 			{/* Top-right corner */}
 			<path
 				d="M16 3h5v5"
+				stroke={color || "currentColor"}
 				strokeWidth={strokeWidth}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -314,6 +371,7 @@ export function OcrIcon({
 			{/* Bottom-left corner */}
 			<path
 				d="M3 16v5h5"
+				stroke={color || "currentColor"}
 				strokeWidth={strokeWidth}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -321,6 +379,7 @@ export function OcrIcon({
 			{/* Bottom-right corner */}
 			<path
 				d="M16 21h5v-5"
+				stroke={color || "currentColor"}
 				strokeWidth={strokeWidth}
 				strokeLinecap="round"
 				strokeLinejoin="round"
@@ -339,6 +398,6 @@ export function OcrIcon({
 			>
 				OCR
 			</text>
-		</Icon>
+		</svg>
 	)
 }

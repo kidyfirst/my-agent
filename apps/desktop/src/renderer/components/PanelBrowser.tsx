@@ -16,7 +16,6 @@ import {
 	type BrowserTab,
 	type BrowserTabsState,
 } from "../utils/browserTabs"
-import { Icon } from "./Icon"
 
 /**
  * The subset of Electron's `<webview>` element this panel uses. Declared
@@ -457,10 +456,18 @@ function TabChip({ tab, active, loading, onActivate, onClose }: TabChipProps) {
 					transition: "opacity 120ms ease-out",
 				}}
 			>
-				<Icon size={9} strokeWidth={1.8} viewBox="0 0 16 16">
+				<svg
+					width="9"
+					height="9"
+					viewBox="0 0 16 16"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="1.8"
+					strokeLinecap="round"
+				>
 					<line x1="4" y1="4" x2="12" y2="12" />
 					<line x1="12" y1="4" x2="4" y2="12" />
-				</Icon>
+				</svg>
 			</button>
 		</div>
 	)
@@ -529,40 +536,40 @@ function ChromeIconSvg({ icon }: { icon: ChromeIcon }) {
 
 	if (icon === "plus") {
 		return (
-			<Icon>
+			<svg {...common}>
 				<line x1="8" y1="3.5" x2="8" y2="12.5" />
 				<line x1="3.5" y1="8" x2="12.5" y2="8" />
-			</Icon>
+			</svg>
 		)
 	}
 	if (icon === "back") {
 		return (
-			<Icon>
+			<svg {...common}>
 				<polyline points="10 3.5 5.5 8 10 12.5" />
-			</Icon>
+			</svg>
 		)
 	}
 	if (icon === "forward") {
 		return (
-			<Icon>
+			<svg {...common}>
 				<polyline points="6 3.5 10.5 8 6 12.5" />
-			</Icon>
+			</svg>
 		)
 	}
 	if (icon === "reload") {
 		return (
-			<Icon>
+			<svg {...common}>
 				<path d="M12.5 8a4.5 4.5 0 1 1-1.6-3.4" />
 				<polyline points="12.5 3 12.5 5.6 9.9 5.6" />
-			</Icon>
+			</svg>
 		)
 	}
 	return (
-		<Icon>
+		<svg {...common}>
 			<path d="M9 3.5h3.5V7" />
 			<path d="M12.5 3.5L8.5 7.5" />
 			<path d="M11 9.5v2.5a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1H7" />
-		</Icon>
+		</svg>
 	)
 }
 

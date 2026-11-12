@@ -9,7 +9,6 @@ import {
 } from "../../types/ipc"
 import { CustomGraphNode } from "./CustomGraphNode"
 import { buildFlowElements } from "./graphLayout"
-import { Icon } from "../Icon"
 
 function matchMode(a?: string | null, b?: string | null): boolean {
 	if (!a || !b) return false
@@ -349,10 +348,19 @@ export function GraphViewerModal({
 								;(e.currentTarget as HTMLElement).style.color = "var(--muted)"
 							}}
 						>
-							<Icon size={16} strokeWidth={2}>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
 								<line x1="18" y1="6" x2="6" y2="18" />
 								<line x1="6" y1="6" x2="18" y2="18" />
-							</Icon>
+							</svg>
 						</button>
 					</div>
 				</div>

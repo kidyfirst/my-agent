@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, memo } from "react"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
 import { ImagePreviewModal } from "./ImagePreviewModal"
-import { Icon } from "./Icon"
 
 interface UserMessageProps {
 	message: Message
@@ -340,10 +339,20 @@ export const UserMessage = memo(function UserMessage({
 										maxWidth: 220,
 									}}
 								>
-									<Icon size={14} strokeWidth={1.5} style={{ flexShrink: 0 }}>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="var(--muted)"
+										strokeWidth="1.5"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										style={{ flexShrink: 0 }}
+									>
 										<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
 										<polyline points="14 2 14 8 20 8" />
-									</Icon>
+									</svg>
 									<span
 										style={{
 											overflow: "hidden",
@@ -396,9 +405,19 @@ export const UserMessage = memo(function UserMessage({
 								pointerEvents: "none",
 							}}
 						>
-							<Icon size={10} strokeWidth={1.3} viewBox="0 0 10 10" style={{ marginBottom: 2 }}>
+							<svg
+								width="10"
+								height="10"
+								viewBox="0 0 10 10"
+								fill="none"
+								stroke="var(--muted)"
+								strokeWidth="1.3"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								style={{ marginBottom: 2 }}
+							>
 								<path d="M2 3.5L5 6.5L8 3.5" />
-							</Icon>
+							</svg>
 						</div>
 					)}
 				</div>
@@ -449,14 +468,32 @@ export const UserMessage = memo(function UserMessage({
 					}}
 				>
 					{copied ? (
-						<Icon size={13} strokeWidth={2}>
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
 							<polyline points="20 6 9 17 4 12" />
-						</Icon>
+						</svg>
 					) : (
-						<Icon size={13} strokeWidth={2}>
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
 							<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
 							<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-						</Icon>
+						</svg>
 					)}
 				</button>
 			</div>
@@ -521,12 +558,22 @@ function ImageAttachmentItem({
 					userSelect: "none",
 				}}
 			>
-				<Icon size={14} strokeWidth={1.5} style={{ flexShrink: 0, opacity: 0.7 }}>
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="1.5"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					style={{ flexShrink: 0, opacity: 0.7 }}
+				>
 					<rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
 					<circle cx="8.5" cy="8.5" r="1.5" />
 					<polyline points="21 15 16 10 5 21" />
 					<line x1="2" y1="2" x2="22" y2="22" />
-				</Icon>
+				</svg>
 				<span
 					style={{
 						overflow: "hidden",

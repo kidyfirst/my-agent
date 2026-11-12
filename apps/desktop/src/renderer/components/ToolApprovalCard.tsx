@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
 import type { PendingApproval } from "../hooks/useDialogManager"
-import { Icon } from "./Icon"
 
 export type PendingApprovalData = PendingApproval
 
@@ -187,10 +186,10 @@ function renderActionText(
 				{parts[0]}
 				<span style={{ color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 2 }}>
 					{url}
-					<Icon size={11} strokeWidth={2.2}>
+					<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
 						<line x1="7" y1="17" x2="17" y2="7" />
 						<polyline points="7 7 17 7 17 17" />
-					</Icon>
+					</svg>
 				</span>
 				{parts.slice(1).join(url)}
 			</>
@@ -444,10 +443,19 @@ export function ToolApprovalCard({
 						position: "relative",
 					}}
 				>
-					<Icon size={13} strokeWidth={2.2}>
+					<svg
+						width="13"
+						height="13"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2.2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<polyline points="4 17 10 11 4 5" />
 						<line x1="12" y1="19" x2="20" y2="19" />
-					</Icon>
+					</svg>
 					<span
 						style={{
 							position: "absolute",

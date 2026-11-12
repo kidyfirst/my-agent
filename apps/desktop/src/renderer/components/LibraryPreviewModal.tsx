@@ -11,7 +11,6 @@ import {
 } from "./LibraryIcon"
 import { OpenInDropdown } from "./OpenInDropdown"
 import type { LibraryItemContent } from "@my-agent/core"
-import { Icon } from "./Icon"
 
 interface LibraryPreviewModalProps {
 	itemId: string | null
@@ -407,10 +406,18 @@ export function LibraryPreviewModal({
 							justifyContent: "center",
 						}}
 					>
-						<Icon size={14} strokeWidth={2}>
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+						>
 							<line x1="18" y1="6" x2="6" y2="18" />
 							<line x1="6" y1="6" x2="18" y2="18" />
-						</Icon>
+						</svg>
 					</button>
 				</div>
 
@@ -1909,11 +1916,20 @@ export function LibraryPreviewModal({
 													width: "100%",
 												}}
 											>
-												<Icon size={14} strokeWidth={2}>
+												<svg
+													width="14"
+													height="14"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth="2"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												>
 													<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
 													<polyline points="15 3 21 3 21 9" />
 													<line x1="10" y1="14" x2="21" y2="3" />
-												</Icon>
+												</svg>
 												<span>Open in Default App</span>
 											</button>
 

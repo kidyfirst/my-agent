@@ -13,7 +13,6 @@ import {
 	OcrIcon,
 } from "./LibraryIcon"
 import { LibraryPreviewModal } from "./LibraryPreviewModal"
-import { Icon } from "./Icon"
 
 
 export interface LibraryItem {
@@ -542,11 +541,20 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 							pointerEvents: "none",
 						}}
 					>
-						<Icon size={48} strokeWidth={1.8}>
+						<svg
+							width="48"
+							height="48"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="var(--accent)"
+							strokeWidth="1.8"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
 							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 							<polyline points="17 8 12 3 7 8" />
 							<line x1="12" y1="3" x2="12" y2="15" />
-						</Icon>
+						</svg>
 						<div
 							style={{
 								fontSize: 16,
@@ -676,12 +684,22 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 						>
 							<span style={{ fontSize: 12, lineHeight: 1 }}>+</span>
 							<span>New</span>
-							<Icon size={10} strokeWidth={2.5} style={{
+							<svg
+								width="10"
+								height="10"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2.5"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								style={{
 									transform: showNewDropdown ? "rotate(180deg)" : "rotate(0deg)",
 									transition: "transform 0.15s ease",
-								}}>
+								}}
+							>
 								<polyline points="6 9 12 15 18 9" />
-							</Icon>
+							</svg>
 						</button>
 
 						{/* New Dropdown Menu */}
@@ -890,10 +908,18 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 							justifyContent: "center",
 						}}
 					>
-						<Icon size={14} strokeWidth={2}>
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+						>
 							<line x1="18" y1="6" x2="6" y2="18" />
 							<line x1="6" y1="6" x2="18" y2="18" />
-						</Icon>
+						</svg>
 					</button>
 				</div>
 
@@ -982,12 +1008,12 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 								alignItems: "center",
 							}}
 						>
-							<Icon size={14} strokeWidth={2}>
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
 								<rect x="3" y="3" width="7" height="7" rx="1.5" />
 								<rect x="14" y="3" width="7" height="7" rx="1.5" />
 								<rect x="14" y="14" width="7" height="7" rx="1.5" />
 								<rect x="3" y="14" width="7" height="7" rx="1.5" />
-							</Icon>
+							</svg>
 						</button>
 						<button
 							type="button"
@@ -1004,14 +1030,23 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 								alignItems: "center",
 							}}
 						>
-							<Icon size={14} strokeWidth={2}>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
 								<line x1="8" y1="6" x2="21" y2="6" />
 								<line x1="8" y1="12" x2="21" y2="12" />
 								<line x1="8" y1="18" x2="21" y2="18" />
 								<line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2.5" />
 								<line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2.5" />
 								<line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2.5" />
-							</Icon>
+							</svg>
 						</button>
 					</div>
 
@@ -1104,12 +1139,22 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 									onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
 								>
 									<span>Start creating</span>
-									<Icon size={12} strokeWidth={2} style={{
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										style={{
 											transform: showNewDropdown ? "rotate(180deg)" : "rotate(0deg)",
 											transition: "transform 0.15s ease",
-										}}>
+										}}
+									>
 										<polyline points="6 9 12 15 18 9" />
-									</Icon>
+									</svg>
 								</button>
 							</div>
 						</div>
@@ -1351,9 +1396,18 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 														}}
 													>
 														{ocrSuccessIds[item.id] ? (
-															<Icon size={14} strokeWidth={2.5}>
+															<svg
+																width="14"
+																height="14"
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="var(--success)"
+																strokeWidth="2.5"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															>
 																<polyline points="20 6 9 17 4 12" />
-															</Icon>
+															</svg>
 														) : (
 															<OcrIcon size={14} />
 														)}
@@ -1606,9 +1660,18 @@ export function LibraryModal({ isOpen, onClose, showToast }: LibraryModalProps) 
 												}}
 											>
 												{ocrSuccessIds[item.id] ? (
-													<Icon size={14} strokeWidth={2.5}>
+													<svg
+														width="14"
+														height="14"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="var(--success)"
+														strokeWidth="2.5"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													>
 														<polyline points="20 6 9 17 4 12" />
-													</Icon>
+													</svg>
 												) : (
 													<OcrIcon size={14} />
 												)}

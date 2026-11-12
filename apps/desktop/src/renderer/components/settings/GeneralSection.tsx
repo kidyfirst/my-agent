@@ -9,7 +9,6 @@ import {
 	clearCustomSound,
 	getAudioContext,
 } from "../../utils/audio"
-import { Icon } from "../Icon"
 
 export function previewNotificationMode(mode: NotificationMode) {
 	if (mode === "bell" || mode === "both") {
@@ -148,9 +147,18 @@ export function GeneralSection({ state, update }: GeneralSectionProps) {
 								e.currentTarget.style.borderColor = "var(--border)"
 							}}
 						>
-							<Icon size={12} strokeWidth={2}>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
 								<polygon points="5 3 19 12 5 21 5 3" />
-							</Icon>
+							</svg>
 							<span>Test</span>
 						</button>
 					)}
@@ -203,11 +211,20 @@ export function GeneralSection({ state, update }: GeneralSectionProps) {
 								e.currentTarget.style.borderColor = "var(--border)"
 							}}
 						>
-							<Icon size={13} strokeWidth={2}>
+							<svg
+								width="13"
+								height="13"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
 								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 								<polyline points="17 8 12 3 7 8" />
 								<line x1="12" y1="3" x2="12" y2="15" />
-							</Icon>
+							</svg>
 							<span>{customSound ? "Replace Sound" : "Upload Sound"}</span>
 						</button>
 

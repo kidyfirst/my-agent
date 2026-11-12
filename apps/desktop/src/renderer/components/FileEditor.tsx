@@ -8,7 +8,6 @@ import {
 } from "react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { Icon } from "./Icon"
 
 interface FileContents {
 	content: string
@@ -239,11 +238,20 @@ export const FileEditor = forwardRef<FileEditorHandle, FileEditorProps>(
 							background: "transparent",
 						}}
 					>
-						<Icon size={14} strokeWidth={1.3} viewBox="0 0 16 16">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.3"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
 							<path d="M12 9v4H3V4h4" />
 							<path d="M9 2h5v5" />
 							<path d="M14 2L7 9" />
-						</Icon>
+						</svg>
 					</button>
 					{isDirty && !saving && (
 						<button
