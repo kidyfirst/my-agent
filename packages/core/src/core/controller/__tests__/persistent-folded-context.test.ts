@@ -703,4 +703,154 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 
 		await storage.close()
 	})
+
+	it("cleans up _foldedRanges and _tokenCalibrationByThread on thread.delete, preventing memory leaks", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+		const store = await storage.getStore("memory")
+
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async () => reply("ok"),
+		})
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			contextWindow: 4_000,
+			tools: {},
+		})
+		const controller = new AgentController({ storage, agent })
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "r-leak",
+			contextWindow: 4_000,
+		})
+		const thread = await session.thread.create({ title: "Leak Test Thread" })
+
+		// Record a folded range and a token calibration ratio
+		await session.recordFoldedRange(
+			thread.id,
+			{
+				rangeId: "fold_001",
+				threadId: thread.id,
+				messageCount: 5,
+				startIndex: 0,
+				createdAt: Date.now(),
+				messageIds: ["m1", "m2", "m3", "m4", "m5"],
+			},
+			store,
+		)
+		;(session as any)._setTokenCalibration(thread.id, 1.25)
+
+		expect(session.getFoldedRanges(thread.id).length).toBe(1)
+		expect((session as any)._foldedRanges.has(thread.id)).toBe(true)
+		expect((session as any)._tokenCalibrationByThread.has(thread.id)).toBe(true)
+
+		// Delete thread
+		await session.thread.delete({ threadId: thread.id })
+
+		// Both memory maps must be cleanly purged
+		expect((session as any)._foldedRanges.has(thread.id)).toBe(false)
+		expect((session as any)._tokenCalibrationByThread.has(thread.id)).toBe(
+			false,
+		)
+		expect(session.getFoldedRanges(thread.id)).toEqual([])
+
+		await storage.close()
+	})
+
+	it("synchronizes fresh folded ranges from disk when modified externally, avoiding cache short-circuit", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+		const store = await storage.getStore("memory")
+
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async () => reply("ok"),
+		})
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			contextWindow: 4_000,
+			tools: {},
+		})
+		const controller = new AgentController({ storage, agent })
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "r-stale",
+			contextWindow: 4_000,
+		})
+		const thread = await session.thread.create({ title: "Stale Cache Test" })
+
+		// Initial state: record fold_001 in session
+		await session.recordFoldedRange(
+			thread.id,
+			{
+				rangeId: "fold_001",
+				threadId: thread.id,
+				messageCount: 3,
+				startIndex: 0,
+				createdAt: Date.now(),
+				messageIds: ["m1", "m2", "m3"],
+			},
+			store,
+		)
+
+		const initialRanges = await session.getFoldedRangesAsync(thread.id)
+		expect(initialRanges.map((r) => r.rangeId)).toEqual(["fold_001"])
+
+		// Simulate external update directly in SQLite store (e.g. from another window/process)
+		const threadRec = await store.getThreadById({ threadId: thread.id })
+		await store.updateThread({
+			id: thread.id,
+			metadata: {
+				...(threadRec.metadata || {}),
+				foldedRanges: [
+					{
+						rangeId: "fold_001",
+						threadId: thread.id,
+						messageCount: 3,
+						startIndex: 0,
+						createdAt: Date.now(),
+						messageIds: ["m1", "m2", "m3"],
+					},
+					{
+						rangeId: "fold_002",
+						threadId: thread.id,
+						messageCount: 4,
+						startIndex: 3,
+						createdAt: Date.now(),
+						messageIds: ["m4", "m5", "m6", "m7"],
+					},
+				],
+			},
+		})
+
+		// getFoldedRangesAsync MUST NOT short-circuit on existing in-memory fold_001;
+		// it must re-hydrate from SQLite and reflect fold_002!
+		const refreshedRanges = await session.getFoldedRangesAsync(thread.id)
+		expect(refreshedRanges.map((r) => r.rangeId)).toEqual([
+			"fold_001",
+			"fold_002",
+		])
+
+		// Simulate external deletion of all ranges in SQLite store
+		const threadRec2 = await store.getThreadById({ threadId: thread.id })
+		await store.updateThread({
+			id: thread.id,
+			metadata: {
+				...(threadRec2.metadata || {}),
+				foldedRanges: [],
+			},
+		})
+
+		const clearedRanges = await session.getFoldedRangesAsync(thread.id)
+		expect(clearedRanges).toEqual([])
+
+		await storage.close()
+	})
 })

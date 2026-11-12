@@ -482,12 +482,37 @@ export class AgentController<TState = any> {
 		return []
 	}
 
-	async getFoldedRange(
+	getFoldedRange(threadId: string, rangeId: string): FoldedRange | undefined {
+		for (const session of this._sessions.values()) {
+			const r = session.getFoldedRange?.(threadId, rangeId)
+			if (r) return r
+		}
+		return undefined
+	}
+
+	async getFoldedRangeAsync(
 		threadId: string,
 		rangeId: string,
 	): Promise<FoldedRange | undefined> {
 		const ranges = await this.getFoldedRangesAsync(threadId)
 		return ranges.find((r) => r.rangeId === rangeId)
+	}
+
+	clearThreadCache(threadId: string): void {
+		for (const session of this._sessions.values()) {
+			session.clearThreadCache?.(threadId)
+		}
+	}
+
+	deleteSession(sessionId: string): boolean {
+		const session = this._sessions.get(sessionId)
+		if (session) {
+			if (typeof (session as any).dispose === "function") {
+				;(session as any).dispose()
+			}
+			return this._sessions.delete(sessionId)
+		}
+		return false
 	}
 }
 
@@ -552,20 +577,59 @@ export class Session<TState = any> {
 	private _threadQueues: Map<string, Promise<void>> = new Map()
 	private _foldedRanges: Map<string, FoldedRange[]> = new Map()
 
+	private static readonly MAX_CACHED_THREADS = 100
+
+	private _setFoldedRanges(threadId: string, ranges: FoldedRange[]): void {
+		if (this._foldedRanges.has(threadId)) {
+			this._foldedRanges.delete(threadId)
+		} else if (this._foldedRanges.size >= Session.MAX_CACHED_THREADS) {
+			const oldestKey = this._foldedRanges.keys().next().value
+			if (oldestKey) this._foldedRanges.delete(oldestKey)
+		}
+		this._foldedRanges.set(threadId, ranges)
+	}
+
+	private _setTokenCalibration(threadId: string, ratio: number): void {
+		if (this._tokenCalibrationByThread.has(threadId)) {
+			this._tokenCalibrationByThread.delete(threadId)
+		} else if (
+			this._tokenCalibrationByThread.size >= Session.MAX_CACHED_THREADS
+		) {
+			const oldestKey = this._tokenCalibrationByThread.keys().next().value
+			if (oldestKey) this._tokenCalibrationByThread.delete(oldestKey)
+		}
+		this._tokenCalibrationByThread.set(threadId, ratio)
+	}
+
+	clearThreadCache(threadId: string): void {
+		this._foldedRanges.delete(threadId)
+		this._tokenCalibrationByThread.delete(threadId)
+		this._threadRuns.delete(threadId)
+		this._threadQueues.delete(threadId)
+	}
+
+	dispose(): void {
+		this._foldedRanges.clear()
+		this._tokenCalibrationByThread.clear()
+		this._threadRuns.clear()
+		this._threadQueues.clear()
+		this._subscribers.clear()
+	}
+
 	getFoldedRanges(threadId: string): FoldedRange[] {
-		return this._foldedRanges.get(threadId) || []
+		const ranges = this._foldedRanges.get(threadId)
+		if (ranges) {
+			this._foldedRanges.delete(threadId)
+			this._foldedRanges.set(threadId, ranges)
+			return ranges
+		}
+		return []
 	}
 
 	async getFoldedRangesAsync(
 		threadId: string,
 		store?: any,
 	): Promise<FoldedRange[]> {
-		if (
-			this._foldedRanges.has(threadId) &&
-			(this._foldedRanges.get(threadId)?.length ?? 0) > 0
-		) {
-			return this._foldedRanges.get(threadId)!
-		}
 		return await this.hydrateFoldedRanges(threadId, store)
 	}
 
@@ -577,19 +641,28 @@ export class Session<TState = any> {
 			const activeStore = store || (await this.getMemoryStore())
 			if (activeStore?.getThreadById) {
 				const thread = await activeStore.getThreadById({ threadId })
-				const stored = (thread?.metadata as any)?.foldedRanges
-				if (Array.isArray(stored) && stored.length > 0) {
-					const existing = this._foldedRanges.get(threadId) || []
-					const existingIds = new Set(existing.map((r) => r.rangeId))
-					const merged = [...existing]
-					for (const r of stored) {
-						if (!existingIds.has(r.rangeId)) {
-							merged.push(r)
-							existingIds.add(r.rangeId)
+				if (thread) {
+					const stored = (thread.metadata as any)?.foldedRanges
+					if (Array.isArray(stored)) {
+						// Preserve cached message objects for matching rangeIds if present in memory
+						const existing = this._foldedRanges.get(threadId) || []
+						const messageCache = new Map<string, any[]>()
+						for (const r of existing) {
+							if (r.messages && r.messages.length > 0) {
+								messageCache.set(r.rangeId, r.messages)
+							}
 						}
+						const synced: FoldedRange[] = stored.map((r) => ({
+							...r,
+							messages: messageCache.get(r.rangeId) || r.messages,
+						}))
+						this._setFoldedRanges(threadId, synced)
+						return synced
+					} else {
+						// Thread exists on disk but has no folded ranges
+						this._setFoldedRanges(threadId, [])
+						return []
 					}
-					this._foldedRanges.set(threadId, merged)
-					return merged
 				}
 			}
 		} catch (err) {
@@ -611,7 +684,7 @@ export class Session<TState = any> {
 		const ranges = this.getFoldedRanges(threadId)
 		const filtered = ranges.filter((r) => r.rangeId !== range.rangeId)
 		filtered.push(range)
-		this._foldedRanges.set(threadId, filtered)
+		this._setFoldedRanges(threadId, filtered)
 
 		// Persist compact range metadata to thread.metadata.foldedRanges in SQLite
 		try {
@@ -885,6 +958,8 @@ export class Session<TState = any> {
 				if (this._currentThreadId === opts.threadId) {
 					this._currentThreadId = ""
 				}
+				this.clearThreadCache(opts.threadId)
+				this.controller.clearThreadCache(opts.threadId)
 				this.emit({ type: "thread_deleted", threadId: opts.threadId })
 			},
 			list: async () => {
@@ -1966,7 +2041,7 @@ export class Session<TState = any> {
 					const threadRec = await store.getThreadById({ threadId })
 					const metaRatio = (threadRec?.metadata as any)?.tokenCalibrationRatio
 					if (typeof metaRatio === "number" && metaRatio > 0) {
-						this._tokenCalibrationByThread.set(threadId, metaRatio)
+						this._setTokenCalibration(threadId, metaRatio)
 					}
 				}
 			} catch {}
@@ -3064,7 +3139,7 @@ export class Session<TState = any> {
 			) {
 				const observedRatio = actualPromptTokens / rawEstimatedTokens
 				newCalibrationRatio = Math.min(Math.max(observedRatio, 0.5), 3.0)
-				this._tokenCalibrationByThread.set(threadId, newCalibrationRatio)
+				this._setTokenCalibration(threadId, newCalibrationRatio)
 			}
 
 			// Persist usage, context window and calibration stats to thread metadata
