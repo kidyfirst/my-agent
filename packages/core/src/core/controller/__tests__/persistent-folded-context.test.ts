@@ -7,6 +7,9 @@ import { createRetrieveFoldedMessagesTool } from "../../../tools/retrieve-folded
 import {
 	resolveModelContextWindow,
 	computeMaxHistoryTokens,
+	estimateToolsSchemaTokens,
+	estimateMessageTokens,
+	estimateMessagesTokens,
 } from "../../llm/context-window.js"
 
 function streamOf(chunks: any[]): ReadableStream {
@@ -852,5 +855,74 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 		expect(clearedRanges).toEqual([])
 
 		await storage.close()
+	})
+
+	it("sorts pattern matching by length descending so specific models never match shorter prefixes", () => {
+		// Specific Qwen model must match 128k, not generic 'qwen' (32k)
+		expect(resolveModelContextWindow(undefined, "qwen-2.5-coder-32b")).toBe(
+			128_000,
+		)
+		expect(resolveModelContextWindow(undefined, "qwen-turbo")).toBe(128_000)
+		expect(resolveModelContextWindow(undefined, "qwen-base")).toBe(32_768)
+
+		// Specific Llama model must match 128k, not generic 'llama-3' (8k)
+		expect(resolveModelContextWindow(undefined, "llama-3.1-70b")).toBe(128_000)
+		expect(resolveModelContextWindow(undefined, "llama-3-8b")).toBe(8_192)
+
+		// Specific GPT-4 model must match 32k/128k, not generic 'gpt-4' (8k)
+		expect(resolveModelContextWindow(undefined, "gpt-4-32k")).toBe(32_768)
+		expect(resolveModelContextWindow(undefined, "gpt-4o")).toBe(128_000)
+		expect(resolveModelContextWindow(undefined, "gpt-4")).toBe(8_192)
+	})
+
+	it("accurately estimates tool schema tokens and caps vision image tokens", () => {
+		// 1. Tool schema tokens calculation
+		const tools = {
+			test_tool: {
+				description: "A tool that does testing with extensive parameters",
+				parameters: {
+					type: "object",
+					properties: {
+						query: { type: "string", description: "Search query string" },
+						count: { type: "number", description: "Number of items to return" },
+						options: {
+							type: "object",
+							properties: {
+								verbose: { type: "boolean" },
+								tags: { type: "array", items: { type: "string" } },
+							},
+						},
+					},
+					required: ["query"],
+				},
+			},
+		}
+		const schemaTokens = estimateToolsSchemaTokens(tools)
+		expect(schemaTokens).toBeGreaterThan(50)
+		expect(schemaTokens).toBeLessThan(300)
+
+		// 2. Vision tokens calculation: raw base64 string must NOT explode into 100k tokens
+		const hugeBase64 = "a".repeat(400_000) // 400KB base64 payload
+		const imageMsg = {
+			role: "user",
+			content: [
+				{ type: "text", text: "Look at this screenshot" },
+				{ type: "image", image: hugeBase64, mediaType: "image/png" },
+			],
+		}
+		const estimated = estimateMessageTokens(imageMsg)
+		// Should count ~6 tokens for text + ~1200 tokens for image = ~1206, NOT 100,006!
+		expect(estimated).toBeGreaterThan(1_100)
+		expect(estimated).toBeLessThan(1_500)
+
+		// 3. estimateMessagesTokens aggregates cleanly
+		const multiMsg = estimateMessagesTokens([
+			{ role: "user", content: "hello world" },
+			imageMsg,
+		])
+		expect(multiMsg.tokensByMessage.length).toBe(2)
+		expect(multiMsg.tokensByMessage[0]).toBe(3)
+		expect(multiMsg.tokensByMessage[1]).toBe(estimated)
+		expect(multiMsg.totalTokens).toBe(3 + estimated)
 	})
 })

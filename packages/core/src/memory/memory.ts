@@ -383,6 +383,7 @@ export class Memory extends MyAgentMemory {
 		messages: ObservationMessage[]
 		pendingTokens: number
 		requestContext?: any
+		foldedMessageIds?: string[] | Set<string>
 	}): Promise<ObservationStepResult | null> {
 		const config = this.resolveObservationalConfig()
 		if (!config) return null
@@ -423,6 +424,7 @@ export class Memory extends MyAgentMemory {
 				pendingTokens: args.pendingTokens,
 				counter: this.tokenCounter,
 				requestContext: args.requestContext,
+				foldedMessageIds: args.foldedMessageIds,
 			})
 			if (step.kind === "none") return step
 

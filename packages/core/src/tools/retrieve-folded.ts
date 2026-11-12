@@ -59,7 +59,7 @@ If 'rangeId' is omitted, returns a table of all available folded ranges for the 
 				.optional()
 				.default(MAX_RETRIEVE_TOKENS)
 				.describe(
-					"Maximum token budget for the returned content (defaults to 3000 to prevent re-overflowing the context window).",
+					"Maximum token budget for the returned content (defaults to 2000 to prevent re-overflowing the context window).",
 				),
 		}),
 		execute: async (context, toolContext) => {

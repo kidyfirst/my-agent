@@ -190,6 +190,7 @@ export async function runObservationStep(args: {
 	pendingTokens: number
 	counter?: TokenCounter
 	requestContext?: any
+	foldedMessageIds?: string[] | Set<string>
 }): Promise<ObservationStepResult> {
 	const { config, record, messages, pendingTokens } = args
 	const counter = args.counter ?? new TokenCounter()
@@ -264,9 +265,15 @@ export async function runObservationStep(args: {
 		}
 	}
 
-	// Only messages not already folded into the log are worth re-reading.
+	// Only messages not already folded into the log or compacted into history ranges are worth re-reading.
 	const seen = new Set(record?.observedMessageIds ?? [])
-	const fresh = messages.filter((m) => !m.id || !seen.has(m.id))
+	const folded =
+		args.foldedMessageIds instanceof Set
+			? args.foldedMessageIds
+			: new Set(args.foldedMessageIds ?? [])
+	const fresh = messages.filter(
+		(m) => !m.id || (!seen.has(m.id) && !folded.has(m.id)),
+	)
 	if (fresh.length === 0) {
 		return {
 			activeObservations: existing,

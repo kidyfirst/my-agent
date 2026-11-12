@@ -95,9 +95,13 @@ export function resolveModelContextWindow(
 		return DEFAULT_FALLBACK_CONTEXT_WINDOW
 	}
 
-	for (const [pattern, windowSize] of Object.entries(
-		KNOWN_MODEL_CONTEXT_WINDOWS,
-	)) {
+	// Sort patterns by length descending so more specific patterns (e.g. 'qwen-2.5-coder-32b', 'gpt-4-32k')
+	// are always evaluated before shorter generic fallback prefixes (e.g. 'qwen', 'gpt-4').
+	const sortedPatterns = Object.entries(KNOWN_MODEL_CONTEXT_WINDOWS).sort(
+		([a], [b]) => b.length - a.length,
+	)
+
+	for (const [pattern, windowSize] of sortedPatterns) {
 		if (normalizedId.includes(pattern)) {
 			return windowSize
 		}
@@ -131,4 +135,84 @@ export function computeMaxHistoryTokens(contextWindow: number): number {
 	// Cap active working history budget at 256,000 tokens to prevent excessive latency,
 	// memory bloat, and serialization cost during local turn processing.
 	return Math.min(Math.floor(contextWindow * 0.8), 256_000)
+}
+
+/**
+ * Accurately estimates token overhead of executable tool JSON schemas.
+ */
+export function estimateToolsSchemaTokens(tools?: Record<string, any>): number {
+	if (!tools || Object.keys(tools).length === 0) return 0
+	let totalChars = 0
+	for (const [name, t] of Object.entries(tools)) {
+		totalChars += name.length + (t?.description?.length || 0)
+		const schema = t?.parameters || t?.inputSchema
+		if (schema) {
+			try {
+				totalChars += JSON.stringify(schema).length
+			} catch {}
+		}
+	}
+	return Math.ceil(totalChars / 3.8)
+}
+
+/**
+ * Structural message token estimator that properly accounts for vision tokens
+ * without letting massive base64 image strings inflate token counts to hundreds of thousands.
+ */
+export function estimateMessageTokens(msg: any): number {
+	if (!msg) return 0
+	if (typeof msg.content === "string") {
+		return Math.ceil(msg.content.length / 4)
+	}
+	if (!Array.isArray(msg.content)) {
+		return Math.ceil(JSON.stringify(msg.content || "").length / 4)
+	}
+
+	let tokens = 0
+	for (const part of msg.content) {
+		if (!part) continue
+		if (part.type === "text" && typeof part.text === "string") {
+			tokens += Math.ceil(part.text.length / 4)
+		} else if (part.type === "image") {
+			// Standard vision token cost: ~1200 tokens per image
+			// (prevents raw base64 payloads from inflating token counts by hundreds of thousands)
+			tokens += 1_200
+		} else if (part.type === "tool-call") {
+			const inputStr = JSON.stringify(part.args || part.input || {})
+			tokens += Math.ceil(((part.toolName?.length || 0) + inputStr.length) / 4)
+		} else if (part.type === "tool-result") {
+			const res = part.output !== undefined ? part.output : part.result
+			const resStr = typeof res === "string" ? res : JSON.stringify(res || "")
+			tokens += Math.ceil(resStr.length / 4)
+		} else {
+			// Strip large base64/data payloads before stringifying arbitrary parts
+			const clone = { ...part }
+			if (clone.image) delete clone.image
+			if (
+				clone.data &&
+				typeof clone.data === "string" &&
+				clone.data.length > 500
+			) {
+				delete clone.data
+			}
+			tokens += Math.ceil(JSON.stringify(clone).length / 4)
+		}
+	}
+	return tokens
+}
+
+/**
+ * Computes individual token counts and total tokens across an array of messages.
+ */
+export function estimateMessagesTokens(messages: any[]): {
+	tokensByMessage: number[]
+	totalTokens: number
+} {
+	let total = 0
+	const tokensByMessage = messages.map((m) => {
+		const t = estimateMessageTokens(m)
+		total += t
+		return t
+	})
+	return { tokensByMessage, totalTokens: total }
 }

@@ -35,6 +35,9 @@ import type { FoldedRange } from "../../tools/retrieve-folded.js"
 import {
 	resolveModelContextWindow,
 	computeMaxHistoryTokens,
+	estimateToolsSchemaTokens,
+	estimateMessagesTokens,
+	estimateMessageTokens,
 } from "../llm/context-window.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
@@ -2046,11 +2049,38 @@ export class Session<TState = any> {
 				}
 			} catch {}
 
+			// Hydrate folded ranges from persistent storage
+			const existingRanges = await this.getFoldedRangesAsync(threadId, store)
+			const allAlreadyFoldedIds = new Set(
+				existingRanges.flatMap((r) => r.messageIds || []),
+			)
+
 			const historyRes = await store.listMessages({
 				threadId,
-				limit: 100,
+				limit: 200,
 			})
-			const historyMessages: any[] = [...(historyRes?.messages || [])]
+			let historyMessages: any[] = [...(historyRes?.messages || [])]
+
+			// Anti-Black-Hole Gap Detection: If folded ranges exist and the loaded batch reached limit,
+			// check if the oldest loaded message overlaps with already-folded message IDs.
+			// If not, there are un-folded messages older than the batch that would otherwise be silently lost.
+			if (existingRanges.length > 0 && historyMessages.length >= 200) {
+				const oldestLoadedId = historyMessages[0]?.id
+				if (oldestLoadedId && !allAlreadyFoldedIds.has(oldestLoadedId)) {
+					try {
+						const fullRes = await store.listMessages({
+							threadId,
+							perPage: false,
+						})
+						if (
+							fullRes?.messages &&
+							fullRes.messages.length > historyMessages.length
+						) {
+							historyMessages = [...fullRes.messages]
+						}
+					} catch {}
+				}
+			}
 
 			// Call memory input processors if registered
 			if (memory && typeof (memory as any).getInputProcessors === "function") {
@@ -2113,12 +2143,6 @@ export class Session<TState = any> {
 			).length
 			let assistantTurnCounter = 0
 			const globalSeenToolCallIds = new Set<string>()
-
-			// Hydrate folded ranges from persistent storage
-			const existingRanges = await this.getFoldedRangesAsync(threadId, store)
-			const allAlreadyFoldedIds = new Set(
-				existingRanges.flatMap((r) => r.messageIds || []),
-			)
 
 			const coreMessages: any[] = []
 			for (const m of historyMessages) {
@@ -2584,16 +2608,6 @@ export class Session<TState = any> {
 			// Calibrate character-to-token ratio using real provider feedback if available
 			const calibrationRatio =
 				this._tokenCalibrationByThread.get(threadId) ?? 1.0
-			let rawEstimatedTokens = 0
-			const messageTokens: number[] = coreMessages.map((msg) => {
-				const str =
-					typeof msg.content === "string"
-						? msg.content
-						: JSON.stringify(msg.content)
-				const baseTokens = Math.ceil((str?.length || 0) / 4)
-				rawEstimatedTokens += baseTokens
-				return baseTokens
-			})
 
 			// Pre-fetch existing observations from memory if available, so they are properly budgeted
 			let observationBlock: string | null = null
@@ -2610,11 +2624,21 @@ export class Session<TState = any> {
 			const baseSystemPromptTokens = instructions
 				? Math.ceil(instructions.length / 4)
 				: 0
+			// Estimate tool schema tokens to ensure dynamic MCP tool additions do not exceed context window
+			const toolSchemaTokens = estimateToolsSchemaTokens(executableTools)
+			const fixedSystemOverhead = baseSystemPromptTokens + toolSchemaTokens
+
 			let observationTokens = observationBlock
 				? Math.ceil(observationBlock.length / 4)
 				: 0
+
+			// Estimate message tokens structurally, properly accounting for vision tokens without base64 inflation
+			const { tokensByMessage: messageTokens, totalTokens: initialRawTokens } =
+				estimateMessagesTokens(coreMessages)
+			let rawEstimatedTokens = initialRawTokens
+
 			const totalEstimatedTokens = Math.round(
-				(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
+				(rawEstimatedTokens + observationTokens + fixedSystemOverhead) *
 					calibrationRatio,
 			)
 
@@ -2657,12 +2681,16 @@ export class Session<TState = any> {
 
 				if (isSyncTriggered && typeof (memory as any).observe === "function") {
 					try {
+						const unobservedHistory = historyMessages.filter(
+							(m) => !m.id || !allAlreadyFoldedIds.has(m.id),
+						)
 						const step = await (memory as any).observe({
 							threadId,
 							resourceId,
-							messages: historyMessages,
+							messages: unobservedHistory,
 							pendingTokens: totalEstimatedTokens,
 							requestContext,
+							foldedMessageIds: Array.from(allAlreadyFoldedIds),
 						})
 						if (step && step.kind !== "none") {
 							const omMaxTokens = Math.min(
@@ -2689,12 +2717,16 @@ export class Session<TState = any> {
 					// without blocking the immediate response turn.
 					void Promise.resolve().then(async () => {
 						try {
+							const unobservedHistory = historyMessages.filter(
+								(m) => !m.id || !allAlreadyFoldedIds.has(m.id),
+							)
 							await (memory as any).observe({
 								threadId,
 								resourceId,
-								messages: historyMessages,
+								messages: unobservedHistory,
 								pendingTokens: totalEstimatedTokens,
 								requestContext,
+								foldedMessageIds: Array.from(allAlreadyFoldedIds),
 							})
 						} catch {
 							// Best-effort background observation
@@ -2744,9 +2776,9 @@ export class Session<TState = any> {
 					: 0
 			}
 
-			// Include observationBlock and system prompt tokens in the total estimated context tokens
+			// Include observationBlock, tool schema and system prompt tokens in the total estimated context tokens
 			let calibratedContextTokens = Math.round(
-				(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
+				(rawEstimatedTokens + observationTokens + fixedSystemOverhead) *
 					calibrationRatio,
 			)
 
@@ -2765,7 +2797,9 @@ export class Session<TState = any> {
 					content: advisoryContent,
 				})
 				// Keep messageTokens synchronized with coreMessages to prevent index misalignment and NaN
-				messageTokens.push(Math.ceil(advisoryContent.length / 4))
+				const advTokens = Math.ceil(advisoryContent.length / 4)
+				messageTokens.push(advTokens)
+				rawEstimatedTokens += advTokens
 			}
 
 			if (calibratedContextTokens > MAX_HISTORY_TOKENS) {
@@ -2780,11 +2814,21 @@ export class Session<TState = any> {
 								(part.toolName === "retrieve_folded_messages" ||
 									part.name === "retrieve_folded_messages")
 							) {
-								if (
-									typeof part.result === "string" &&
-									!part.result.startsWith("[Retrieved History")
-								) {
-									part.result = `[Retrieved History: Inspected by model. Content evicted to prevent context oscillation.]`
+								const currentResult =
+									part.output !== undefined
+										? typeof part.output === "object" &&
+											part.output?.value !== undefined
+											? part.output.value
+											: part.output
+										: part.result
+								const isAlreadyEvicted =
+									typeof currentResult === "string" &&
+									currentResult.startsWith("[Retrieved History")
+
+								if (!isAlreadyEvicted) {
+									const evictedText = `[Retrieved History: Inspected by model. Content evicted to prevent context oscillation.]`
+									part.result = evictedText
+									part.output = { type: "text", value: evictedText }
 									evictedAnyRfm = true
 								}
 							}
@@ -2792,20 +2836,14 @@ export class Session<TState = any> {
 					}
 				}
 				if (evictedAnyRfm) {
-					// Re-estimate tokens after evicting retrieved content
-					rawEstimatedTokens = 0
+					// Re-estimate tokens cleanly after evicting retrieved content
+					const recheck = estimateMessagesTokens(coreMessages)
+					rawEstimatedTokens = recheck.totalTokens
 					for (let i = 0; i < coreMessages.length; i++) {
-						const msg = coreMessages[i]
-						const str =
-							typeof msg.content === "string"
-								? msg.content
-								: JSON.stringify(msg.content)
-						const baseTokens = Math.ceil((str?.length || 0) / 4)
-						messageTokens[i] = baseTokens
-						rawEstimatedTokens += baseTokens
+						messageTokens[i] = recheck.tokensByMessage[i]
 					}
 					calibratedContextTokens = Math.round(
-						(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
+						(rawEstimatedTokens + observationTokens + fixedSystemOverhead) *
 							calibrationRatio,
 					)
 				}
@@ -2813,7 +2851,7 @@ export class Session<TState = any> {
 
 			if (calibratedContextTokens > MAX_HISTORY_TOKENS) {
 				let keptTokens = Math.round(
-					(observationTokens + baseSystemPromptTokens) * calibrationRatio,
+					(observationTokens + fixedSystemOverhead) * calibrationRatio,
 				)
 				// Ensure at least the last 4 messages (recent 2 turns) are immune from folding
 				const maxFoldIndex = Math.max(0, coreMessages.length - 4)
@@ -3132,14 +3170,14 @@ export class Session<TState = any> {
 			// Dynamic token calibration update from actual LanguageModelUsage
 			const actualPromptTokens = runResult.tokenUsage?.promptTokens
 			let newCalibrationRatio = calibrationRatio
-			if (
-				actualPromptTokens &&
-				actualPromptTokens > 0 &&
-				rawEstimatedTokens > 0
-			) {
-				const observedRatio = actualPromptTokens / rawEstimatedTokens
-				newCalibrationRatio = Math.min(Math.max(observedRatio, 0.5), 3.0)
-				this._setTokenCalibration(threadId, newCalibrationRatio)
+			if (actualPromptTokens && actualPromptTokens > 0) {
+				const totalPreflightTokens =
+					rawEstimatedTokens + observationTokens + fixedSystemOverhead
+				if (totalPreflightTokens > 500) {
+					const observedRatio = actualPromptTokens / totalPreflightTokens
+					newCalibrationRatio = Math.min(Math.max(observedRatio, 0.5), 2.5)
+					this._setTokenCalibration(threadId, newCalibrationRatio)
+				}
 			}
 
 			// Persist usage, context window and calibration stats to thread metadata
