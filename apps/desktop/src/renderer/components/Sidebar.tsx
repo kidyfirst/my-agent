@@ -6,6 +6,7 @@ import { ShortcutTooltip } from "./ShortcutTooltip"
 import { WindowToggleIcon } from "./WindowToggleIcon"
 import { LogIcon } from "./LogIcon"
 import { LibraryIcon } from "./LibraryIcon"
+import { BotIcon } from "./icons"
 
 import { CommunityBanner } from "./sidebar/CommunityBanner"
 import {
@@ -414,29 +415,7 @@ export function Sidebar({
 							e.currentTarget.style.background = "transparent"
 					}}
 				>
-					<svg
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<rect
-							width="13.5"
-							height="12.5"
-							x="5.25"
-							y="7.75"
-							strokeWidth="1.5"
-							rx="2.5"
-						/>
-						<path strokeWidth="1.5" d="M12 7.75V4" />
-						<path strokeWidth="2" d="M12 3.25h.01" />
-						<path strokeWidth="1.5" d="M2.75 12.5V16m18.5-3.5V16" />
-						<path strokeWidth="2" d="M9.25 12.75h.01m5.49 0h.01" />
-						<path strokeWidth="1.5" d="M9.75 16.5h4.5" />
-					</svg>
+					<BotIcon size={16} />
 					<span
 						style={{
 							fontSize: 13,
