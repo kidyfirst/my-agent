@@ -350,8 +350,8 @@ function syncDocsSite() {
 		const before = fs.readFileSync(jsPath, "utf8")
 		const after = before
 			.replace(
-				/const DEFAULT_VERSION = (?:[^|\n]+\|\|\s*)?"v[^"]+"/g,
-				`const DEFAULT_VERSION = (staticTag && staticTag.textContent.trim()) || "v${targetVersion}"`,
+				/const DEFAULT_VERSION\s*=\s*(?:[\s\S]*?\|\|\s*)?"v[^"]+"/g,
+				`const DEFAULT_VERSION =\n\t\t(staticTag && staticTag.textContent.trim()) || "v${targetVersion}"`,
 			)
 			.replace(
 				new RegExp(`my-agent-[\\d.]+-`, "g"),

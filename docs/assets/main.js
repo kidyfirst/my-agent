@@ -13,7 +13,7 @@
 			? document.querySelector(".js-version-tag")
 			: null
 	const DEFAULT_VERSION =
-		(staticTag && staticTag.textContent.trim()) || "v0.1.7"
+		(staticTag && staticTag.textContent.trim()) || "v0.1.8"
 	const BASE_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases`
 	const I18N = window.DocsI18n
 
