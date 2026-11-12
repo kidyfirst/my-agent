@@ -6,7 +6,7 @@ export interface StarIconProps extends IconProps {
 }
 
 export function StarIcon({
-	size = 16,
+	size = 14,
 	strokeWidth = 1.5,
 	viewBox = "0 0 24 24",
 	fill,

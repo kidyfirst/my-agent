@@ -110,7 +110,7 @@ export function RowActions({
 						e.currentTarget.style.color = "var(--muted)"
 					}}
 				>
-					<MoreVerticalIcon size={14} fill="currentColor" stroke="none" />
+					<MoreVerticalIcon size={14} />
 				</button>
 			)}
 			{hovered && onCreate && (

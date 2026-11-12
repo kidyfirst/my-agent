@@ -2,7 +2,7 @@ import type React from "react"
 import type { IconProps } from "./types"
 
 export function ShareIcon({
-	size = 16,
+	size = 14,
 	strokeWidth = 1.5,
 	viewBox = "0 0 24 24",
 	fill = "none",
