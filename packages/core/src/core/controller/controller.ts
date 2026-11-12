@@ -3037,6 +3037,11 @@ export class Session<TState = any> {
 						role: "user",
 						content: summaryNote,
 					})
+
+					// Re-estimate raw message tokens after folding so post-flight token calibration
+					// matches the actual messages dispatched to the model rather than the pre-folded count.
+					const postFoldEstimate = estimateMessagesTokens(coreMessages)
+					rawEstimatedTokens = postFoldEstimate.totalTokens
 				}
 			}
 
