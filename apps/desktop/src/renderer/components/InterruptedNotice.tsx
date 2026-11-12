@@ -9,6 +9,8 @@
  * It is renderer state only — never written to the thread store — so reopening
  * the session or the app shows the transcript as the model left it.
  */
+import { Icon } from "./Icon"
+
 export function InterruptedNotice({
 	label = "User actively interrupts task",
 	onRevert,
@@ -54,17 +56,17 @@ export function InterruptedNotice({
 					whiteSpace: "nowrap",
 				}}
 			>
-				<svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+				<Icon size={8} viewBox="0 0 8 8" filled>
 					<rect
-						x="0.5"
-						y="0.5"
-						width="7"
-						height="7"
-						rx="2"
-						fill="currentColor"
-						opacity="0.5"
+					x="0.5"
+					y="0.5"
+					width="7"
+					height="7"
+					rx="2"
+					fill="currentColor"
+					opacity="0.5"
 					/>
-				</svg>
+				</Icon>
 				{label}
 				{onRevert && (
 					<button

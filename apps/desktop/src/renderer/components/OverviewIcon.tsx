@@ -1,4 +1,5 @@
 import type { OverviewAction } from "../utils/overviewMenu"
+import { Icon } from "./Icon"
 
 /**
  * One icon per Overview destination, shared by the title-bar dropdown and the
@@ -8,22 +9,14 @@ import type { OverviewAction } from "../utils/overviewMenu"
 export function OverviewIcon({
 	id,
 	size = 14,
+	strokeWidth = 1.1,
 }: {
 	id: OverviewAction
 	size?: number
+	strokeWidth?: number
 }) {
 	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.1"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			style={{ flexShrink: 0, display: "block" }}
-		>
+		<Icon size={size} strokeWidth={strokeWidth} viewBox="0 0 16 16">
 			{id === "files" && (
 				<>
 					<path d="M9 1.8H4.6A1.6 1.6 0 0 0 3 3.4v9.2a1.6 1.6 0 0 0 1.6 1.6h6.8a1.6 1.6 0 0 0 1.6-1.6V5.8z" />
@@ -52,6 +45,6 @@ export function OverviewIcon({
 					<path d="M8 2.4a8.4 8.4 0 0 1 2.2 5.6A8.4 8.4 0 0 1 8 13.6a8.4 8.4 0 0 1-2.2-5.6A8.4 8.4 0 0 1 8 2.4z" />
 				</>
 			)}
-		</svg>
+		</Icon>
 	)
 }

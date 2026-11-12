@@ -1,3 +1,5 @@
+import { Icon } from "./Icon"
+
 /**
  * Log glyph: a page with a folded corner and two text lines.
  *
@@ -17,22 +19,11 @@ export function LogIcon({
 	strokeWidth?: number
 }) {
 	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth={strokeWidth}
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			style={{ flexShrink: 0 }}
-			aria-hidden="true"
-		>
+		<Icon size={size} strokeWidth={strokeWidth}>
 			<path d="M14.25 3.25H7A2.25 2.25 0 0 0 4.75 5.5v13A2.25 2.25 0 0 0 7 20.75h10a2.25 2.25 0 0 0 2.25-2.25V8.25z" />
 			<path d="M14.25 3.25V8.25H19.25" />
 			<path d="M8.5 12.5h7" />
 			<path d="M8.5 16h4.5" />
-		</svg>
+		</Icon>
 	)
 }

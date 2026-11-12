@@ -8,6 +8,7 @@ import {
 } from "react"
 import { getFileTypeInfo } from "../utils/fileIcons"
 import type { AttachedFile } from "../types/chat"
+import { Icon } from "./Icon"
 
 export interface RepoFileItem {
 	path: string
@@ -120,22 +121,14 @@ export function ReactAtomIcon({
 	color?: string
 }) {
 	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="-11.5 -10.23174 23 20.46348"
-			fill="none"
-			// `color` may be a CSS variable, which SVG presentation attributes do
-			// not resolve — paint through currentColor instead.
-			style={{ flexShrink: 0, color }}
-		>
+		<Icon size={size} strokeWidth={1} viewBox="-11.5 -10.23174 23 20.46348" style={{ flexShrink: 0, color }}>
 			<circle cx="0" cy="0" r="2.05" fill="currentColor" />
 			<g stroke="currentColor" strokeWidth="1" fill="none">
-				<ellipse rx="11" ry="4.2" />
-				<ellipse rx="11" ry="4.2" transform="rotate(60)" />
-				<ellipse rx="11" ry="4.2" transform="rotate(120)" />
+			<ellipse rx="11" ry="4.2" />
+			<ellipse rx="11" ry="4.2" transform="rotate(60)" />
+			<ellipse rx="11" ry="4.2" transform="rotate(120)" />
 			</g>
-		</svg>
+		</Icon>
 	)
 }
 

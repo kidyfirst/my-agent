@@ -5,6 +5,7 @@ import { ShortcutTooltip } from "./ShortcutTooltip"
 import { WindowToggleIcon } from "./WindowToggleIcon"
 import type { PRStatus } from "../hooks/useProjectManager"
 import type { OverviewAction } from "../utils/overviewMenu"
+import { Icon } from "./Icon"
 
 interface TabBarProps {
 	activeTab: string
@@ -281,21 +282,11 @@ export function TabBar(props: TabBarProps) {
 								</span>
 							)}
 							{isBrowser && (
-								<svg
-									width="11"
-									height="11"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="var(--accent)"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									style={{ flexShrink: 0 }}
-								>
+								<Icon size={11} strokeWidth={2} style={{ flexShrink: 0 }}>
 									<circle cx="12" cy="12" r="10" />
 									<line x1="2" y1="12" x2="22" y2="12" />
 									<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-								</svg>
+								</Icon>
 							)}
 							<span
 								style={{
@@ -383,22 +374,13 @@ export function TabBar(props: TabBarProps) {
 						/>
 					)}
 					{!prDotColor && (
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 16 16"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.3"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
+						<Icon size={14} strokeWidth={1.3} viewBox="0 0 16 16">
 							<circle cx="5" cy="3.5" r="2" />
 							<circle cx="5" cy="12.5" r="2" />
 							<circle cx="11" cy="5.5" r="2" />
 							<line x1="5" y1="5.5" x2="5" y2="10.5" />
 							<path d="M9 5.5 H7 C5.9 5.5 5 6.4 5 7.5" />
-						</svg>
+						</Icon>
 					)}
 					{prLabel}
 				</button>

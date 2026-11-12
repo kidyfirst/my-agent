@@ -21,6 +21,7 @@ import { isReplayMessage, getReplayPlaybackKey } from "../utils/replayMessage"
 import { shouldPinToBottom } from "../utils/chatScroll"
 import { ComputerUsePreview } from "./ComputerUsePreview"
 import { TaskNavigator, type TaskItem } from "./TaskNavigator"
+import { Icon } from "./Icon"
 export interface ChatViewProps {
 	threadId?: string | null
 	/** Root of the project this transcript belongs to; scopes browser previews. */
@@ -1520,19 +1521,10 @@ export function ChatView({
 					}
 				}}
 			>
-				<svg
-					width="15"
-					height="15"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2.2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-				>
+				<Icon size={15} strokeWidth={2.2}>
 					<line x1="12" y1="5" x2="12" y2="19" />
 					<polyline points="19 12 12 19 5 12" />
-				</svg>
+				</Icon>
 			</button>
 
 			{/* Live mirror of the headless browser the agent is driving. */}

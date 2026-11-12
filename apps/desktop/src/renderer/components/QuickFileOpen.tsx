@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { Icon } from "./Icon"
 
 interface QuickFileOpenProps {
 	onSelect: (filePath: string) => void
@@ -125,19 +126,10 @@ export function QuickFileOpen({ onSelect, onClose }: QuickFileOpenProps) {
 						gap: 8,
 					}}
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="var(--muted)"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
+					<Icon size={14} strokeWidth={2}>
 						<circle cx="11" cy="11" r="8" />
 						<line x1="21" y1="21" x2="16.65" y2="16.65" />
-					</svg>
+					</Icon>
 					<input
 						ref={inputRef}
 						type="text"

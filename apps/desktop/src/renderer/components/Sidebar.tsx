@@ -20,6 +20,7 @@ import type { ThreadInfo, UpdateInfo } from "../types/ipc"
 import type { WorktreeStatus } from "../types/project"
 import type { QueuedMessage } from "../types/chat"
 import type { PendingApproval } from "../hooks/useDialogManager"
+import { Icon } from "./Icon"
 
 interface SidebarProps {
 	threads: ThreadInfo[]
@@ -121,20 +122,10 @@ const providers = [
 
 function SearchIcon({ size = 14 }: { size?: number }) {
 	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.3"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			aria-hidden="true"
-		>
+		<Icon size={size} strokeWidth={1.3}>
 			<circle cx="11" cy="11" r="7" />
 			<line x1="16.5" y1="16.5" x2="21" y2="21" />
-		</svg>
+		</Icon>
 	)
 }
 
@@ -414,29 +405,21 @@ export function Sidebar({
 							e.currentTarget.style.background = "transparent"
 					}}
 				>
-					<svg
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
+					<Icon size={16} strokeWidth={1.5}>
 						<rect
-							width="13.5"
-							height="12.5"
-							x="5.25"
-							y="7.75"
-							strokeWidth="1.5"
-							rx="2.5"
+						width="13.5"
+						height="12.5"
+						x="5.25"
+						y="7.75"
+						strokeWidth="1.5"
+						rx="2.5"
 						/>
 						<path strokeWidth="1.5" d="M12 7.75V4" />
 						<path strokeWidth="2" d="M12 3.25h.01" />
 						<path strokeWidth="1.5" d="M2.75 12.5V16m18.5-3.5V16" />
 						<path strokeWidth="2" d="M9.25 12.75h.01m5.49 0h.01" />
 						<path strokeWidth="1.5" d="M9.75 16.5h4.5" />
-					</svg>
+					</Icon>
 					<span
 						style={{
 							fontSize: 13,
@@ -686,19 +669,9 @@ export function Sidebar({
 							)
 						})()}
 						{/* Arrow icon */}
-						<svg
-							width="12"
-							height="12"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="var(--dim)"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							style={{ flexShrink: 0 }}
-						>
+						<Icon size={12} strokeWidth={2} style={{ flexShrink: 0 }}>
 							<polyline points="9 18 15 12 9 6" />
-						</svg>
+						</Icon>
 					</button>
 
 					{/* Update notification download button */}
@@ -739,11 +712,15 @@ export function Sidebar({
 							}}
 						>
 							{downloadProgress ? (
+								// Not an <Icon>: this is a progress gauge whose arc length is
+								// computed from the download percentage, not a static glyph.
 								<svg
 									width="24"
 									height="24"
 									viewBox="0 0 24 24"
 									style={{ display: "block" }}
+									role="img"
+									aria-label={`Downloading, ${Math.round(downloadProgress.percent)}%`}
 								>
 									{/* Inner concentric core / orb (Codex style) */}
 									<circle
@@ -786,20 +763,11 @@ export function Sidebar({
 									/>
 								</svg>
 							) : (
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2.5"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
+								<Icon size={14} strokeWidth={2.5}>
 									<line x1="12" y1="4" x2="12" y2="15" />
 									<polyline points="7 10 12 15 17 10" />
 									<path d="M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
-								</svg>
+								</Icon>
 							)}
 						</button>
 					)}
@@ -821,19 +789,10 @@ export function Sidebar({
 							alignItems: "center",
 						}}
 					>
-						<svg
-							width="16"
-							height="16"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
+						<Icon size={16} strokeWidth={2}>
 							<circle cx="12" cy="12" r="3" />
 							<path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-						</svg>
+						</Icon>
 					</button>
 				</div>
 			</div>

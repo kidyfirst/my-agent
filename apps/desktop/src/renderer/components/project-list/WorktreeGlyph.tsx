@@ -11,6 +11,8 @@
  * `filled` fills the three nodes: the sidebar uses it to say "this worktree is
  * open, its sessions are listed", the menu leaves the nodes as rings.
  */
+import { Icon } from "../Icon"
+
 export function WorktreeGlyph({
 	size = 13,
 	color = "currentColor",
@@ -24,18 +26,7 @@ export function WorktreeGlyph({
 }) {
 	const node = filled ? color : "none"
 	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke={color}
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			aria-hidden="true"
-			style={{ display: "block", flexShrink: 0, ...style }}
-		>
+		<Icon size={size} strokeWidth={2} color={color} style={style}>
 			{/* Trunk between the two left nodes. */}
 			<path d="M6 9v6" />
 			{/* Branch from the right node, curving into the trunk's foot. */}
@@ -43,6 +34,6 @@ export function WorktreeGlyph({
 			<circle cx="6" cy="6" r="3" fill={node} />
 			<circle cx="18" cy="6" r="3" fill={node} />
 			<circle cx="6" cy="18" r="3" fill={node} />
-		</svg>
+		</Icon>
 	)
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useId } from "react"
 import { getFileTypeInfo } from "../utils/fileIcons"
 import { claimMenu, releaseMenu } from "../utils/menuRegistry"
+import { Icon } from "./Icon"
 
 interface FileEntry {
 	name: string
@@ -19,49 +20,37 @@ interface FileTreeProps {
 function FolderIcon({ open }: { open?: boolean }) {
 	if (open) {
 		return (
-			<svg
-				width="15"
-				height="15"
-				viewBox="0 0 16 16"
-				fill="none"
-				style={{ marginRight: 4, flexShrink: 0, color: "var(--dir-icon)" }}
-			>
+			<Icon size={15} strokeWidth={0.8} viewBox="0 0 16 16" style={{ marginRight: 4, flexShrink: 0, color: "var(--dir-icon)" }}>
 				<path
-					d="M1.5 3.5A1 1 0 012.5 2.5H6l1.5 1.5H13a1 1 0 011 1V6H3L1.5 13V3.5z"
-					fill="currentColor"
-					fillOpacity="0.3"
-					stroke="currentColor"
-					strokeWidth="0.8"
-					strokeLinejoin="round"
-				/>
-				<path
-					d="M3 6h11.5L12.5 13H1L3 6z"
-					fill="currentColor"
-					fillOpacity="0.15"
-					stroke="currentColor"
-					strokeWidth="0.8"
-					strokeLinejoin="round"
-				/>
-			</svg>
-		)
-	}
-	return (
-		<svg
-			width="15"
-			height="15"
-			viewBox="0 0 16 16"
-			fill="none"
-			style={{ marginRight: 4, flexShrink: 0, color: "var(--dir-icon)" }}
-		>
-			<path
-				d="M1.5 3.5A1 1 0 012.5 2.5H6l1.5 1.5H13a1 1 0 011 1V12.5a1 1 0 01-1 1H2.5a1 1 0 01-1-1V3.5z"
+				d="M1.5 3.5A1 1 0 012.5 2.5H6l1.5 1.5H13a1 1 0 011 1V6H3L1.5 13V3.5z"
 				fill="currentColor"
-				fillOpacity="0.2"
+				fillOpacity="0.3"
 				stroke="currentColor"
 				strokeWidth="0.8"
 				strokeLinejoin="round"
+				/>
+				<path
+				d="M3 6h11.5L12.5 13H1L3 6z"
+				fill="currentColor"
+				fillOpacity="0.15"
+				stroke="currentColor"
+				strokeWidth="0.8"
+				strokeLinejoin="round"
+				/>
+			</Icon>
+		)
+	}
+	return (
+		<Icon size={15} strokeWidth={0.8} viewBox="0 0 16 16" style={{ marginRight: 4, flexShrink: 0, color: "var(--dir-icon)" }}>
+			<path
+			d="M1.5 3.5A1 1 0 012.5 2.5H6l1.5 1.5H13a1 1 0 011 1V12.5a1 1 0 01-1 1H2.5a1 1 0 01-1-1V3.5z"
+			fill="currentColor"
+			fillOpacity="0.2"
+			stroke="currentColor"
+			strokeWidth="0.8"
+			strokeLinejoin="round"
 			/>
-		</svg>
+		</Icon>
 	)
 }
 

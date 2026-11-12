@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo } from "react"
 import { ToolExecution } from "./ToolExecution"
+import { Icon } from "./Icon"
 
 export interface ExecutionTool {
 	id: string
@@ -45,25 +46,18 @@ export function Chevron({ open }: { open: boolean }) {
 				flexShrink: 0,
 			}}
 		>
-			<svg
-				width="10"
-				height="10"
-				viewBox="0 0 10 10"
-				fill="none"
-				aria-hidden="true"
-				style={{
+			<Icon size={10} strokeWidth={1.3} viewBox="0 0 10 10" style={{
 					transform: open ? "rotate(90deg)" : "rotate(0deg)",
 					transition: "transform 0.15s ease",
-				}}
-			>
+				}}>
 				<path
-					d="M3.5 2L6.5 5L3.5 8"
-					stroke="currentColor"
-					strokeWidth="1.3"
-					strokeLinecap="round"
-					strokeLinejoin="round"
+				d="M3.5 2L6.5 5L3.5 8"
+				stroke="currentColor"
+				strokeWidth="1.3"
+				strokeLinecap="round"
+				strokeLinejoin="round"
 				/>
-			</svg>
+			</Icon>
 		</span>
 	)
 }

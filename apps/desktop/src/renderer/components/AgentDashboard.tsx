@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { hashColor } from "../utils/project-list"
+import { Icon } from "./Icon"
 
 interface AgentData {
 	worktreePath: string
@@ -231,29 +232,21 @@ export function AgentDashboard({
 								color: "var(--on-accent)",
 							}}
 						>
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
+							<Icon size={14} strokeWidth={1.5}>
 								<rect
-									width="13.5"
-									height="12.5"
-									x="5.25"
-									y="7.75"
-									strokeWidth="1.5"
-									rx="2.5"
+								width="13.5"
+								height="12.5"
+								x="5.25"
+								y="7.75"
+								strokeWidth="1.5"
+								rx="2.5"
 								/>
 								<path strokeWidth="1.5" d="M12 7.75V4" />
 								<path strokeWidth="2" d="M12 3.25h.01" />
 								<path strokeWidth="1.5" d="M2.75 12.5V16m18.5-3.5V16" />
 								<path strokeWidth="2" d="M9.25 12.75h.01m5.49 0h.01" />
 								<path strokeWidth="1.5" d="M9.75 16.5h4.5" />
-							</svg>
+							</Icon>
 						</div>
 						<span
 							style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}
@@ -311,19 +304,10 @@ export function AgentDashboard({
 								;(e.currentTarget as HTMLElement).style.color = "var(--muted)"
 							}}
 						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
+							<Icon size={16} strokeWidth={2}>
 								<line x1="18" y1="6" x2="6" y2="18" />
 								<line x1="6" y1="6" x2="18" y2="18" />
-							</svg>
+							</Icon>
 						</button>
 					</div>
 				</div>
@@ -643,18 +627,9 @@ export function AgentDashboard({
 													: "1px solid var(--border-muted)",
 											}}
 										>
-											<svg
-												width="10"
-												height="10"
-												viewBox="0 0 24 24"
-												fill="none"
-												stroke="currentColor"
-												strokeWidth="2"
-												strokeLinecap="round"
-												strokeLinejoin="round"
-											>
+											<Icon size={10} strokeWidth={2}>
 												<path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7zM9 21h6" />
-											</svg>
+											</Icon>
 											Thinking: {thinkingLabel}
 										</span>
 

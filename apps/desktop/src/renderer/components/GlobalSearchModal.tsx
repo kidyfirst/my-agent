@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ThreadInfo } from "../types/ipc"
 import type { EnrichedProject } from "../types/project-list"
 import { formatRelativeTime } from "../utils/relativeTime"
+import { Icon } from "./Icon"
 
 export interface SearchItem {
 	kind: "project" | "thread"
@@ -73,20 +74,9 @@ export function filterSearchItems(
 
 function FolderGlyph() {
 	return (
-		<svg
-			width="12"
-			height="12"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.8"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			style={{ flexShrink: 0 }}
-			aria-hidden="true"
-		>
+		<Icon size={12} strokeWidth={1.8} style={{ flexShrink: 0 }}>
 			<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2a1.5 1.5 0 0 1 1.2.6l1 1.4h9.6A1.5 1.5 0 0 1 22 9.5v8A1.5 1.5 0 0 1 20.5 19h-16A1.5 1.5 0 0 1 3 17.5z" />
-		</svg>
+		</Icon>
 	)
 }
 
@@ -220,21 +210,10 @@ export function GlobalSearchModal({
 						borderBottom: "1px solid var(--border-muted)",
 					}}
 				>
-					<svg
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="var(--dim)"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						aria-hidden="true"
-						style={{ flexShrink: 0 }}
-					>
+					<Icon size={16} strokeWidth={2} style={{ flexShrink: 0 }}>
 						<circle cx="11" cy="11" r="7" />
 						<line x1="16.5" y1="16.5" x2="21" y2="21" />
-					</svg>
+					</Icon>
 					<input
 						ref={inputRef}
 						type="text"
