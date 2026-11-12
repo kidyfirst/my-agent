@@ -965,30 +965,65 @@ flowchart TD
 
 #### 3.5.4 会话内工作记忆工程优化 (L1 上下文组装)
 
-为了应对多轮复杂编码场景下的大文件传输卡顿、上下文 Token 爆炸以及历史截断导致的目标遗忘，系统在会话内短期上下文组装层（`packages/core/src/core/controller/controller.ts`）实现了五项核心工程优化：
+为了应对多轮复杂编码场景下的大文件传输卡顿、上下文 Token 爆炸、语言切换估算漂移以及历史截断导致的目标遗忘，系统在会话内短期上下文组装与预算治理层（`packages/core/src/core/controller/controller.ts` 与 `packages/core/src/core/llm/context-window.ts`）构建了全生命周期的工程治理体系：
 
-1. **大文件与资源解耦存储（Asset Decoupled Storage）**：
-   - 用户发送的图片、大文件 Base64 统一剥离，由 `AssetManager` (`packages/core/src/assets/manager.ts`) 落盘至项目根目录 `.myagent/assets/<assetId>.<ext>`（并自动生成 `.gitignore` 防误提交），不再膨胀 SQLite `myagent_messages` 记录；
-   - Electron 端注册 `myagent-asset://` 特权协议流式读取本地资产，UI 保留原生缩略图与点击查看体验；若本地资源被误删，前端自动渲染警示性错误占位卡片；大模型需要探查图片或文档细节时，通过自主调用 `assets_fetch` 工具惰性拉取内容。
-2. **历史工具调用链与 Schema 完整性（AI SDK v6 Tool Call Integrity）**：
-   - 完整还原多轮历史中的 `tool-call` 与 `tool-result`，同时规范化注入 `input` 与 `args`，彻底根除 OpenAI / DeepSeek 等服务端反序列化报错（`missing field arguments`）；
-   - 自动孤立调用补齐：若前序 Turn 发生中断或异常，自动补齐对应的 `tool-result` 占位节点，防止大模型提供商因缺少配对响应而拒绝请求。
-3. **历史工具结果渐进式折叠（Temporal Output Decay）**：
+1. **动态上下文窗口与阶梯历史预算 (Dynamic Context Window & Headroom Budgeting)**：
+   - **模型窗口自适应 (`resolveModelContextWindow`)**：告别静态硬编码，内置主流模型上下文物理窗口矩阵（Claude 3.x 200k、GPT-4o/o1/o3/Llama-3.x/Mistral 128k、Gemini 1.5/2.0 1M、DeepSeek 64k、Qwen 128k/32k，默认优雅回退 64k），并支持配置项自定义覆盖；
+   - **梯度安全预算预留 (`computeMaxHistoryTokens`)**：为静态系统指令、动态工具 Schema 声明及大模型长链思考（Thinking / Reasoning tokens）预留充分安全余量：
+     - **超小型模型 ($\le 16\text{k}$)**：保留 35% 余量（历史预算 65%，保底 2,000 tokens）；
+     - **小型模型 ($32\text{k}$)**：历史预算 72%（$\approx 23.5\text{k}$，预留 $\approx 8.5\text{k}$）；
+     - **中型模型 ($64\text{k}$)**：历史预算 75%（$= 48\text{k}$，预留 16k）；
+     - **大型模型 ($128\text{k} \sim 200\text{k}$)**：历史预算 80%（128k 对应 $\approx 102\text{k}$，200k 对应 160k）；
+     - **超大模型 ($1\text{M}+$ 如 Gemini)**：历史预算硬封顶 256,000 tokens，杜绝单轮请求无限反序列化导致的本地内存泄漏与交互延迟。
+
+2. **多态与结构感知 Token 分词估算体系 (Multi-tier Structure-Aware Token Estimation)**：
+   - 废弃全局粗暴 `/4` 的散文估算假设，在 `packages/core/src/core/llm/context-window.ts` 中实现高精度分词估算器 `estimateTextTokens(text, isJson)`：
+     - **CJK 与多字节字符感知**：主流模型 BPE 词表对中日韩字符的编码密度约为 1.3 字符/token（原 `/4` 算法会导致中文 Token 严重低估近 3 倍）。分词器对非 ASCII 字符采用 Unicode Code Point 准确统计，以 `codePoints / 1.3` 计量；
+     - **结构化 JSON 密度感知**：工具输入参数、返回值及工具 Schema 中富含引号、冒号、花括号与短键名，其实际 BPE 密度约为 2.85 字符/token（比英文散文致密约 29%）。分词器对 JSON 内容自动以 `asciiChars / 2.85` 计算，消除结构化数据的系统性低估；
+     - **零内存分配 JSON 快速探测 (`isJsonLike`)**：采用双指针无分配扫描首尾字符，支持识别 JSON 对象（`{...}`）及合法 JSON 数组（`[...]` 内部校验首元素类型与标点），杜绝将 Markdown 段落中的 `[System Note: ...]` 或引用标号误判为 JSON；
+     - **多模态 Vision 固定封顶**：在 `estimateMessageTokens` 中，对图片（Base64 或远程引用）按 1,200 tokens/张固定封顶，杜绝数兆字节的图片 Base64 膨胀为数十万 token；工具调用 `tool-call` 与 `tool-result` 自动按 JSON 结构密度计量。
+
+3. **静态基线隔离与纯对话校准环 (Pure Conversational Calibration Loop)**：
+   - **设计动机**：启发式分词估算在面临多语言混合、代码片段与不同模型 BPE 词表时存在残差，系统通过 LLM 返回的真实 `tokenUsage.promptTokens` 构建闭环反馈校准；
+   - **静态基座完全隔离**：系统提示词（`baseSystemPromptTokens`）与工具定义（`toolSchemaTokens`）属于会话生命周期内字节恒定的常量，不随对话内容漂移。最新架构将二者完全从校准比率的分母与乘法因子中剥离，仅作为静态常量独立加成：
+     $$\text{calibratedContextTokens} = \text{toolSchemaTokens} + \text{baseSystemPromptTokens} + \text{round}((\text{rawEstimatedTokens} + \text{observationTokens}) \times \text{calibrationRatio})$$
+   - **纯动态校准公式与 EMA 平滑滤波**：
+     - 动态内容基数：$\text{estimatedConversational} = \text{rawEstimatedTokens} + \text{observationTokens}$；
+     - 剥离静态常量后的实际动态消耗：$\text{actualConversational} = \max(0, \text{actualPromptTokens} - (\text{toolSchemaTokens} + \text{baseSystemPromptTokens}))$；
+     - 瞬时比率与安全夹取：$\text{observedRatio} = \text{actualConversational} / \text{estimatedConversational}$，安全 Clamp 至 $[0.5, 2.0]$；
+     - **50/50 EMA 平滑**：采用 $\text{newRatio} = \text{calibrationRatio} \times 0.5 + \text{clampedObserved} \times 0.5$；由于消除了静态常量的信号稀释，在语言从英文突变到中文时，校准比率只需 1~2 轮即可快速平稳收敛到真实基线；
+     - **短会话敏感度提升**：校准激活门槛降至 $\ge 80$ tokens，确保短会话在初始前几轮即可迅速完成自适应校准；校准结果持久化到 SQLite 线程元数据 `metadata.tokenCalibrationRatio`，会话恢复时即刻生效。
+
+4. **平滑高水位 Nudge 预警 (Smooth High-Watermark Nudge)**：
+   - 借鉴前沿长上下文治理设计，当上下文水位进入 70%~100% 区间（`calibratedContextTokens >= MAX_HISTORY_TOKENS * 0.7`）时，在组装当前推理上下文末端注入非持久化的温和预警：
+     `[Context Advisory: Context window is at ~X% capacity (current/max tokens, model window: W). Please plan your remaining edits and summarize key outcomes before automated context folding.]`；
+   - 提示大模型在即将超出窗口前主动收尾未完任务、总结关键代码进展，防范突发被动截断破坏重构逻辑；该预警纯内存临时组装，不写入 SQLite 数据库，避免污染长期上下文。
+
+5. **目标保真与持久化可逆折叠机制 (Goal-Preserving Reversible Context Folding & Anti-Oscillation Retrieval)**：
+   - **末尾免疫保护 (Tail Guard)**：超出 `MAX_HISTORY_TOKENS` 触发滑动窗口时，末尾 4 条消息（即最近 2 轮完整交互）绝对豁免折叠，保留当前正在进行的工具交互链与上下文反思能力；
+   - **首轮目标锚定 (Root Goal Anchoring)**：抽取会话首条 User 消息的核心意图，形成带原任务目标的上下文说明头，彻底杜绝长周期多轮会话产生“目标漂移”；
+   - **结构化折叠记录持久化 (`FoldedRange`)**：被裁切的历史消息打包为唯一标识的 `FoldedRange`（`fold_001`、`fold_002`...），将其元数据（包含 `startIndex`、`messageCount`、`firstMessageId`、`lastMessageId`、`messageIds`、`userGoal` 等）持久化写入 SQLite `myagent_threads` 表的 `metadata.foldedRanges`。进程重启后，仍能按 ID 精准重构并还原底层数据库记录；
+   - **按需精准召回工具 (`retrieve_folded_messages`)**：向大模型开放只读检索工具，大模型可传入 `rangeId`、`filter`（`tool_outputs` 错误/diff/日志、`user_messages`、`all`）以及可选的 `query` 正则关键词，按需查阅此前被折叠的编译报错或历史修改细节；未传 `rangeId` 时自动输出当前会话的所有可用折叠区段目录；
+   - **防震荡即时驱逐 (Anti-Oscillation Eviction)**：当大模型召回历史折叠内容后，若后续执行再度触发上下文超限，折叠引擎在裁切真实对话前，**优先扫描并驱逐前序轮次中已使用的 `retrieve_folded_messages` 临时结果**，重算 Token 预算。彻底避免“召回历史 $\rightarrow$ 上下文超限 $\rightarrow$ 截断更多对话 $\rightarrow$ 再次召回”的雪崩式上下文震荡循环。
+
+6. **历史工具结果渐进式折叠 (Temporal Output Decay)**：
    - **最新 2 轮**：保留工具完整执行结果（上限 6,000 字符），供模型即时反思与代码修改；
    - **3 轮及以前的历史 Turn**：若工具输出超过 300 字符，自动折叠为语义占位摘要（`[Tool Result: <toolName> completed. Content folded for context economy...]`），立减 70%~85% 的历史 Token 冗余。
-4. **目标保真与可逆折叠机制（Goal-Preserving Reversible Context Folding）**：
-   - 设定 64,000 Token 上下文安全预算；
-   - 超出预算触发早期轮次切除时，不仅抽取第 1 条用户消息的核心任务目标（Root Goal）锚定当前轮次头部，还将切除的消息打包为带有唯一索引标识的 `FoldedRange`（如 `fold_001`）并记录入会话元数据；
-   - 生成系统提示：`[System Note: Earlier conversation history was truncated and folded into range "fold_001" (N messages folded)... If you need to inspect previous tool outputs, errors, or code from this folded history, call the "retrieve_folded_messages" tool with rangeId "fold_001".]`；
-   - 模型在需要时可通过只读内置工具 `retrieve_folded_messages` 精准检索历史编译报错、代码 diff 或工具执行日志，实现“滑动窗口裁剪但细节完全可逆”。
-5. **倒序按需加载（Recent-First Paged Retrieval）**：
+
+7. **历史工具调用链与 Schema 完整性 (AI SDK v6 Tool Call Integrity)**：
+   - 完整还原多轮历史中的 `tool-call` 与 `tool-result`，同时规范化注入 `input` 与 `args`，彻底根除 OpenAI / DeepSeek 等服务端反序列化报错（`missing field arguments`）；
+   - 自动孤立调用补齐：若前序 Turn 发生中断或异常，自动补齐对应的 `tool-result` 占位节点，防止大模型提供商因缺少配对响应而拒绝请求。
+
+8. **大文件与资源解耦存储 (Asset Decoupled Storage)**：
+   - 用户发送的图片、大文件 Base64 统一剥离，由 `AssetManager` (`packages/core/src/assets/manager.ts`) 落盘至项目根目录 `.myagent/assets/<assetId>.<ext>`（并自动生成 `.gitignore` 防误提交），不再膨胀 SQLite `myagent_messages` 记录；
+   - Electron 端注册 `myagent-asset://` 特权协议流式读取本地资产，UI 保留原生缩略图与点击查看体验；若本地资源被误删，前端自动渲染警示性错误占位卡片；大模型需要探查图片或文档细节时，通过自主调用 `assets_fetch` 工具惰性拉取内容。
+
+9. **倒序按需加载 (Recent-First Paged Retrieval)**：
    - 历史消息通过 `ORDER BY createdAt DESC LIMIT 100` 从 SQLite 仅拉取最新 100 轮再在内存恢复时间正序，避免无上限加载全量历史引发的反序列化性能瓶颈。
-6. **平滑高水位 Nudge 预警（Smooth High-Watermark Nudge）**：
-   - 借鉴 `billion-context` 架构设计，在上下文容量到达 70%~100% 水位时，向模型注入非持久化的温和预警：`[Context Advisory: Context window is at ~X% capacity... Please plan your remaining edits and summarize key outcomes before automated context folding.]`；
-   - 帮助大模型主动收敛工作、保存关键进展，避免突发被动截断破坏重构逻辑；且该预警仅在当轮推理内存中可见，不写入 SQLite 数据库，避免污染长期上下文。
-7. **前缀缓存对齐保护（Prompt Cache Alignment & Tool Determinism）**：
-   - 工具集严格按字母升序排序（`sortToolsByName`），保证工具 schema 字节序列跨轮次绝对稳定；
-   - 静态系统指令与工具声明置于上下文最前端并注入 `cache_control: { type: "ephemeral" }` 断点，配合倒数第 2 轮 User 断点，实现长会话下 80%+ 的 Prompt Caching 命中率，大幅削减 API 成本与首字时延。
+
+10. **前缀缓存对齐保护 (Prompt Cache Alignment & Tool Determinism)**：
+    - 工具集严格按字母升序排序（`sortToolsByName`），保证工具 schema 字节序列跨轮次绝对稳定；
+    - 静态系统指令与工具声明置于上下文最前端并注入 `cache_control: { type: "ephemeral" }` 断点，配合倒数第 2 轮 User 断点，实现长会话下 80%+ 的 Prompt Caching 命中率，大幅削减 API 成本与首字时延（详见 3.5.7）。
 
 #### 3.5.5 观察性记忆运行机制与双阈值阶梯 (L2 Observational Memory)
 
@@ -1069,12 +1104,14 @@ observationalMemory: {
    - 以 `` `${obsThreshold}:${refThreshold}:${omScope}` `` 为缓存键，阈值与作用域不变时复用单例；
    - `observation.model` / `reflection.model` 为延迟解析闭包，桌面设置面板修改或模型升级时即刻生效，无需重启会话。
 2. **分词估算与非阻塞 `settled()`**：
-   - **`TokenCounter`**：采用 `ceil(len / 4)` 启发式算法，零依赖估算 token 数，`Memory` 覆写 `estimateTokens()` 统一调用；
+   - **`TokenCounter`**：轻量级字符估算器（`ceil(len / 4)`，主要用于底层 OM 触发观察与存储的粗粒度统计）；而在 L1 LLM 上下文装配与预算控制核心链路中，已全面升级为多态结构感知分词体系（`estimateTextTokens`，详见 3.5.4）；
    - **`settled()`**：直接 `Promise.resolve()`，后台观察/反思异步执行，UI 侧 `agent_end` 响应零等待；
    - **Mastra 原生 Working Memory 覆写**：清空并绕过 Mastra 单会话静态用户画像逻辑，长期记忆完全由 L2 OM 与 L3 `.myagent/` 分层承载。
 3. **自动化测试套件覆盖**：
+   - `packages/core/src/core/llm/__tests__/context-window.test.ts`：验证模型上下文窗口解析、阶梯预算分配、CJK / JSON 多态分词估算、`isJsonLike` 零拷贝探测与动态校准算法；
+   - `packages/core/src/core/controller/__tests__/memory-context.test.ts`：全面验证资产解耦脱敏、AI SDK v6 工具完整性补全、第 3 轮后的时序衰减、可逆折叠持久化与首轮用户目标锁定的滑动窗口；
+   - `packages/core/src/tools/__tests__/retrieve-folded.test.ts`：端到端验证 `retrieve_folded_messages` 工具的按需召回、范围列表索引、关键词过滤与防震荡即时驱逐；
    - `packages/core/src/memory/__tests__/memory.test.ts`：内存态 SQLite 验证线程 CRUD、消息保存/召回顺序、信号过滤、OM 配置与 `settled()`、`cloneThread`；
-   - `packages/core/src/core/controller/__tests__/memory-context.test.ts`：全面验证资产解耦脱敏、AI SDK v6 工具完整性补全、第 3 轮后的时序衰减、以及首轮用户目标锁定的滑动窗口；
    - `packages/core/src/core/llm/__tests__/prompt-cache.test.ts`：验证工具名称字典序排序、System + 倒数第二轮用户的双断点 `cacheControl` 打标与前缀稳定性；
    - `packages/core/src/memory/__tests__/project-memory.test.ts`：项目级上下文 JSON 读写、规则 Markdown CRUD、增量去重与合并；
    - `packages/core/src/tools/__tests__/project-memory.test.ts`：Agent 自主调用 `project_memory` 工具读写与管理规则端到端验证；

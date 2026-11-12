@@ -920,25 +920,66 @@ Every read and write first resolves the `memory` domain of the composite storage
 
 #### 3.5.4 In-Session Working Context Optimizations (L1 Context Assembly)
 
-To handle large file transfer latency, multi-turn tool output token bloat, and context truncation goal loss during complex coding workflows, the runtime memory assembly layer (`packages/core/src/core/controller/controller.ts`) implements five core engineering optimizations:
+To overcome large file transfer latency, multi-turn tool output token bloat, language switching estimation drift, and context truncation goal loss during complex coding workflows, the runtime context assembly and token budget governance layer (`packages/core/src/core/controller/controller.ts` and `packages/core/src/core/llm/context-window.ts`) implements a full-lifecycle engineering governance system:
 
-1. **Asset Decoupled Storage**:
-   - User-submitted images and document Base64 payloads are completely stripped from SQLite (`myagent_messages`) and stored to disk under `.myagent/assets/<assetId>.<ext>` by `AssetManager` (`packages/core/src/assets/manager.ts`), with auto-generated `.gitignore` protecting repo cleanliness.
-   - Electron registers the privileged scheme `myagent-asset://` to stream assets locally without memory bloat; missing/deleted files gracefully fall back to an informative broken asset placeholder card in the UI.
-   - The agent lazily fetches raw image or document content via the `assets_fetch` tool on demand when visual or text inspection is required.
-2. **Tool Chain Integrity (AI SDK v6 Schema Compatibility)**:
-   - Accurately reconstructs historical `tool-call` and `tool-result` message parts with normalized `input` and `args`, completely eliminating provider deserialization errors (`missing field arguments`).
-   - Auto-fills synthetic placeholder results for interrupted tool executions from aborted previous turns, preventing upstream model APIs from rejecting incomplete tool pairs.
-3. **Temporal Output Decay**:
-   - **Latest 2 turns**: Full tool execution output is preserved (up to 6,000 characters) for immediate model reasoning and code editing.
+1. **Dynamic Context Window & Headroom Budgeting**:
+   - **Model Window Auto-Resolution (`resolveModelContextWindow`)**: Eliminates static hardcoding with a built-in context window matrix covering major model families (Claude 3.x 200k, GPT-4o/o1/o3/Llama-3.x/Mistral 128k, Gemini 1.5/2.0 1M, DeepSeek 64k, Qwen 128k/32k, gracefully falling back to 64k), alongside configurable per-model overrides;
+   - **Tiered Safe Headroom Reservation (`computeMaxHistoryTokens`)**: Reserves ample headroom for static system instructions, tool schemas, and lengthy model reasoning (Thinking / Reasoning tokens):
+     - **Ultra-small models ($\le 16\text{k}$)**: Reserves 35% headroom (history budget 65%, minimum 2,000 tokens);
+     - **Small models ($32\text{k}$)**: History budget 72% ($\approx 23.5\text{k}$, reserves $\approx 8.5\text{k}$);
+     - **Medium models ($64\text{k}$)**: History budget 75% ($= 48\text{k}$, reserves 16k);
+     - **Large models ($128\text{k} \sim 200\text{k}$)**: History budget 80% (128k $\to \approx 102\text{k}$, 200k $\to 160\text{k}$);
+     - **Ultra-large models ($1\text{M}+$ like Gemini)**: History budget capped at 256,000 tokens to prevent unbounded deserialization latency and local memory pressure.
+
+2. **Multi-tier Structure-Aware Token Estimation**:
+   - Replaces naive `/4` character heuristics with a high-precision multi-tier estimator `estimateTextTokens(text, isJson)` in `packages/core/src/core/llm/context-window.ts`:
+     - **CJK & Multi-byte Awareness**: Mainstream BPE tokenizers encode CJK characters at approximately 1.3 characters per token (naive `/4` severely underestimates Chinese tokens by ~3x). The tokenizer inspects Unicode code points and scales non-ASCII characters at `codePoints / 1.3`;
+     - **Structured JSON Density Awareness**: Tool inputs, return values, and JSON schemas contain high punctuation density (quotes, colons, braces) and short property keys, encoding at ~2.85 characters per token (~29% denser than prose). The estimator applies `asciiChars / 2.85` to JSON content, completely eliminating systematic 29% underestimations;
+     - **Zero-Allocation Fast JSON Detection (`isJsonLike`)**: Uses pointer scans without allocating memory to identify JSON objects (`{...}`) and valid JSON arrays (`[...]` with initial token validation), avoiding false positives on bracketed Markdown prose (e.g. `[System Note: ...]`, citation links);
+     - **Multimodal Vision Token Cap**: In `estimateMessageTokens`, images (Base64 or URLs) are capped at a standard 1,200 tokens per image, preventing multi-megabyte payloads from blowing out token counts into the hundreds of thousands; `tool-call` and `tool-result` parts automatically use structured JSON density.
+
+3. **Static Baseline Isolation & Pure Conversational Calibration Loop**:
+   - **Design Rationale**: Heuristic token estimates naturally encounter residual drift across languages, code syntax, and provider tokenizers. The system constructs a closed-loop feedback mechanism driven by provider `tokenUsage.promptTokens`;
+   - **Complete Isolation of Static Constants**: System instructions (`baseSystemPromptTokens`) and tool schemas (`toolSchemaTokens`) are invariant structural constants. The latest architecture completely excludes them from the calibration denominator and multiplier, adding them as unskewed additive baselines:
+     $$\text{calibratedContextTokens} = \text{toolSchemaTokens} + \text{baseSystemPromptTokens} + \text{round}((\text{rawEstimatedTokens} + \text{observationTokens}) \times \text{calibrationRatio})$$
+   - **Pure Dynamic Ratio & EMA Smoothing**:
+     - Conversational estimated tokens: $\text{estimatedConversational} = \text{rawEstimatedTokens} + \text{observationTokens}$;
+     - Actual conversational usage: $\text{actualConversational} = \max(0, \text{actualPromptTokens} - (\text{toolSchemaTokens} + \text{baseSystemPromptTokens}))$;
+     - Instantaneous ratio & safety clamp: $\text{observedRatio} = \text{actualConversational} / \text{estimatedConversational}$, clamped to $[0.5, 2.0]$;
+     - **50/50 EMA Filter**: $\text{newRatio} = \text{calibrationRatio} \times 0.5 + \text{clampedObserved} \times 0.5$. With static baselines decoupled, the ratio tracks pure conversational variance and converges stably in 1-2 turns;
+     - **Short Session Responsiveness**: Threshold lowered to $\ge 80$ tokens, activating calibration within the earliest user turns; ratios are persisted to SQLite thread metadata `metadata.tokenCalibrationRatio` for zero-friction session resumption.
+
+4. **Smooth High-Watermark Nudge**:
+   - When context usage enters the 70%~100% capacity zone (`calibratedContextTokens >= MAX_HISTORY_TOKENS * 0.7`), a non-persisted advisory is injected into the prompt tail:
+     `[Context Advisory: Context window is at ~X% capacity (current/max tokens, model window: W). Please plan your remaining edits and summarize key outcomes before automated context folding.]`;
+   - Prompts the model to wrap up pending edits and consolidate findings before automatic folding occurs; injected in-memory only without cluttering SQLite history.
+
+5. **Goal-Preserving Reversible Context Folding & Anti-Oscillation Retrieval**:
+   - **Tail Guard Immunity**: When `calibratedContextTokens > MAX_HISTORY_TOKENS` triggers window compaction, the trailing 4 messages (latest 2 turns) are guaranteed immune from truncation, preserving immediate reflection and tool execution loops;
+   - **Root Goal Anchoring**: Extracts the initial user task to anchor the compacted session header, preventing goal drift over extended multi-turn interactions;
+   - **Persistent Structured Ranges (`FoldedRange`)**: Folded messages are indexed under unique identifiers (`fold_001`, `fold_002`...) and saved into SQLite thread metadata `metadata.foldedRanges` (storing `startIndex`, `messageCount`, `firstMessageId`, `lastMessageId`, `messageIds`, `userGoal`), allowing complete transcript reconstruction across application restarts;
+   - **On-Demand Inspection Tool (`retrieve_folded_messages`)**: Exposes a read-only retrieval tool allowing the model to inspect earlier compiler errors, diffs, or logs using `rangeId`, `filter` (`tool_outputs`, `user_messages`, `all`), and optional keyword `query`; invoking without `rangeId` outputs a structured catalog of all folded ranges;
+   - **Anti-Oscillation Eviction**: If retrieving folded content pushes the context window over the limit in subsequent steps, the compaction engine **evicts previous temporary `retrieve_folded_messages` results before compacting real conversation messages**, preventing context explosion cascades.
+
+6. **Temporal Output Decay**:
+   - **Latest 2 turns**: Full tool execution output is preserved (up to 6,000 characters) for immediate model reasoning and code editing;
    - **Turns older than 2 assistant turns**: Verbose outputs (> 300 characters) are collapsed into concise semantic summary placeholders (`[Tool Result: <toolName> completed. Content folded for context economy...]`), slashing historical token bloat by 70%~85%.
-4. **Goal-Preserving Sliding Window**:
-   - Maintains a safe 64,000-token historical budget.
-   - When older turns must be truncated, extracts the initial root user task and prepends a structured summary note:
-     `[System Note: Earlier conversation history was truncated (N messages folded). Original User Task: "..."]`
-     fundamentally preventing "goal drift" across extended multi-turn sessions.
-5. **Recent-First Paged Retrieval**:
+
+7. **Tool Chain Integrity (AI SDK v6 Schema Compatibility)**:
+   - Accurately reconstructs historical `tool-call` and `tool-result` message parts with normalized `input` and `args`, completely eliminating provider deserialization errors (`missing field arguments`);
+   - Auto-fills synthetic placeholder results for interrupted tool executions from aborted previous turns, preventing upstream model APIs from rejecting incomplete tool pairs.
+
+8. **Asset Decoupled Storage**:
+   - User-submitted images and document Base64 payloads are completely stripped from SQLite (`myagent_messages`) and stored to disk under `.myagent/assets/<assetId>.<ext>` by `AssetManager` (`packages/core/src/assets/manager.ts`), with auto-generated `.gitignore` protecting repo cleanliness;
+   - Electron registers the privileged scheme `myagent-asset://` to stream assets locally without memory bloat; missing/deleted files gracefully fall back to an informative broken asset placeholder card in the UI;
+   - The agent lazily fetches raw image or document content via the `assets_fetch` tool on demand when visual or text inspection is required.
+
+9. **Recent-First Paged Retrieval**:
    - History retrieval queries `ORDER BY createdAt DESC LIMIT 100` before inverting to chronological order in memory, bypassing unbounded full-table scans and deserialization overhead.
+
+10. **Prompt Cache Alignment & Tool Determinism**:
+    - Tool definitions are deterministically sorted in alphabetical order before LLM dispatch (`sortToolsByName`), eliminating schema hash discrepancies caused by non-deterministic JavaScript object key iteration;
+    - System prompts and tool definitions receive `cache_control: { type: "ephemeral" }` breakpoints alongside penultimate user turn markers, delivering 80%+ Prompt Caching hit rates and slashing TTFT latency (see Section 3.5.7).
 
 #### 3.5.5 Observational Memory Mechanics and Dual-Threshold Ladder (L2 OM)
 
@@ -1019,12 +1060,14 @@ To completely eliminate cache hash disruptions caused by dynamic timestamps, uns
    - Uses `` `${obsThreshold}:${refThreshold}:${omScope}` `` as cache key to reuse the singleton instance when thresholds and scope remain unchanged;
    - `observation.model` / `reflection.model` are deferred resolution closures, taking immediate effect upon desktop settings changes or model switches without requiring session restarts.
 2. **Token Estimation & Non-Blocking `settled()`**:
-   - **`TokenCounter`**: Implements the `ceil(len / 4)` heuristic for zero-dependency token estimation, uniformly called via `Memory.estimateTokens()`;
+   - **`TokenCounter`**: Implements the lightweight `ceil(len / 4)` heuristic for rough storage and OM observation triggering; the core L1 context assembly and token budget governance loop has been fully upgraded to a multi-tier structure-aware tokenizer (`estimateTextTokens`, see Section 3.5.4);
    - **`settled()`**: Directly returns `Promise.resolve()`, allowing background OM observation/reflection tasks to run asynchronously without blocking UI `agent_end` responses;
    - **Mastra Working Memory Overrides**: Statically bypasses Mastra's single-thread user profile system, cleanly delegating long-term memory to L2 OM and L3 `.myagent/`.
 3. **Automated Test Suite Coverage**:
+   - `packages/core/src/core/llm/__tests__/context-window.test.ts`: Validates model context window resolution, tiered budget allocation, CJK/JSON multi-tier token estimation, `isJsonLike` zero-allocation detection, and dynamic calibration algorithms;
+   - `packages/core/src/core/controller/__tests__/memory-context.test.ts`: Comprehensively tests asset decoupling, AI SDK v6 tool chain repair, temporal output decay beyond 2 turns, persistent folded ranges, and root user goal preservation;
+   - `packages/core/src/tools/__tests__/retrieve-folded.test.ts`: End-to-end tests for `retrieve_folded_messages` on-demand recall, catalog listings, query filters, and anti-oscillation eviction;
    - `packages/core/src/memory/__tests__/memory.test.ts`: Verifies in-memory SQLite thread CRUD, message ordering, transient signal filtering, OM configuration, and `settled()`;
-   - `packages/core/src/core/controller/__tests__/memory-context.test.ts`: Comprehensively tests asset decoupling, AI SDK v6 tool chain repair, temporal output decay beyond 2 turns, and root user goal preservation;
    - `packages/core/src/core/llm/__tests__/prompt-cache.test.ts`: Tests alphabetical tool ordering, dual `cacheControl` breakpoint marking, and prefix stability;
    - `packages/core/src/memory/__tests__/project-memory.test.ts`: Tests project context JSON read/write, Markdown rules CRUD, and incremental deduplication;
    - `packages/core/src/tools/__tests__/project-memory.test.ts`: Tests end-to-end autonomous invocation of the `project_memory` tool by the agent;
