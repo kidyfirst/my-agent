@@ -140,22 +140,41 @@ export function computeMaxHistoryTokens(contextWindow: number): number {
 const NON_ASCII_RE = /[^\x00-\x7f]/
 
 /**
- * Fixed-ratio text token estimator.
+ * Fast check for JSON object or array structure ({...} or [...]) without allocating memory.
+ */
+export function isJsonLike(text: string): boolean {
+	if (!text || text.length < 2) return false
+	let start = 0
+	while (start < text.length && text.charCodeAt(start) <= 32) start++
+	if (start >= text.length) return false
+	let end = text.length - 1
+	while (end > start && text.charCodeAt(end) <= 32) end--
+	const first = text.charCodeAt(start)
+	const last = text.charCodeAt(end)
+	return (first === 123 && last === 125) || (first === 91 && last === 93)
+}
+
+/**
+ * Fixed-ratio text token estimator with JSON density and CJK awareness.
  *
  * A flat `length / 4` assumes ~4 characters per token, which only holds for
- * ASCII prose. BPE vocabularies encode CJK at roughly 1.3 characters per token,
- * so a flat /4 underestimates Chinese by ~3x and can let a session blow past the
- * model's real context window before folding ever triggers.
+ * ASCII prose. Two major classes violate this:
+ * 1. BPE vocabularies encode CJK at roughly 1.3 characters per token (~3x denser than /4).
+ * 2. Structured JSON content (e.g. `{"id":0,"path":"/src/file0.ts"}`) has high punctuation
+ *    density (quotes, colons, commas, braces) and short property keys, encoding at ~2.85
+ *    characters per token (~29% denser than /4 prose).
  *
- * This walks code points once (same cost class as `length / 4`, no BPE lookup)
- * and weights ASCII and non-ASCII separately. Rounding is left to the caller so
- * that many small fragments don't each round up and accumulate bias.
+ * This walks code points once and applies category-specific weights:
+ * - Prose ASCII: length / 4
+ * - Structured JSON ASCII: length / 2.85
+ * - CJK / non-ASCII: code points / 1.3
  */
-export function estimateTextTokens(text: string): number {
+export function estimateTextTokens(text: string, isJson?: boolean): number {
 	if (!text) return 0
-	// 纯 ASCII: every code unit is < 128, so the weighted result collapses to
-	// length / 4. A regex scan is far cheaper than a per-character JS loop.
-	if (!NON_ASCII_RE.test(text)) return text.length / 4
+	const jsonMode = isJson !== undefined ? isJson : isJsonLike(text)
+	const asciiDivisor = jsonMode ? 2.85 : 4
+
+	if (!NON_ASCII_RE.test(text)) return text.length / asciiDivisor
 
 	let asciiChars = 0
 	let nonAsciiChars = 0
@@ -173,7 +192,7 @@ export function estimateTextTokens(text: string): number {
 			nonAsciiChars++
 		}
 	}
-	return asciiChars / 4 + nonAsciiChars / 1.3
+	return asciiChars / asciiDivisor + nonAsciiChars / 1.3
 }
 
 /**
@@ -190,7 +209,7 @@ export function estimateToolsSchemaTokens(tools?: Record<string, any>): number {
 		const schema = t?.parameters || t?.inputSchema
 		if (schema) {
 			try {
-				tokens += estimateTextTokens(JSON.stringify(schema))
+				tokens += estimateTextTokens(JSON.stringify(schema), true)
 			} catch {}
 		}
 	}
@@ -207,7 +226,9 @@ export function estimateMessageTokens(msg: any): number {
 		return Math.ceil(estimateTextTokens(msg.content))
 	}
 	if (!Array.isArray(msg.content)) {
-		return Math.ceil(estimateTextTokens(JSON.stringify(msg.content || "")))
+		return Math.ceil(
+			estimateTextTokens(JSON.stringify(msg.content || ""), true),
+		)
 	}
 
 	let tokens = 0
@@ -221,11 +242,14 @@ export function estimateMessageTokens(msg: any): number {
 			tokens += 1_200
 		} else if (part.type === "tool-call") {
 			const inputStr = JSON.stringify(part.args || part.input || {})
-			tokens += estimateTextTokens(`${part.toolName || ""}${inputStr}`)
+			tokens += estimateTextTokens(`${part.toolName || ""}${inputStr}`, true)
 		} else if (part.type === "tool-result") {
 			const res = part.output !== undefined ? part.output : part.result
 			const resStr = typeof res === "string" ? res : JSON.stringify(res || "")
-			tokens += estimateTextTokens(resStr)
+			tokens += estimateTextTokens(
+				resStr,
+				typeof res !== "string" || isJsonLike(resStr),
+			)
 		} else {
 			// Strip large base64/data payloads before stringifying arbitrary parts
 			const clone = { ...part }
@@ -237,7 +261,7 @@ export function estimateMessageTokens(msg: any): number {
 			) {
 				delete clone.data
 			}
-			tokens += estimateTextTokens(JSON.stringify(clone))
+			tokens += estimateTextTokens(JSON.stringify(clone), true)
 		}
 	}
 	return Math.ceil(tokens)

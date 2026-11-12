@@ -949,5 +949,18 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 		}
 		const chineseToolTokens = estimateToolsSchemaTokens(chineseTool)
 		expect(chineseToolTokens).toBeGreaterThan(30)
+
+		// 6. JSON structured outputs: density ~2.85 chars/token eliminates the ~29% systematic underestimate
+		const jsonToolResult = '{"id":0,"path":"/src/file0.ts"}'
+		const jsonEstimated = Math.ceil(estimateTextTokens(jsonToolResult))
+		const jsonLegacyDiv4 = Math.ceil(jsonToolResult.length / 4) // 8 tokens
+		expect(jsonLegacyDiv4).toBe(8)
+		expect(jsonEstimated).toBe(11) // 31 / 2.85 = 10.88 -> 11 tokens
+
+		// Normal prose ASCII still uses / 4 cleanly
+		const proseAscii = "The quick brown fox jumps over the lazy dog."
+		expect(Math.ceil(estimateTextTokens(proseAscii))).toBe(
+			Math.ceil(proseAscii.length / 4),
+		)
 	})
 })
