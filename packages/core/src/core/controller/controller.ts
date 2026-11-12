@@ -2641,10 +2641,8 @@ export class Session<TState = any> {
 
 			const totalEstimatedTokens =
 				toolSchemaTokens +
-				Math.round(
-					(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
-						calibrationRatio,
-				)
+				baseSystemPromptTokens +
+				Math.round((rawEstimatedTokens + observationTokens) * calibrationRatio)
 
 			// Observational memory: fold earlier turns into a rolling summary
 			// carried in the system prompt so the truncation window can drop raw
@@ -2781,13 +2779,11 @@ export class Session<TState = any> {
 			}
 
 			// Include observationBlock, tool schema and system prompt tokens in the total estimated context tokens.
-			// Tool schema is an invariant structural constant; dynamic calibration ratio applies only to conversational content.
+			// System prompt and tool schemas are invariant structural constants; dynamic calibration applies exclusively to conversational messages & observations.
 			let calibratedContextTokens =
 				toolSchemaTokens +
-				Math.round(
-					(rawEstimatedTokens + observationTokens + baseSystemPromptTokens) *
-						calibrationRatio,
-				)
+				baseSystemPromptTokens +
+				Math.round((rawEstimatedTokens + observationTokens) * calibrationRatio)
 
 			// Smooth Nudge: high-watermark warning when context usage is between 70% and 100%
 			const NUDGE_THRESHOLD = Math.floor(MAX_HISTORY_TOKENS * 0.7)
@@ -2851,11 +2847,9 @@ export class Session<TState = any> {
 					}
 					calibratedContextTokens =
 						toolSchemaTokens +
+						baseSystemPromptTokens +
 						Math.round(
-							(rawEstimatedTokens +
-								observationTokens +
-								baseSystemPromptTokens) *
-								calibrationRatio,
+							(rawEstimatedTokens + observationTokens) * calibrationRatio,
 						)
 				}
 			}
@@ -2863,9 +2857,8 @@ export class Session<TState = any> {
 			if (calibratedContextTokens > MAX_HISTORY_TOKENS) {
 				let keptTokens =
 					toolSchemaTokens +
-					Math.round(
-						(observationTokens + baseSystemPromptTokens) * calibrationRatio,
-					)
+					baseSystemPromptTokens +
+					Math.round(observationTokens * calibrationRatio)
 				// Ensure at least the last 4 messages (recent 2 turns) are immune from folding
 				const maxFoldIndex = Math.max(0, coreMessages.length - 4)
 				let startIndex = maxFoldIndex
@@ -3182,25 +3175,33 @@ export class Session<TState = any> {
 			}
 
 			// Dynamic token calibration update from actual LanguageModelUsage.
-			// Isolates static tool schema overhead so calibration exclusively tracks dynamic conversational content.
+			// Isolates static constants (tool schemas + base system prompt) so calibration
+			// exclusively tracks dynamic conversational content (messages + observation memory).
+			//
+			// Note on Prompt Caching: Provider usage (e.g. usage.inputTokens from Anthropic or OpenAI)
+			// reports the total input tokens for the request, including cached and uncached tokens.
+			// Preflight estimates similarly estimate the complete input context, so numerator and
+			// denominator represent the exact same prompt payload.
 			const actualPromptTokens = runResult.tokenUsage?.promptTokens
 			let newCalibrationRatio = calibrationRatio
 			if (actualPromptTokens && actualPromptTokens > 0) {
-				const estimatedDynamicTokens =
-					rawEstimatedTokens + observationTokens + baseSystemPromptTokens
-				if (estimatedDynamicTokens >= 300) {
-					// Subtract static tool schema overhead so calibration exclusively tracks dynamic conversation content
-					const actualDynamicTokens = Math.max(
+				const estimatedConversationalTokens =
+					rawEstimatedTokens + observationTokens
+				if (estimatedConversationalTokens >= 80) {
+					// Subtract invariant structural constants (tool schemas + base system prompt)
+					const actualConversationalTokens = Math.max(
 						0,
-						actualPromptTokens - toolSchemaTokens,
+						actualPromptTokens - (toolSchemaTokens + baseSystemPromptTokens),
 					)
-					const observedRatio = actualDynamicTokens / estimatedDynamicTokens
+					const observedRatio =
+						actualConversationalTokens / estimatedConversationalTokens
 					const clampedObserved = Math.min(Math.max(observedRatio, 0.5), 2.0)
-					// Exponential moving average: 60% historical baseline, 40% latest observation
-					// to prevent abrupt step-change distortions when topic, language or format shifts temporarily
+					// Exponential moving average: 50% historical baseline, 50% latest observation.
+					// With invariant system prompt and tool schemas completely removed from the denominator,
+					// the ratio tracks pure conversational language/format shifts and converges in 1-2 turns.
 					newCalibrationRatio =
 						Math.round(
-							(calibrationRatio * 0.6 + clampedObserved * 0.4) * 1000,
+							(calibrationRatio * 0.5 + clampedObserved * 0.5) * 1000,
 						) / 1000
 					this._setTokenCalibration(threadId, newCalibrationRatio)
 				}

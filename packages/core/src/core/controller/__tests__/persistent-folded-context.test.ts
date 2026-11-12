@@ -11,6 +11,7 @@ import {
 	estimateMessageTokens,
 	estimateMessagesTokens,
 	estimateTextTokens,
+	isJsonLike,
 } from "../../llm/context-window.js"
 
 function streamOf(chunks: any[]): ReadableStream {
@@ -962,5 +963,22 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 		expect(Math.ceil(estimateTextTokens(proseAscii))).toBe(
 			Math.ceil(proseAscii.length / 4),
 		)
+
+		// 7. isJsonLike differentiates valid JSON from bracketed prose/notes
+		expect(
+			isJsonLike(
+				"[System Note: Earlier conversation history was truncated and folded into range fold_001]",
+			),
+		).toBe(false)
+		expect(
+			isJsonLike(
+				"[Context Advisory: Context window is at ~80% capacity (8000/10000 tokens)]",
+			),
+		).toBe(false)
+		expect(isJsonLike("[1] Citation reference in markdown text]")).toBe(false)
+		expect(isJsonLike("{ plain text without colons }")).toBe(false)
+		expect(isJsonLike('["index.ts", "package.json"]')).toBe(true)
+		expect(isJsonLike('{"id":0,"path":"/src/file0.ts"}')).toBe(true)
+		expect(isJsonLike("[1, 2, 3]")).toBe(true)
 	})
 })

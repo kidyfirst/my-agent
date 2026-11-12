@@ -141,6 +141,7 @@ const NON_ASCII_RE = /[^\x00-\x7f]/
 
 /**
  * Fast check for JSON object or array structure ({...} or [...]) without allocating memory.
+ * Differentiates valid JSON arrays from bracketed markdown prose/notes (e.g. [System Note:...], [1]).
  */
 export function isJsonLike(text: string): boolean {
 	if (!text || text.length < 2) return false
@@ -151,7 +152,44 @@ export function isJsonLike(text: string): boolean {
 	while (end > start && text.charCodeAt(end) <= 32) end--
 	const first = text.charCodeAt(start)
 	const last = text.charCodeAt(end)
-	return (first === 123 && last === 125) || (first === 91 && last === 93)
+
+	// JSON object: starts with "{" and ends with "}"
+	if (first === 123 && last === 125) {
+		// Empty object "{}" or contains ":" for key-value pair
+		if (end - start <= 2) return true
+		return text.indexOf(":", start) !== -1
+	}
+
+	// JSON array: starts with "[" and ends with "]"
+	if (first === 91 && last === 93) {
+		// Empty array "[]"
+		if (end - start <= 2) return true
+		let inner = start + 1
+		while (inner < end && text.charCodeAt(inner) <= 32) inner++
+		if (inner === end) return true
+		const nextChar = text.charCodeAt(inner)
+		// In valid JSON, an element can only start with ", {, [, digit, -, t, f, n
+		const isJsonElement =
+			nextChar === 34 || // "
+			nextChar === 123 || // {
+			nextChar === 91 || // [
+			(nextChar >= 48 && nextChar <= 57) || // 0-9
+			nextChar === 45 || // -
+			nextChar === 116 || // t (true)
+			nextChar === 102 || // f (false)
+			nextChar === 110 // n (null)
+		if (!isJsonElement) return false
+		// For longer arrays (>20 chars), valid JSON arrays contain commas, colons, or quotes
+		if (end - start > 20) {
+			return (
+				text.indexOf(",", start) !== -1 ||
+				text.indexOf(":", start) !== -1 ||
+				text.indexOf('"', start) !== -1
+			)
+		}
+		return true
+	}
+	return false
 }
 
 /**
