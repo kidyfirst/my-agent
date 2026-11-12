@@ -1,3 +1,5 @@
+import { StopIcon } from "./icons"
+
 /**
  * Marks the point where the user stopped a run.
  *
@@ -54,17 +56,7 @@ export function InterruptedNotice({
 					whiteSpace: "nowrap",
 				}}
 			>
-				<svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
-					<rect
-						x="0.5"
-						y="0.5"
-						width="7"
-						height="7"
-						rx="2"
-						fill="currentColor"
-						opacity="0.5"
-					/>
-				</svg>
+				<StopIcon size={8} style={{ opacity: 0.5 }} />
 				{label}
 				{onRevert && (
 					<button

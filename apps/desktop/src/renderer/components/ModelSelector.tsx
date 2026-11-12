@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react"
+import { CloseIcon, ChevronDownIcon } from "./icons"
 
 export interface ModelInfo {
 	id: string
@@ -343,19 +344,7 @@ export function ModelSelector({
 								;(e.currentTarget as HTMLElement).style.color = "var(--muted)"
 							}}
 						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
-								<line x1="18" y1="6" x2="6" y2="18" />
-								<line x1="6" y1="6" x2="18" y2="18" />
-							</svg>
+							<CloseIcon size={16} strokeWidth={2} />
 						</button>
 					</div>
 				</div>
@@ -536,24 +525,16 @@ export function ModelPickerInline({
 				</span>
 
 				{/* Unified SVG Chevron */}
-				<svg
-					width="12"
-					height="12"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
+				<ChevronDownIcon
+					size={12}
+					strokeWidth={2}
 					style={{
 						color: "var(--muted)",
 						transform: open ? "rotate(180deg)" : "rotate(0deg)",
 						transition: "transform 0.15s ease",
 						flexShrink: 0,
 					}}
-				>
-					<polyline points="6 9 12 15 18 9" />
-				</svg>
+				/>
 			</button>
 			{isUnauth && !open && (
 				<div style={{ fontSize: 10, color: "var(--warning)", marginTop: 2 }}>

@@ -6,7 +6,7 @@ import { ShortcutTooltip } from "./ShortcutTooltip"
 import { WindowToggleIcon } from "./WindowToggleIcon"
 import { LogIcon } from "./LogIcon"
 import { LibraryIcon } from "./LibraryIcon"
-import { BotIcon } from "./icons"
+import { BotIcon, ChevronRightIcon, DownloadIcon, GearIcon, SearchIcon, DownloadProgressRing } from "./icons"
 
 import { CommunityBanner } from "./sidebar/CommunityBanner"
 import {
@@ -119,25 +119,6 @@ const providers = [
 	{ id: "google", label: "Google" },
 	{ id: "deepseek", label: "DeepSeek" },
 ]
-
-function SearchIcon({ size = 14 }: { size?: number }) {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.3"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			aria-hidden="true"
-		>
-			<circle cx="11" cy="11" r="7" />
-			<line x1="16.5" y1="16.5" x2="21" y2="21" />
-		</svg>
-	)
-}
 
 export function Sidebar({
 	threads,
@@ -665,19 +646,7 @@ export function Sidebar({
 							)
 						})()}
 						{/* Arrow icon */}
-						<svg
-							width="12"
-							height="12"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="var(--dim)"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							style={{ flexShrink: 0 }}
-						>
-							<polyline points="9 18 15 12 9 6" />
-						</svg>
+						<ChevronRightIcon size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
 					</button>
 
 					{/* Update notification download button */}
@@ -718,67 +687,9 @@ export function Sidebar({
 							}}
 						>
 							{downloadProgress ? (
-								<svg
-									width="24"
-									height="24"
-									viewBox="0 0 24 24"
-									style={{ display: "block" }}
-								>
-									{/* Inner concentric core / orb (Codex style) */}
-									<circle
-										cx="12"
-										cy="12"
-										r="3.5"
-										fill="currentColor"
-										fillOpacity={0.45}
-									/>
-									{/* Background circular track */}
-									<circle
-										cx="12"
-										cy="12"
-										r="7.5"
-										fill="none"
-										stroke="currentColor"
-										strokeOpacity={0.25}
-										strokeWidth="2.2"
-									/>
-									{/* Dynamic progress ring (clockwise from top) */}
-									<circle
-										cx="12"
-										cy="12"
-										r="7.5"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2.2"
-										strokeLinecap="round"
-										strokeDasharray={2 * Math.PI * 7.5}
-										strokeDashoffset={
-											2 *
-											Math.PI *
-											7.5 *
-											(1 -
-												Math.min(Math.max(downloadProgress.percent, 0), 100) /
-													100)
-										}
-										transform="rotate(-90 12 12)"
-										style={{ transition: "stroke-dashoffset 0.25s ease-out" }}
-									/>
-								</svg>
+								<DownloadProgressRing percent={downloadProgress.percent} size={24} />
 							) : (
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2.5"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<line x1="12" y1="4" x2="12" y2="15" />
-									<polyline points="7 10 12 15 17 10" />
-									<path d="M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
-								</svg>
+								<DownloadIcon size={14} strokeWidth={2.5} />
 							)}
 						</button>
 					)}
@@ -800,19 +711,7 @@ export function Sidebar({
 							alignItems: "center",
 						}}
 					>
-						<svg
-							width="16"
-							height="16"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
-							<circle cx="12" cy="12" r="3" />
-							<path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-						</svg>
+						<GearIcon size={16} strokeWidth={2} />
 					</button>
 				</div>
 			</div>

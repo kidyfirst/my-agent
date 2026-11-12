@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
+import { ChevronDownIcon, CheckIcon } from "./icons"
 
 export interface SelectOption {
 	value: string
@@ -134,24 +135,16 @@ export function Select({
 				</span>
 
 				{/* Unified SVG Chevron */}
-				<svg
-					width="12"
-					height="12"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
+				<ChevronDownIcon
+					size={12}
+					strokeWidth={2}
 					style={{
 						color: "var(--muted)",
 						transform: open ? "rotate(180deg)" : "rotate(0deg)",
 						transition: "transform 0.15s ease",
 						flexShrink: 0,
 					}}
-				>
-					<polyline points="6 9 12 15 18 9" />
-				</svg>
+				/>
 			</button>
 
 			{/* Dropdown Popover */}
@@ -218,18 +211,7 @@ export function Select({
 									<span>{opt.label}</span>
 								</span>
 								{isSelected && (
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="var(--accent)"
-										strokeWidth="2.5"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<polyline points="20 6 9 17 4 12" />
-									</svg>
+									<CheckIcon size={12} stroke="var(--accent)" strokeWidth={2.5} />
 								)}
 							</button>
 						)

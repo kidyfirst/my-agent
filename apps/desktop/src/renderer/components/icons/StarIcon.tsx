@@ -1,24 +1,32 @@
 import type React from "react"
 import type { IconProps } from "./types"
 
+export interface StarIconProps extends IconProps {
+	filled?: boolean
+}
+
 export function StarIcon({
 	size = 16,
 	strokeWidth = 1.5,
 	viewBox = "0 0 24 24",
-	fill = "none",
-	stroke = "currentColor",
+	fill,
+	stroke,
+	filled = false,
 	strokeLinecap = "round",
 	strokeLinejoin = "round",
 	style,
+	color,
 	...props
-}: IconProps) {
+}: StarIconProps) {
+	const effectiveFill = fill ?? (filled ? color || "var(--warning)" : "none")
+	const effectiveStroke = stroke ?? (color || (filled ? "var(--warning)" : "currentColor"))
 	return (
 		<svg
 			width={size}
 			height={size}
 			viewBox={viewBox}
-			fill={fill}
-			stroke={stroke}
+			fill={effectiveFill}
+			stroke={effectiveStroke}
 			strokeWidth={strokeWidth}
 			strokeLinecap={strokeLinecap}
 			strokeLinejoin={strokeLinejoin}

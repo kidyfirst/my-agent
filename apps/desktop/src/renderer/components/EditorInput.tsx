@@ -19,6 +19,19 @@ import {
 } from "@my-agent/core"
 import type { AttachedFile, QueuedMessage } from "../types/chat"
 import { ToolApprovalCard, type PendingApprovalData } from "./ToolApprovalCard"
+import {
+	ZapIcon,
+	LockIcon,
+	ShieldIcon,
+	InfoIcon,
+	PlusIcon,
+	ChevronUpIcon,
+	ChevronRightIcon,
+	CheckIcon,
+	BarChartIcon,
+	GraphIcon,
+	ArrowRightIcon,
+} from "./icons"
 
 export type { AttachedFile }
 
@@ -162,37 +175,14 @@ function PermissionIcon({
 	size?: number
 	color?: string
 }) {
-	const common = {
-		width: size,
-		height: size,
-		viewBox: "0 0 24 24",
-		fill: "none" as const,
-		stroke: "currentColor",
-		strokeWidth: 2,
-		strokeLinecap: "round" as const,
-		strokeLinejoin: "round" as const,
-		style: color ? { color } : undefined,
-	}
+	const style = color ? { color } : undefined
 	if (mode === "auto-approve") {
-		return (
-			<svg {...common}>
-				<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-			</svg>
-		)
+		return <ZapIcon size={size} strokeWidth={2} style={style} />
 	}
 	if (mode === "read-only") {
-		return (
-			<svg {...common}>
-				<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-				<path d="M7 11V7a5 5 0 0 1 10 0v4" />
-			</svg>
-		)
+		return <LockIcon size={size} strokeWidth={2} style={style} />
 	}
-	return (
-		<svg {...common}>
-			<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-		</svg>
-	)
+	return <ShieldIcon size={size} strokeWidth={2} style={style} />
 }
 
 export function EditorInput({
@@ -1055,21 +1045,7 @@ export function EditorInput({
 							pointerEvents: "none",
 						}}
 					>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							style={{ flexShrink: 0 }}
-						>
-							<circle cx="12" cy="12" r="10" />
-							<line x1="12" y1="8" x2="12" y2="12" />
-							<line x1="12" y1="16" x2="12.01" y2="16" />
-						</svg>
+						<InfoIcon size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
 						<span>{busyPrompt}</span>
 					</div>
 				)}
@@ -1346,19 +1322,7 @@ export function EditorInput({
 									e.currentTarget.style.backgroundColor = "transparent"
 								}}
 							>
-								<svg
-									width="15"
-									height="15"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<line x1="12" y1="5" x2="12" y2="19" />
-									<line x1="5" y1="12" x2="19" y2="12" />
-								</svg>
+								<PlusIcon size={15} strokeWidth={2} />
 							</button>
 							<input
 								ref={fileInputRef}
@@ -1487,24 +1451,16 @@ export function EditorInput({
 											{currentThinkingDisplay}
 										</span>
 									)}
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
+									<ChevronUpIcon
+										size={12}
+										strokeWidth={2}
 										style={{
 											color: "var(--muted)",
 											transform: isModelMenuOpen ? "rotate(180deg)" : "none",
 											transition: "transform 0.15s",
 											flexShrink: 0,
 										}}
-									>
-										<polyline points="18 15 12 9 6 15" />
-									</svg>
+									/>
 								</button>
 
 								{/* Upward Thinking Slider Popover */}
@@ -1775,21 +1731,7 @@ export function EditorInput({
 														gap: 6,
 													}}
 												>
-													<svg
-														width="13"
-														height="13"
-														viewBox="0 0 24 24"
-														fill="none"
-														stroke="currentColor"
-														strokeWidth="2"
-														strokeLinecap="round"
-														strokeLinejoin="round"
-														style={{ flexShrink: 0 }}
-													>
-														<circle cx="12" cy="12" r="10" />
-														<line x1="12" y1="8" x2="12" y2="12" />
-														<line x1="12" y1="16" x2="12.01" y2="16" />
-													</svg>
+													<InfoIcon size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
 													<span>{busyPrompt}</span>
 												</div>
 											)}
@@ -1965,36 +1907,18 @@ export function EditorInput({
 																										)
 																									: "High"}
 																							</span>
-																							<svg
-																								width="12"
-																								height="12"
-																								viewBox="0 0 24 24"
-																								fill="none"
-																								stroke="currentColor"
-																								strokeWidth="2"
-																								strokeLinecap="round"
-																								strokeLinejoin="round"
-																								style={{
-																									color: "var(--muted)",
-																								}}
-																							>
-																								<polyline points="9 18 15 12 9 6" />
-																							</svg>
+																							<ChevronRightIcon
+																								size={12}
+																								strokeWidth={2}
+																								style={{ color: "var(--muted)" }}
+																							/>
 																						</>
 																					) : (
 																						isSelected && (
-																							<svg
-																								width="14"
-																								height="14"
-																								viewBox="0 0 24 24"
-																								fill="none"
-																								stroke="currentColor"
-																								strokeWidth="2.5"
-																								strokeLinecap="round"
-																								strokeLinejoin="round"
-																							>
-																								<polyline points="20 6 9 17 4 12" />
-																							</svg>
+																							<CheckIcon
+																								size={14}
+																								strokeWidth={2.5}
+																							/>
 																						)
 																					)}
 																				</div>
@@ -2059,19 +1983,11 @@ export function EditorInput({
 																flex: 1,
 															}}
 														>
-															<svg
-																width="13"
-																height="13"
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth="2"
-																strokeLinecap="round"
-																strokeLinejoin="round"
+															<BarChartIcon
+																size={13}
+																strokeWidth={2}
 																style={{ flexShrink: 0 }}
-															>
-																<path d="M12 20v-6M6 20V10M18 20V4" />
-															</svg>
+															/>
 															<span
 																style={{
 																	overflow: "hidden",
@@ -2082,19 +1998,11 @@ export function EditorInput({
 																Model Catalog & Settings
 															</span>
 														</div>
-														<svg
-															width="12"
-															height="12"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2"
-															strokeLinecap="round"
-															strokeLinejoin="round"
+														<ChevronRightIcon
+															size={12}
+															strokeWidth={2}
 															style={{ flexShrink: 0, marginLeft: 6 }}
-														>
-															<polyline points="9 18 15 12 9 6" />
-														</svg>
+														/>
 													</button>
 												</div>
 											)}
@@ -2198,18 +2106,7 @@ export function EditorInput({
 															>
 																<span>{lvl.label}</span>
 																{isLvlSelected && (
-																	<svg
-																		width="14"
-																		height="14"
-																		viewBox="0 0 24 24"
-																		fill="none"
-																		stroke="currentColor"
-																		strokeWidth="2.5"
-																		strokeLinecap="round"
-																		strokeLinejoin="round"
-																	>
-																		<polyline points="20 6 9 17 4 12" />
-																	</svg>
+																	<CheckIcon size={14} strokeWidth={2.5} />
 																)}
 															</button>
 														)
@@ -2266,24 +2163,16 @@ export function EditorInput({
 									<span style={{ whiteSpace: "nowrap" }}>
 										{currentModeConfig.label}
 									</span>
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
+									<ChevronUpIcon
+										size={12}
+										strokeWidth={2}
 										style={{
 											color: "var(--muted)",
 											transform: isModeMenuOpen ? "rotate(180deg)" : "none",
 											transition: "transform 0.15s",
 											flexShrink: 0,
 										}}
-									>
-										<polyline points="18 15 12 9 6 15" />
-									</svg>
+									/>
 								</button>
 
 								{/* Mode Popover */}
@@ -2334,21 +2223,7 @@ export function EditorInput({
 													gap: 6,
 												}}
 											>
-												<svg
-													width="13"
-													height="13"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth="2"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													style={{ flexShrink: 0 }}
-												>
-													<circle cx="12" cy="12" r="10" />
-													<line x1="12" y1="8" x2="12" y2="12" />
-													<line x1="12" y1="16" x2="12.01" y2="16" />
-												</svg>
+												<InfoIcon size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
 												<span>{busyPrompt}</span>
 											</div>
 										)}
@@ -2438,19 +2313,11 @@ export function EditorInput({
 														</span>
 													</div>
 													{isSelected && (
-														<svg
-															width="14"
-															height="14"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2.5"
-															strokeLinecap="round"
-															strokeLinejoin="round"
+														<CheckIcon
+															size={14}
+															strokeWidth={2.5}
 															style={{ flexShrink: 0, marginTop: 2 }}
-														>
-															<polyline points="20 6 9 17 4 12" />
-														</svg>
+														/>
 													)}
 												</button>
 											)
@@ -2509,23 +2376,11 @@ export function EditorInput({
 															flex: 1,
 														}}
 													>
-														<svg
-															width="13"
-															height="13"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2"
-															strokeLinecap="round"
-															strokeLinejoin="round"
+														<GraphIcon
+															size={13}
+															strokeWidth={2}
 															style={{ flexShrink: 0 }}
-														>
-															<circle cx="6" cy="6" r="3" />
-															<circle cx="18" cy="18" r="3" />
-															<circle cx="18" cy="6" r="3" />
-															<path d="M8.5 7.5L15.5 16.5" />
-															<path d="M8.5 6h7" />
-														</svg>
+														/>
 														<span
 															style={{
 																overflow: "hidden",
@@ -2536,19 +2391,11 @@ export function EditorInput({
 															View Execution Graph Topology...
 														</span>
 													</div>
-													<svg
-														width="12"
-														height="12"
-														viewBox="0 0 24 24"
-														fill="none"
-														stroke="currentColor"
-														strokeWidth="2"
-														strokeLinecap="round"
-														strokeLinejoin="round"
+													<ChevronRightIcon
+														size={12}
+														strokeWidth={2}
 														style={{ flexShrink: 0, marginLeft: 6 }}
-													>
-														<polyline points="9 18 15 12 9 6" />
-													</svg>
+													/>
 												</button>
 											</>
 										)}
@@ -2632,15 +2479,9 @@ export function EditorInput({
 										<span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
 											{permissionLabel}
 										</span>
-										<svg
-											width="12"
-											height="12"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
+										<ChevronUpIcon
+											size={12}
+											strokeWidth={2}
 											style={{
 												color: "var(--muted)",
 												transform: isPermissionMenuOpen
@@ -2649,9 +2490,7 @@ export function EditorInput({
 												transition: "transform 0.15s",
 												flexShrink: 0,
 											}}
-										>
-											<polyline points="18 15 12 9 6 15" />
-										</svg>
+										/>
 									</>
 								)}
 							</button>
@@ -2741,18 +2580,11 @@ export function EditorInput({
 															{opt.label}
 														</span>
 														{isSelected && (
-															<svg
-																width="13"
-																height="13"
-																viewBox="0 0 24 24"
-																fill="none"
+															<CheckIcon
+																size={13}
 																stroke="var(--accent)"
-																strokeWidth="2.5"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															>
-																<polyline points="20 6 9 17 4 12" />
-															</svg>
+																strokeWidth={2.5}
+															/>
 														)}
 													</div>
 													<div
@@ -2845,19 +2677,7 @@ export function EditorInput({
 											e.currentTarget.style.transform = "scale(1)"
 										}}
 									>
-										<svg
-											width="16"
-											height="16"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2.2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<line x1="5" y1="12" x2="19" y2="12" />
-											<polyline points="12 5 19 12 12 19" />
-										</svg>
+										<ArrowRightIcon size={16} strokeWidth={2.2} />
 									</button>
 								) : isAgentActive ? (
 									<button
@@ -2917,19 +2737,7 @@ export function EditorInput({
 											opacity: 0.5,
 										}}
 									>
-										<svg
-											width="16"
-											height="16"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2.2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<line x1="5" y1="12" x2="19" y2="12" />
-											<polyline points="12 5 19 12 12 19" />
-										</svg>
+										<ArrowRightIcon size={16} strokeWidth={2.2} />
 									</button>
 								)}
 							</div>

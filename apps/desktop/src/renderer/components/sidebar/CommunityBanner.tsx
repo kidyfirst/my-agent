@@ -5,6 +5,7 @@ import appLogo from "../../assets/logo.png"
 import { BRAND_MARKS } from "./brandMarks"
 import { claimMenu, releaseMenu } from "../../utils/menuRegistry"
 import { SIDEBAR_DEFAULT_WIDTH } from "../../utils/sidebarResize"
+import { StarIcon, CoffeeIcon, ShareIcon, BrandMarkIcon } from "../icons"
 import {
 	REPO_URL,
 	STAR_TIERS,
@@ -493,15 +494,7 @@ function BrandBadge({
 				e.currentTarget.style.boxShadow = "none"
 			}}
 		>
-			<svg
-				width="16"
-				height="16"
-				viewBox="0 0 24 24"
-				fill={mark.glyphColor}
-				aria-hidden="true"
-			>
-				{mark.glyph}
-			</svg>
+			<BrandMarkIcon mark={mark} size={16} />
 		</button>
 	)
 }
@@ -577,60 +570,5 @@ function Action({
 				</span>
 			)}
 		</button>
-	)
-}
-
-function StarIcon({ size = 13 }: { size?: number }) {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="currentColor"
-			stroke="currentColor"
-			strokeWidth="1"
-			strokeLinejoin="round"
-			aria-hidden="true"
-		>
-			<path d="M12 2.6l2.9 5.88 6.49.95-4.7 4.58 1.11 6.46L12 17.42 6.2 20.47l1.11-6.46-4.7-4.58 6.49-.95z" />
-		</svg>
-	)
-}
-
-function CoffeeIcon({ size = 14 }: { size?: number }) {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			strokeWidth="1.5"
-			aria-hidden="true"
-		>
-			<path d="M3.75 9.75h11.5v5.75A5.25 5.25 0 0 1 10 20.75H9a5.25 5.25 0 0 1-5.25-5.25Z" />
-			<path d="M15.25 11H17a2.5 2.5 0 0 1 0 5h-1.9M7.75 2.75c-.6.6-.6 1.6 0 2.25s.6 1.6 0 2.25m3.5-4.5c-.6.6-.6 1.6 0 2.25s.6 1.6 0 2.25" />
-		</svg>
-	)
-}
-
-function ShareIcon({ size = 14 }: { size?: number }) {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.5"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			aria-hidden="true"
-		>
-            <path d="M13.5 5 20 11.5 13.5 18" />
-            <path d="M20 11.5H9.5A5.5 5.5 0 0 0 4 17v2" />
-		</svg>
 	)
 }

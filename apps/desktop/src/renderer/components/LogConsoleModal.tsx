@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import { LogIcon } from "./LogIcon"
+import { CloseIcon } from "./icons"
 
 /**
  * Live developer log console.
@@ -394,18 +395,7 @@ export function LogConsoleModal({ onClose }: LogConsoleModalProps) {
 							color: "var(--muted)",
 						}}
 					>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-						>
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
-						</svg>
+						<CloseIcon size={14} strokeWidth={2} />
 					</button>
 				</div>
 

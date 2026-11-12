@@ -1,121 +1,45 @@
 import { useState, useEffect, useRef, useId } from "react"
 import { claimMenu, releaseMenu } from "../utils/menuRegistry"
+import {
+	FinderIcon,
+	CursorIcon,
+	VSCodeIcon,
+	TerminalIcon,
+	GlobeIcon,
+	ExternalLinkIcon,
+	ChevronDownIcon,
+} from "./icons"
 
 const openTargets = [
 	{
 		id: "finder",
 		label: "Finder",
-		icon: (
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 16 16"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.3"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<rect x="2" y="2" width="12" height="12" rx="2" />
-				<line x1="2" y1="6" x2="14" y2="6" />
-				<line x1="6" y1="6" x2="6" y2="14" />
-			</svg>
-		),
+		icon: <FinderIcon size={14} />,
 	},
 	{
 		id: "cursor",
 		label: "Cursor",
-		icon: (
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 16 16"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.3"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<path d="M4 2 L4 14 L7.5 10.5 L11 14 L13 12 L9.5 8.5 L14 7 Z" />
-			</svg>
-		),
+		icon: <CursorIcon size={14} />,
 	},
 	{
 		id: "vscode",
 		label: "VS Code",
-		icon: (
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 16 16"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.3"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<path d="M11 1 L14 3 V13 L11 15 L2 9 L5 7 L11 11 V5 L5 9 L2 7 L11 1 Z" />
-			</svg>
-		),
+		icon: <VSCodeIcon size={14} />,
 	},
 	{
 		id: "terminal",
 		label: "Terminal",
-		icon: (
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 16 16"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.3"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<polyline points="4,5 7,8 4,11" />
-				<line x1="9" y1="11" x2="12" y2="11" />
-			</svg>
-		),
+		icon: <TerminalIcon size={14} strokeWidth={1.3} viewBox="0 0 16 16" />,
 	},
 	{
 		id: "browser",
 		label: "Browser",
-		icon: (
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.8"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<circle cx="12" cy="12" r="10" />
-				<line x1="2" y1="12" x2="22" y2="12" />
-				<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-			</svg>
-		),
+		icon: <GlobeIcon size={14} strokeWidth={1.8} />,
 	},
 	{
 		id: "defaultApp",
 		label: "Default App",
-		icon: (
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.8"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-				<polyline points="15 3 21 3 21 9" />
-				<line x1="10" y1="14" x2="21" y2="3" />
-			</svg>
-		),
+		icon: <ExternalLinkIcon size={14} strokeWidth={1.8} />,
 	},
 ]
 
@@ -188,18 +112,7 @@ export function OpenInDropdown({
 				title={isFile ? "Open file in..." : "Open project in..."}
 			>
 				Open in...
-				<svg
-					width="8"
-					height="8"
-					viewBox="0 0 8 8"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="1.5"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-				>
-					<path d="M2 3 L4 5 L6 3" />
-				</svg>
+				<ChevronDownIcon size={8} strokeWidth={1.5} viewBox="0 0 8 8" />
 			</button>
 			{open && (
 				<div

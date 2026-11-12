@@ -8,6 +8,7 @@ import {
 } from "react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { ExternalLinkIcon } from "./icons"
 
 interface FileContents {
 	content: string
@@ -238,20 +239,7 @@ export const FileEditor = forwardRef<FileEditorHandle, FileEditorProps>(
 							background: "transparent",
 						}}
 					>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 16 16"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.3"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						>
-							<path d="M12 9v4H3V4h4" />
-							<path d="M9 2h5v5" />
-							<path d="M14 2L7 9" />
-						</svg>
+						<ExternalLinkIcon size={14} viewBox="0 0 16 16" strokeWidth={1.3} />
 					</button>
 					{isDirty && !saving && (
 						<button

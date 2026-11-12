@@ -1,4 +1,11 @@
 import { useState, useRef, useCallback } from "react"
+import {
+	ChevronLeftIcon,
+	ChevronRightIcon,
+	RefreshIcon,
+	ExternalLinkIcon,
+	CloseIcon,
+} from "./icons"
 
 interface BrowserHistoryEntry {
 	url: string
@@ -194,18 +201,7 @@ export function BrowserView({
 					}}
 					title="Back"
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<polyline points="15 18 9 12 15 6" />
-					</svg>
+					<ChevronLeftIcon size={14} strokeWidth={2} />
 				</button>
 
 				{/* Forward */}
@@ -225,18 +221,7 @@ export function BrowserView({
 					}}
 					title="Forward"
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<polyline points="9 18 15 12 9 6" />
-					</svg>
+					<ChevronRightIcon size={14} strokeWidth={2} />
 				</button>
 
 				{/* Reload */}
@@ -255,19 +240,7 @@ export function BrowserView({
 					}}
 					title={isLoading ? "Loading..." : "Reload"}
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<polyline points="23 4 23 10 17 10" />
-						<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-					</svg>
+					<RefreshIcon size={14} strokeWidth={2} />
 				</button>
 
 				{/* Address bar */}
@@ -398,20 +371,7 @@ export function BrowserView({
 					}}
 					title="Open in external browser"
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-						<polyline points="15 3 21 3 21 9" />
-						<line x1="10" y1="14" x2="21" y2="3" />
-					</svg>
+					<ExternalLinkIcon size={14} strokeWidth={2} />
 				</button>
 
 				{/* Close */}
@@ -430,19 +390,7 @@ export function BrowserView({
 					}}
 					title="Close browser tab"
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<line x1="18" y1="6" x2="6" y2="18" />
-						<line x1="6" y1="6" x2="18" y2="18" />
-					</svg>
+					<CloseIcon size={14} strokeWidth={2} />
 				</button>
 			</div>
 

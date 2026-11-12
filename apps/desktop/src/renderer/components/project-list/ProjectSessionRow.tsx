@@ -4,6 +4,7 @@ import { ContextMenu } from "../ContextMenu"
 import { ConfirmDialog } from "../ConfirmDialog"
 import { RowActions, rowMenuAnchor, rowTextFade } from "../RowActions"
 import { formatRelativeTime } from "../../utils/relativeTime"
+import { ShieldAlertIcon, StopCircleIcon, SpinnerIcon, PencilIcon, TrashIcon } from "../icons"
 
 /** A session awaiting tool approval: amber shield-alert icon matching running icon style & dimensions. */
 function SessionApprovalBadge({
@@ -36,21 +37,7 @@ function SessionApprovalBadge({
 				transition: "background-color 0.15s, color 0.15s",
 			}}
 		>
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				aria-hidden="true"
-			>
-				<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-				<line x1="12" y1="8" x2="12" y2="12" />
-				<line x1="12" y1="16" x2="12.01" y2="16" />
-			</svg>
+			<ShieldAlertIcon size={14} strokeWidth={2} />
 		</button>
 	)
 }
@@ -177,27 +164,7 @@ function SessionRunningStopButton({
 				transition: "background-color 0.15s, color 0.15s",
 			}}
 		>
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-			>
-				<circle cx="12" cy="12" r="9.5" />
-				<rect
-					x="8.5"
-					y="8.5"
-					width="7"
-					height="7"
-					rx="1"
-					fill="currentColor"
-					stroke="none"
-				/>
-			</svg>
+			<StopCircleIcon size={14} strokeWidth={2} />
 		</button>
 	)
 }
@@ -217,26 +184,7 @@ function SessionRunningSpinner() {
 				color: "var(--muted)",
 			}}
 		>
-			<svg
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				style={{
-					animation: "sidebar-thread-spin 0.85s linear infinite",
-					transformOrigin: "center",
-				}}
-			>
-				<circle
-					cx="12"
-					cy="12"
-					r="9"
-					stroke="currentColor"
-					strokeWidth="2.5"
-					strokeLinecap="round"
-					strokeDasharray="40 17"
-				/>
-			</svg>
+			<SpinnerIcon size={14} strokeWidth={2.5} />
 		</div>
 	)
 }
@@ -493,21 +441,7 @@ export function ProjectSessionRow({
 					items={[
 						{
 							label: "Rename",
-							icon: (
-								<svg
-									width="13"
-									height="13"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<path d="M12 20h9" />
-									<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-								</svg>
-							),
+							icon: <PencilIcon size={13} strokeWidth={2} />,
 							onClick: () => {
 								setEditing(true)
 								setDraftTitle(title)
@@ -516,21 +450,7 @@ export function ProjectSessionRow({
 						{
 							label: "Delete",
 							danger: true,
-							icon: (
-								<svg
-									width="13"
-									height="13"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								>
-									<polyline points="3 6 5 6 21 6" />
-									<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-								</svg>
-							),
+							icon: <TrashIcon size={13} strokeWidth={2} />,
 							onClick: () => setConfirmDelete(true),
 						},
 					]}

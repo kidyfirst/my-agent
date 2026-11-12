@@ -1,5 +1,6 @@
 import { useComputerUsePreview } from "../hooks/useComputerUsePreview"
 import type { PreviewFrame } from "../utils/computerUsePreview"
+import { ExternalLinkIcon } from "./icons"
 
 const CARD_WIDTH = 300
 /** Distance from the conversation pane's top-right corner. */
@@ -154,20 +155,11 @@ export function ComputerUsePreviewCard({
 						transition: "opacity 120ms ease-out",
 					}}
 				>
-					<svg
-						width="13"
-						height="13"
+					<ExternalLinkIcon
+						size={13}
 						viewBox="0 0 16 16"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="1.6"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<path d="M6.5 3.5H3.5v9h9v-3" />
-						<path d="M9.5 3.5h3v3" />
-						<path d="M12.5 3.5L7.5 8.5" />
-					</svg>
+						strokeWidth={1.6}
+					/>
 				</button>
 
 				<div

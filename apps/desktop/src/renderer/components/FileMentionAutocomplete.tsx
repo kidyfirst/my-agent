@@ -112,32 +112,8 @@ export function filterRepoFiles(
 }
 
 /** React Atom SVG Icon for TSX / JSX files */
-export function ReactAtomIcon({
-	size = 15,
-	color = "var(--brand-react)",
-}: {
-	size?: number
-	color?: string
-}) {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="-11.5 -10.23174 23 20.46348"
-			fill="none"
-			// `color` may be a CSS variable, which SVG presentation attributes do
-			// not resolve — paint through currentColor instead.
-			style={{ flexShrink: 0, color }}
-		>
-			<circle cx="0" cy="0" r="2.05" fill="currentColor" />
-			<g stroke="currentColor" strokeWidth="1" fill="none">
-				<ellipse rx="11" ry="4.2" />
-				<ellipse rx="11" ry="4.2" transform="rotate(60)" />
-				<ellipse rx="11" ry="4.2" transform="rotate(120)" />
-			</g>
-		</svg>
-	)
-}
+import { ReactAtomIcon } from "./icons"
+export { ReactAtomIcon }
 
 /** File Icon component rendering icons matching the file extension */
 export function RepoFileIcon({

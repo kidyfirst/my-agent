@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { claimMenu, releaseMenu } from "../utils/menuRegistry"
 import { overviewPanelItems, type OverviewAction } from "../utils/overviewMenu"
 import { OverviewIcon } from "./OverviewIcon"
+import { OverviewPanelGlyph } from "./icons"
 import { ShortcutTooltip } from "./ShortcutTooltip"
 
 interface OverviewMenuProps {
@@ -211,52 +212,4 @@ export function OverviewMenu({ hasGitRepo, onSelect }: OverviewMenuProps) {
 	)
 }
 
-/**
- * A rounded document frame with three lines — the "Overview Panel" glyph.
- * Thin outline + soft fills keep it light instead of a solid dark block.
- */
-export function OverviewPanelGlyph({ size = 16 }: { size?: number }) {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1"
-			style={{ display: "block" }}
-		>
-			<rect x="2.3" y="2.5" width="11.4" height="11" rx="2.2" />
-			<rect
-				x="4.7"
-				y="5.4"
-				width="6.6"
-				height="1.3"
-				rx="0.65"
-				fill="currentColor"
-				fillOpacity="0.5"
-				stroke="none"
-			/>
-			<rect
-				x="4.7"
-				y="7.9"
-				width="6.6"
-				height="1.3"
-				rx="0.65"
-				fill="currentColor"
-				fillOpacity="0.5"
-				stroke="none"
-			/>
-			<rect
-				x="4.7"
-				y="10.4"
-				width="4.1"
-				height="1.3"
-				rx="0.65"
-				fill="currentColor"
-				fillOpacity="0.5"
-				stroke="none"
-			/>
-		</svg>
-	)
-}
+export { OverviewPanelGlyph } from "./icons"
