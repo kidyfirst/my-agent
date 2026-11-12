@@ -10,6 +10,7 @@ import {
 	estimateToolsSchemaTokens,
 	estimateMessageTokens,
 	estimateMessagesTokens,
+	estimateTextTokens,
 } from "../../llm/context-window.js"
 
 function streamOf(chunks: any[]): ReadableStream {
@@ -924,5 +925,29 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 		expect(multiMsg.tokensByMessage[0]).toBe(3)
 		expect(multiMsg.tokensByMessage[1]).toBe(estimated)
 		expect(multiMsg.totalTokens).toBe(3 + estimated)
+
+		// 4. Unified weighting: Chinese text does not get underestimated by /4
+		const chineseText =
+			"这是一段用于测试中文分词与Token估算的文本，确保不再使用除以4硬编码"
+		const weightedTokens = Math.ceil(estimateTextTokens(chineseText))
+		const legacyDividedByFour = Math.ceil(chineseText.length / 4)
+		// Weighted estimation (~text.length / 1.3) is roughly 3x legacy (/4)
+		expect(weightedTokens).toBeGreaterThan(legacyDividedByFour * 2.5)
+
+		// 5. Tool schemas with Chinese descriptions also use the unified weighted estimation
+		const chineseTool = {
+			chinese_tool: {
+				description:
+					"这是一个具备中文详细描述的工具，用于测试Schema Token估算与系统提示词比率的一致性",
+				parameters: {
+					type: "object",
+					properties: {
+						param: { type: "string", description: "参数描述文本" },
+					},
+				},
+			},
+		}
+		const chineseToolTokens = estimateToolsSchemaTokens(chineseTool)
+		expect(chineseToolTokens).toBeGreaterThan(30)
 	})
 })

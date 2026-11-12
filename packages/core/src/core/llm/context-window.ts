@@ -137,24 +137,6 @@ export function computeMaxHistoryTokens(contextWindow: number): number {
 	return Math.min(Math.floor(contextWindow * 0.8), 256_000)
 }
 
-/**
- * Accurately estimates token overhead of executable tool JSON schemas.
- */
-export function estimateToolsSchemaTokens(tools?: Record<string, any>): number {
-	if (!tools || Object.keys(tools).length === 0) return 0
-	let totalChars = 0
-	for (const [name, t] of Object.entries(tools)) {
-		totalChars += name.length + (t?.description?.length || 0)
-		const schema = t?.parameters || t?.inputSchema
-		if (schema) {
-			try {
-				totalChars += JSON.stringify(schema).length
-			} catch {}
-		}
-	}
-	return Math.ceil(totalChars / 3.8)
-}
-
 const NON_ASCII_RE = /[^\x00-\x7f]/
 
 /**
@@ -192,6 +174,27 @@ export function estimateTextTokens(text: string): number {
 		}
 	}
 	return asciiChars / 4 + nonAsciiChars / 1.3
+}
+
+/**
+ * Accurately estimates token overhead of executable tool JSON schemas using weighted token ratios.
+ */
+export function estimateToolsSchemaTokens(tools?: Record<string, any>): number {
+	if (!tools || Object.keys(tools).length === 0) return 0
+	let tokens = 0
+	for (const [name, t] of Object.entries(tools)) {
+		tokens += estimateTextTokens(name)
+		if (t?.description) {
+			tokens += estimateTextTokens(t.description)
+		}
+		const schema = t?.parameters || t?.inputSchema
+		if (schema) {
+			try {
+				tokens += estimateTextTokens(JSON.stringify(schema))
+			} catch {}
+		}
+	}
+	return Math.ceil(tokens)
 }
 
 /**

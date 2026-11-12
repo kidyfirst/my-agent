@@ -38,6 +38,7 @@ import {
 	estimateToolsSchemaTokens,
 	estimateMessagesTokens,
 	estimateMessageTokens,
+	estimateTextTokens,
 } from "../llm/context-window.js"
 
 export type PermissionPolicy = "allow" | "deny" | "ask"
@@ -2622,14 +2623,14 @@ export class Session<TState = any> {
 			}
 
 			const baseSystemPromptTokens = instructions
-				? Math.ceil(instructions.length / 4)
+				? Math.ceil(estimateTextTokens(instructions))
 				: 0
 			// Estimate tool schema tokens to ensure dynamic MCP tool additions do not exceed context window
 			const toolSchemaTokens = estimateToolsSchemaTokens(executableTools)
 			const fixedSystemOverhead = baseSystemPromptTokens + toolSchemaTokens
 
 			let observationTokens = observationBlock
-				? Math.ceil(observationBlock.length / 4)
+				? Math.ceil(estimateTextTokens(observationBlock))
 				: 0
 
 			// Estimate message tokens structurally, properly accounting for vision tokens without base64 inflation
@@ -2702,7 +2703,7 @@ export class Session<TState = any> {
 								omMaxTokens,
 							)
 							observationTokens = observationBlock
-								? Math.ceil(observationBlock.length / 4)
+								? Math.ceil(estimateTextTokens(observationBlock))
 								: 0
 						}
 					} catch {
@@ -2747,7 +2748,7 @@ export class Session<TState = any> {
 								resourceId,
 							})) ?? null
 						observationTokens = observationBlock
-							? Math.ceil(observationBlock.length / 4)
+							? Math.ceil(estimateTextTokens(observationBlock))
 							: 0
 					} catch {}
 				}
@@ -2772,7 +2773,7 @@ export class Session<TState = any> {
 					)
 				}
 				observationTokens = observationBlock
-					? Math.ceil(observationBlock.length / 4)
+					? Math.ceil(estimateTextTokens(observationBlock))
 					: 0
 			}
 
@@ -2797,7 +2798,7 @@ export class Session<TState = any> {
 					content: advisoryContent,
 				})
 				// Keep messageTokens synchronized with coreMessages to prevent index misalignment and NaN
-				const advTokens = Math.ceil(advisoryContent.length / 4)
+				const advTokens = Math.ceil(estimateTextTokens(advisoryContent))
 				messageTokens.push(advTokens)
 				rawEstimatedTokens += advTokens
 			}
@@ -2860,11 +2861,7 @@ export class Session<TState = any> {
 					const rawTokens =
 						messageTokens[i] !== undefined
 							? messageTokens[i]
-							: Math.ceil(
-									(typeof coreMessages[i].content === "string"
-										? (coreMessages[i].content as string).length
-										: JSON.stringify(coreMessages[i].content).length) / 4,
-								)
+							: estimateMessageTokens(coreMessages[i])
 					const calibratedMsgTokens = Math.round(rawTokens * calibrationRatio)
 					if (
 						i < maxFoldIndex &&
