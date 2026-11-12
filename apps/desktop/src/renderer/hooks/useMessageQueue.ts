@@ -186,7 +186,8 @@ export function useMessageQueue(
 		const queue = chat.queuesByThread[threadId] || []
 		if (queue.length === 0 || chat.isAgentActive || chat.isQueuePaused) return
 		let cancelled = false
-		const drain = async () => {
+		// Give any in-flight loadMessages from the preceding agent_end turn a moment to settle
+		const timer = setTimeout(async () => {
 			let running = false
 			try {
 				running = (await window.api.invoke({ type: "isRunning" })) === true
@@ -199,10 +200,10 @@ export function useMessageQueue(
 				return
 			}
 			sendNext(threadId, queue)
-		}
-		drain()
+		}, 80)
 		return () => {
 			cancelled = true
+			clearTimeout(timer)
 		}
 	}, [
 		chat.isAgentActive,

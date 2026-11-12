@@ -1347,9 +1347,11 @@ export function App() {
 				})
 				dispatch({ type: "AGENT_START" })
 			})
-			setRunningThreadId(currentThreadId)
-			if (currentThreadId) {
-				setRunningThreads((prev) => new Set(prev).add(currentThreadId))
+			const activeTid =
+				currentThreadId || currentThreadIdRef.current || undefined
+			setRunningThreadId(activeTid ?? null)
+			if (activeTid) {
+				setRunningThreads((prev) => new Set(prev).add(activeTid))
 			}
 			const ipcImages = imageFiles?.map(({ mimeType, data, name }) => ({
 				mediaType: mimeType || "image/png",
@@ -1367,7 +1369,7 @@ export function App() {
 				await nextPaint()
 				await window.api.invoke({
 					type: "sendMessage",
-					threadId: currentThreadId || undefined,
+					threadId: activeTid,
 					content: finalContent,
 					...(ipcImages && ipcImages.length > 0 ? { images: ipcImages } : {}),
 					...(ipcFiles && ipcFiles.length > 0 ? { files: ipcFiles } : {}),
@@ -1389,7 +1391,7 @@ export function App() {
 				dispatch({ type: "AGENT_END" })
 			}
 		},
-		[],
+		[currentThreadId],
 	)
 
 	const handleAbort = useCallback(async () => {

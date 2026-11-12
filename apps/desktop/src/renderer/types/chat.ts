@@ -848,33 +848,43 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				(m) => isUserMessage(m) && String(m.id ?? "").startsWith("user-"),
 			)
 			if (pendingUserMessages.length > 0) {
-				const storedTexts = cleanedMessages
-					.filter(isUserMessage)
-					.map((m) => getMessageText(m).trim())
 				for (const pending of pendingUserMessages) {
 					if (cleanedMessages.some((m) => m.id === pending.id)) continue
 					const pendingText = getMessageText(pending).trim()
-					if (
-						storedTexts.some(
-							(st) =>
-								!pendingText ||
-								!st ||
-								st === pendingText ||
-								st.startsWith(pendingText) ||
-								pendingText.startsWith(st),
-						)
-					) {
-						continue
-					}
-					// Only keep pending message if it was created AFTER the last message in stored list
+
+					// Check if the latest user message in cleanedMessages is already the persisted copy
+					// of this pending message (matching text within a 15-second window).
+					const lastUserMsg = [...cleanedMessages].reverse().find(isUserMessage)
+					const lastUserText = lastUserMsg
+						? getMessageText(lastUserMsg).trim()
+						: ""
 					const pendingTime = pending.createdAt
 						? new Date(pending.createdAt).getTime()
 						: parseInt(pending.id.replace("user-", ""), 10) || 0
+					const lastUserTime = lastUserMsg?.createdAt
+						? new Date(lastUserMsg.createdAt).getTime()
+						: 0
+
+					const isAlreadyPersisted =
+						lastUserText === pendingText &&
+						(!lastUserTime ||
+							!pendingTime ||
+							Math.abs(lastUserTime - pendingTime) < 15_000)
+
+					if (isAlreadyPersisted) {
+						continue
+					}
+
+					// Only drop pending message if it was created way before the stored list (stale residue)
 					const lastMsg = cleanedMessages[cleanedMessages.length - 1]
 					const lastTime = lastMsg?.createdAt
 						? new Date(lastMsg.createdAt).getTime()
 						: 0
-					if (lastTime > 0 && pendingTime > 0 && pendingTime < lastTime) {
+					if (
+						lastTime > 0 &&
+						pendingTime > 0 &&
+						pendingTime < lastTime - 30_000
+					) {
 						continue
 					}
 					cleanedMessages.push(pending)

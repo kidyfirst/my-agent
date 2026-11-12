@@ -399,4 +399,62 @@ describe("Persistent Folded Ranges across App Restarts", () => {
 
 		await storage.close()
 	})
+
+	it("prevents duplicate FoldedRange creation when no newly folded messages exist", async () => {
+		const storage = new SQLiteStore({ url: ":memory:" })
+		await storage.init()
+		const store = await storage.getStore("memory")
+
+		const model = new MockLanguageModelV3({
+			modelId: "test-model",
+			doStream: async () => reply("ok"),
+		})
+
+		const agent = new Agent({
+			id: "agent",
+			name: "Agent",
+			instructions: "Base",
+			model: () => model,
+			contextWindow: 4_000,
+			tools: {},
+		})
+
+		const controller = new AgentController({ storage, agent })
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "r3",
+			contextWindow: 4_000,
+		})
+		const thread = await session.thread.create({ title: "Dedup Test" })
+
+		// Seed 8 messages
+		const seeded: any[] = []
+		for (let i = 0; i < 8; i++) {
+			const text = `Message ${i}: ` + "X".repeat(2_000)
+			seeded.push({
+				id: `msg_${i}`,
+				role: i % 2 === 0 ? "user" : "assistant",
+				content: { format: 2, parts: [{ type: "text", text }], content: text },
+				threadId: thread.id,
+				resourceId: "r3",
+				createdAt: new Date(Date.now() - (10 - i) * 1000),
+			})
+		}
+		await store.saveMessages({ messages: seeded })
+
+		// First fold creates fold_001
+		await session.sendMessage({ content: "First turn" })
+		const ranges1 = await session.getFoldedRangesAsync(thread.id)
+		expect(ranges1.length).toBe(1)
+		expect(ranges1[0].rangeId).toBe("fold_001")
+
+		// Re-invoking without adding lots of new messages should NOT generate duplicate empty/overlapping ranges
+		await session.sendMessage({ content: "Short follow-up" })
+		const ranges2 = await session.getFoldedRangesAsync(thread.id)
+		// Should remain at 1 range (fold_001) rather than creating fold_002 with 0 new messages
+		expect(ranges2.length).toBe(1)
+		expect(ranges2[0].rangeId).toBe("fold_001")
+
+		await storage.close()
+	})
 })

@@ -2486,11 +2486,19 @@ export class Session<TState = any> {
 
 				const obs = omConfig?.observation
 				const messageTokensThreshold = obs?.messageTokens ?? 30_000
-				const bufferTokensRatio =
-					obs?.bufferTokens && obs.bufferTokens > 0 ? obs.bufferTokens : 1 / 5
-				const bufferTrigger = Math.floor(
-					messageTokensThreshold * bufferTokensRatio,
-				)
+				const rawBufferTokens = obs?.bufferTokens
+				let bufferTrigger: number
+				if (typeof rawBufferTokens === "number" && rawBufferTokens > 0) {
+					if (rawBufferTokens >= 100) {
+						// Absolute token budget (e.g. 5,000 tokens)
+						bufferTrigger = rawBufferTokens
+					} else {
+						// Ratio of threshold (e.g. 0.2 = 20%)
+						bufferTrigger = Math.floor(messageTokensThreshold * rawBufferTokens)
+					}
+				} else {
+					bufferTrigger = Math.floor(messageTokensThreshold * (1 / 5))
+				}
 				const syncBlockTrigger = resolveBlockAfter(
 					obs?.blockAfter,
 					messageTokensThreshold,
@@ -2557,30 +2565,47 @@ export class Session<TState = any> {
 				}
 			}
 
+			// Include observationBlock tokens in the total estimated context tokens
+			const observationTokens = observationBlock
+				? Math.ceil(observationBlock.length / 4)
+				: 0
+			const calibratedContextTokens = Math.round(
+				(rawEstimatedTokens + observationTokens) * calibrationRatio,
+			)
+
 			// Smooth Nudge: high-watermark warning when context usage is between 70% and 100%
 			const NUDGE_THRESHOLD = Math.floor(MAX_HISTORY_TOKENS * 0.7)
 			if (
-				totalEstimatedTokens >= NUDGE_THRESHOLD &&
-				totalEstimatedTokens <= MAX_HISTORY_TOKENS
+				calibratedContextTokens >= NUDGE_THRESHOLD &&
+				calibratedContextTokens <= MAX_HISTORY_TOKENS
 			) {
 				const usagePct = Math.round(
-					(totalEstimatedTokens / MAX_HISTORY_TOKENS) * 100,
+					(calibratedContextTokens / MAX_HISTORY_TOKENS) * 100,
 				)
+				const advisoryContent = `[Context Advisory: Context window is at ~${usagePct}% capacity (${calibratedContextTokens}/${MAX_HISTORY_TOKENS} tokens, model window: ${contextWindow}). Please plan your remaining edits and summarize key outcomes before automated context folding.]`
 				coreMessages.push({
 					role: "user",
-					content: `[Context Advisory: Context window is at ~${usagePct}% capacity (${totalEstimatedTokens}/${MAX_HISTORY_TOKENS} tokens, model window: ${contextWindow}). Please plan your remaining edits and summarize key outcomes before automated context folding.]`,
+					content: advisoryContent,
 				})
+				// Keep messageTokens synchronized with coreMessages to prevent index misalignment and NaN
+				messageTokens.push(Math.ceil(advisoryContent.length / 4))
 			}
 
-			if (totalEstimatedTokens > MAX_HISTORY_TOKENS) {
-				let keptTokens = 0
+			if (calibratedContextTokens > MAX_HISTORY_TOKENS) {
+				let keptTokens = Math.round(observationTokens * calibrationRatio)
 				// Ensure at least the last 4 messages (recent 2 turns) are immune from folding
 				const maxFoldIndex = Math.max(0, coreMessages.length - 4)
 				let startIndex = maxFoldIndex
 				for (let i = coreMessages.length - 1; i >= 0; i--) {
-					const calibratedMsgTokens = Math.round(
-						messageTokens[i] * calibrationRatio,
-					)
+					const rawTokens =
+						messageTokens[i] !== undefined
+							? messageTokens[i]
+							: Math.ceil(
+									(typeof coreMessages[i].content === "string"
+										? (coreMessages[i].content as string).length
+										: JSON.stringify(coreMessages[i].content).length) / 4,
+								)
+					const calibratedMsgTokens = Math.round(rawTokens * calibrationRatio)
 					if (
 						i < maxFoldIndex &&
 						keptTokens + calibratedMsgTokens > MAX_HISTORY_TOKENS
@@ -2606,15 +2631,6 @@ export class Session<TState = any> {
 						threadId,
 						store,
 					)
-					let maxIndex = 0
-					for (const r of existingRanges) {
-						const match = r.rangeId.match(/^fold_(\d+)$/)
-						if (match) {
-							const num = parseInt(match[1], 10)
-							if (!isNaN(num) && num > maxIndex) maxIndex = num
-						}
-					}
-					const rangeId = `fold_${String(maxIndex + 1).padStart(3, "0")}`
 
 					// Resolve initialUserGoal: prioritize persistent thread metadata,
 					// or extract the first real user message (ignoring previous [System Note] or [Context Advisory])
@@ -2653,29 +2669,56 @@ export class Session<TState = any> {
 						}
 					}
 
-					const messageIds = Array.from(
-						new Set(foldedMessages.map((m) => m.id).filter(Boolean)),
+					// Collect all message IDs already covered by existing folded ranges to prevent duplication
+					const allAlreadyFoldedIds = new Set(
+						existingRanges.flatMap((r) => r.messageIds || []),
+					)
+					const newlyFoldedMessages = foldedMessages.filter(
+						(m) => m.id && !allAlreadyFoldedIds.has(m.id),
 					)
 
-					await this.recordFoldedRange(
-						threadId,
-						{
-							rangeId,
+					let rangeId: string
+					if (newlyFoldedMessages.length === 0 && existingRanges.length > 0) {
+						// All messages are already covered in existing ranges; reuse latest range ID without duplicate writes
+						rangeId = existingRanges[existingRanges.length - 1].rangeId
+					} else {
+						let maxIndex = 0
+						for (const r of existingRanges) {
+							const match = r.rangeId.match(/^fold_(\d+)$/)
+							if (match) {
+								const num = parseInt(match[1], 10)
+								if (!isNaN(num) && num > maxIndex) maxIndex = num
+							}
+						}
+						rangeId = `fold_${String(maxIndex + 1).padStart(3, "0")}`
+						const targetFolded =
+							newlyFoldedMessages.length > 0
+								? newlyFoldedMessages
+								: foldedMessages
+						const messageIds = Array.from(
+							new Set(targetFolded.map((m) => m.id).filter(Boolean)),
+						)
+
+						await this.recordFoldedRange(
 							threadId,
-							messageCount: startIndex,
-							startIndex: 0,
-							firstMessageId: foldedMessages[0]?.id,
-							lastMessageId: foldedMessages[foldedMessages.length - 1]?.id,
-							firstMessageCreatedAt: foldedMessages[0]?.createdAt,
-							lastMessageCreatedAt:
-								foldedMessages[foldedMessages.length - 1]?.createdAt,
-							messageIds,
-							userGoal: initialUserGoal,
-							createdAt: Date.now(),
-							messages: foldedMessages,
-						},
-						store,
-					)
+							{
+								rangeId,
+								threadId,
+								messageCount: targetFolded.length,
+								startIndex: 0,
+								firstMessageId: targetFolded[0]?.id,
+								lastMessageId: targetFolded[targetFolded.length - 1]?.id,
+								firstMessageCreatedAt: targetFolded[0]?.createdAt,
+								lastMessageCreatedAt:
+									targetFolded[targetFolded.length - 1]?.createdAt,
+								messageIds,
+								userGoal: initialUserGoal,
+								createdAt: Date.now(),
+								messages: targetFolded,
+							},
+							store,
+						)
+					}
 
 					coreMessages.splice(0, startIndex)
 
