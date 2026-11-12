@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useBrowserPreviewFrames } from "../hooks/useComputerUsePreview"
 import {
-	CloseIcon,
-	PlusIcon,
-	ChevronLeftIcon,
-	ChevronRightIcon,
-	RefreshIcon,
-	ExternalLinkIcon,
-} from "./icons"
-import {
 	BLANK_PAGE,
 	activateBrowserTab,
 	activeBrowserTab,
@@ -464,7 +456,18 @@ function TabChip({ tab, active, loading, onActivate, onClose }: TabChipProps) {
 					transition: "opacity 120ms ease-out",
 				}}
 			>
-				<CloseIcon size={9} strokeWidth={1.8} viewBox="0 0 16 16" />
+				<svg
+					width="9"
+					height="9"
+					viewBox="0 0 16 16"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="1.8"
+					strokeLinecap="round"
+				>
+					<line x1="4" y1="4" x2="12" y2="12" />
+					<line x1="12" y1="4" x2="4" y2="12" />
+				</svg>
 			</button>
 		</div>
 	)
@@ -520,19 +523,54 @@ function ChromeButton({ label, icon, disabled, onClick }: ChromeButtonProps) {
 }
 
 function ChromeIconSvg({ icon }: { icon: ChromeIcon }) {
+	const common = {
+		width: 13,
+		height: 13,
+		viewBox: "0 0 16 16",
+		fill: "none",
+		stroke: "currentColor",
+		strokeWidth: 1.5,
+		strokeLinecap: "round" as const,
+		strokeLinejoin: "round" as const,
+	}
+
 	if (icon === "plus") {
-		return <PlusIcon size={13} strokeWidth={1.5} viewBox="0 0 16 16" />
+		return (
+			<svg {...common}>
+				<line x1="8" y1="3.5" x2="8" y2="12.5" />
+				<line x1="3.5" y1="8" x2="12.5" y2="8" />
+			</svg>
+		)
 	}
 	if (icon === "back") {
-		return <ChevronLeftIcon size={13} strokeWidth={1.5} viewBox="0 0 16 16" />
+		return (
+			<svg {...common}>
+				<polyline points="10 3.5 5.5 8 10 12.5" />
+			</svg>
+		)
 	}
 	if (icon === "forward") {
-		return <ChevronRightIcon size={13} strokeWidth={1.5} viewBox="0 0 16 16" />
+		return (
+			<svg {...common}>
+				<polyline points="6 3.5 10.5 8 6 12.5" />
+			</svg>
+		)
 	}
 	if (icon === "reload") {
-		return <RefreshIcon size={13} strokeWidth={1.5} viewBox="0 0 16 16" />
+		return (
+			<svg {...common}>
+				<path d="M12.5 8a4.5 4.5 0 1 1-1.6-3.4" />
+				<polyline points="12.5 3 12.5 5.6 9.9 5.6" />
+			</svg>
+		)
 	}
-	return <ExternalLinkIcon size={13} strokeWidth={1.5} viewBox="0 0 16 16" />
+	return (
+		<svg {...common}>
+			<path d="M9 3.5h3.5V7" />
+			<path d="M12.5 3.5L8.5 7.5" />
+			<path d="M11 9.5v2.5a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1H7" />
+		</svg>
+	)
 }
 
 /** Electron throws from the view's API when the guest is not ready yet. */

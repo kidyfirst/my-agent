@@ -23,4 +23,11 @@ describe("PanelBrowser chrome", () => {
 		expect(html).toContain('aria-label="New browser tab"')
 		expect(html).toContain('data-testid="panel-browser-views"')
 	})
+
+	it("preserves original icon sizes for tab close (9x9) and navigation chrome (13x13)", () => {
+		// Close button inside tab chip must be 9x9 with 16x16 coordinate space
+		expect(html).toMatch(/<svg[^>]*width="9"[^>]*height="9"[^>]*viewBox="0 0 16 16"/)
+		// Navigation buttons (plus, back, forward, reload, external) must be 13x13 with 16x16 coordinate space
+		expect(html).toMatch(/<svg[^>]*width="13"[^>]*height="13"[^>]*viewBox="0 0 16 16"/)
+	})
 })
