@@ -1,6 +1,6 @@
 {
 	"name": "@my-agent/a2a",
-	"version": "0.1.8",
+	"version": "0.1.9",
 	"description": "Agent-to-Agent (A2A) protocol server and client implementation for My Agent",
 	"type": "module",
 	"main": "./src/index.ts",

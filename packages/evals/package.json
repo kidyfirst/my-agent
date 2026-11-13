@@ -1,6 +1,6 @@
 {
 	"name": "@my-agent/evals",
-	"version": "0.1.8",
+	"version": "0.1.9",
 	"description": "Offline evaluation dataset, baseline benchmarker and regression quality gate for My Agent",
 	"type": "module",
 	"main": "./src/index.ts",
