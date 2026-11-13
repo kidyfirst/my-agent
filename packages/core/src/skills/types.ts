@@ -148,6 +148,7 @@ export interface SkillHubSource {
 	webUrl?: string
 	urlPattern?: string
 	downloadUrl?: string
+	resolveUrl?: string
 	isBuiltin?: boolean
 	createdAt?: number
 }

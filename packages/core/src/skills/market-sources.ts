@@ -8,6 +8,7 @@ export const SKILLHUB_SOURCE = {
 	webUrl: "https://skillhub.cn",
 	urlPattern: "{webUrl}/skills/{namespace}/{name}",
 	downloadUrl: "{apiUrl}/api/v1/download?slug={name}&ownerHandle={owner}",
+	resolveUrl: "{apiUrl}/api/v1/skills/resolve?coordinate={coordinate}",
 } as const
 
 export const CLAWHUB_SOURCE = {
@@ -17,6 +18,7 @@ export const CLAWHUB_SOURCE = {
 	webUrl: "https://clawhub.ai",
 	urlPattern: "{webUrl}/{owner}/skills/{name}",
 	downloadUrl: "{apiUrl}/api/v1/download?slug={name}&ownerHandle={owner}",
+	resolveUrl: "{apiUrl}/api/v1/skills/resolve?coordinate={coordinate}",
 } as const
 
 export const DEFAULT_SKILLHUB_API_BASE = SKILLHUB_SOURCE.apiUrl

@@ -236,10 +236,39 @@ export class SkillManager {
 			const rawSlug = options.slug.replace(/^@/, "")
 			const [owner, ...parts] = rawSlug.split("/")
 			const skillName = parts.join("/") || rawSlug
-			const downloadUrl = source.downloadUrl
+			let downloadUrl = source.downloadUrl
 				.replace("{apiUrl}", sourceBase)
 				.replace("{owner}", encodeURIComponent(owner))
 				.replace("{name}", encodeURIComponent(skillName))
+			if (source === SKILLHUB_SOURCE && source.resolveUrl) {
+				const resolveUrl = source.resolveUrl
+					.replace("{apiUrl}", sourceBase)
+					.replace("{coordinate}", encodeURIComponent(`@${owner}/${skillName}`))
+				const resolvedResponse = await fetch(resolveUrl)
+				if (!resolvedResponse.ok)
+					return {
+						success: false,
+						auditReport: await this.securityInspector.auditSkill({
+							manifestContent,
+							files,
+						}),
+						reason: `SkillHub resolve failed (${resolvedResponse.status})`,
+					}
+				const resolved = (await resolvedResponse.json()) as any
+				const namespace = String(resolved.namespace?.handle || owner).replace(
+					/^@/,
+					"",
+				)
+				const publicSlug = String(
+					resolved.namespace?.publicSlug || resolved.skill?.slug || skillName,
+				)
+				const version = String(
+					resolved.latestVersion?.version || resolved.skill?.version || "",
+				)
+				const params = new URLSearchParams({ slug: publicSlug, namespace })
+				if (version) params.set("version", version)
+				downloadUrl = `${sourceBase}/api/v1/download?${params.toString()}`
+			}
 			console.info(
 				`[SkillManager] downloading skill ${rawSlug} from ${downloadUrl}`,
 			)
