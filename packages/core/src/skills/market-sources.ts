@@ -7,7 +7,7 @@ export const SKILLHUB_SOURCE = {
 	apiUrl: "https://api.skillhub.cn",
 	webUrl: "https://skillhub.cn",
 	urlPattern: "{webUrl}/skills/{namespace}/{name}",
-	downloadUrl: "{apiUrl}/api/v1/download?slug=%40{owner}%2F{name}",
+	downloadUrl: "{apiUrl}/api/v1/download?slug={name}&ownerHandle={owner}",
 } as const
 
 export const CLAWHUB_SOURCE = {
