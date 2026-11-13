@@ -226,25 +226,43 @@ export class SkillManager {
 			options.sourceUrl &&
 			options.slug
 		) {
-			const slug = options.slug.startsWith("@")
-				? options.slug
-				: `@${options.slug}`
 			const sourceBase = options.sourceUrl
 				.replace(/\/+$/, "")
 				.replace(/^https:\/\/skillhub\.cn$/i, "https://api.skillhub.cn")
-			const downloadUrl = `${sourceBase}/api/v1/download?slug=${encodeURIComponent(slug)}`
-			console.info(
-				`[SkillManager] downloading SkillHub skill ${slug} from ${downloadUrl}`,
-			)
-			const response = await fetch(downloadUrl)
-			if (!response.ok)
+			const isClawHub = /clawhub/i.test(sourceBase)
+			const slug = isClawHub
+				? options.slug.replace(/^@/, "")
+				: options.slug.startsWith("@")
+					? options.slug
+					: `@${options.slug}`
+			const downloadUrls = isClawHub
+				? [
+						`${sourceBase}/api/skills/${encodeURIComponent(slug)}/download`,
+						`${sourceBase}/api/v1/skills/${encodeURIComponent(slug)}/download`,
+						`${sourceBase}/api/v1/download?slug=${encodeURIComponent(slug)}`,
+					]
+				: [`${sourceBase}/api/v1/download?slug=${encodeURIComponent(slug)}`]
+			let response: Response | undefined
+			let downloadUrl = downloadUrls[0]
+			for (const candidate of downloadUrls) {
+				console.info(
+					`[SkillManager] downloading skill ${slug} from ${candidate}`,
+				)
+				const candidateResponse = await fetch(candidate)
+				if (candidateResponse.ok) {
+					response = candidateResponse
+					downloadUrl = candidate
+					break
+				}
+			}
+			if (!response || !response.ok)
 				return {
 					success: false,
 					auditReport: await this.securityInspector.auditSkill({
 						manifestContent,
 						files,
 					}),
-					reason: `SkillHub download failed (${response.status})`,
+					reason: `Skill download failed; tried ${downloadUrls.join(", ")}`,
 				}
 			const archive = new Uint8Array(await response.arrayBuffer())
 			const downloaded = await extractArchiveFiles(archive)
