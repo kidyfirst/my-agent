@@ -245,7 +245,11 @@ export class SkillManager {
 					.replace("{apiUrl}", sourceBase)
 					.replace("{coordinate}", encodeURIComponent(`@${owner}/${skillName}`))
 				const resolvedResponse = await fetch(resolveUrl)
-				if (!resolvedResponse.ok)
+				if (!resolvedResponse.ok) {
+					const detail = (await resolvedResponse.text()).slice(0, 300)
+					console.warn(
+						`[SkillManager] SkillHub resolve failed ${resolvedResponse.status} ${resolveUrl}: ${detail}`,
+					)
 					return {
 						success: false,
 						auditReport: await this.securityInspector.auditSkill({
@@ -254,6 +258,7 @@ export class SkillManager {
 						}),
 						reason: `SkillHub resolve failed (${resolvedResponse.status})`,
 					}
+				}
 				const resolved = (await resolvedResponse.json()) as any
 				const namespace = String(resolved.namespace?.handle || owner).replace(
 					/^@/,

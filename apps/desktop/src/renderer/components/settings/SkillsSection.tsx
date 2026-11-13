@@ -521,12 +521,7 @@ ${securityPlugin.description}
 				owner: securityPlugin.owner,
 				repositoryUrl: securityPlugin.repositoryUrl,
 				sourceUrl: activeSourceUrl,
-				// The card's owner/name is the public SkillHub identity. `fullName`
-				// can be an internal alias (e.g. indiv-guipi) and must not determine
-				// the download package or local install directory.
-				slug: securityPlugin.owner && securityPlugin.name
-					? `@${securityPlugin.owner}/${securityPlugin.name}`
-					: securityPlugin.fullName || securityPlugin.slug || securityPlugin.name,
+				slug: securityPlugin.fullName || securityPlugin.slug || securityPlugin.name,
 				headSha: securityPlugin.headSha,
 				manifestContent,
 				files: { "SKILL.md": manifestContent },
