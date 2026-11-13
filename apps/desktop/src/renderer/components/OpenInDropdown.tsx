@@ -29,7 +29,7 @@ const openTargets = [
 	{
 		id: "terminal",
 		label: "Terminal",
-		icon: <TerminalIcon size={14} strokeWidth={1.3} viewBox="0 0 16 16" />,
+		icon: <TerminalIcon size={14} strokeWidth={1.3} />,
 	},
 	{
 		id: "browser",
@@ -112,7 +112,7 @@ export function OpenInDropdown({
 				title={isFile ? "Open file in..." : "Open project in..."}
 			>
 				Open in...
-				<ChevronDownIcon size={8} strokeWidth={1.5} viewBox="0 0 8 8" />
+				<ChevronDownIcon size={10} strokeWidth={2} />
 			</button>
 			{open && (
 				<div

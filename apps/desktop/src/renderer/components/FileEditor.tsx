@@ -8,7 +8,7 @@ import {
 } from "react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vscDarkPlus, vs } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { ExternalLinkIcon } from "./icons"
+import { OpenInDropdown } from "./OpenInDropdown"
 
 interface FileContents {
 	content: string
@@ -219,28 +219,7 @@ export const FileEditor = forwardRef<FileEditorHandle, FileEditorProps>(
 					)}
 					<div style={{ flex: 1 }} />
 					{saving && <span style={{ color: "var(--muted)" }}>Saving...</span>}
-					<button
-						onClick={() => {
-							window.api.invoke({
-								type: "openInEditor",
-								filePath,
-								line: 1,
-							})
-						}}
-						title="Open in external editor"
-						style={{
-							display: "flex",
-							alignItems: "center",
-							color: "var(--muted)",
-							cursor: "pointer",
-							padding: "2px 4px",
-							borderRadius: 3,
-							border: "none",
-							background: "transparent",
-						}}
-					>
-						<ExternalLinkIcon size={14} viewBox="0 0 16 16" strokeWidth={1.3} />
-					</button>
+					<OpenInDropdown filePath={filePath} />
 					{isDirty && !saving && (
 						<button
 							onClick={handleSave}

@@ -1,6 +1,7 @@
 import * as path from "path"
 import * as fs from "fs"
 import { getAppDataDir } from "./project.js"
+import type { ProjectSkillsConfig } from "../skills/types.js"
 
 function getRecentProjectsPath(): string {
 	if (process.env.MYAGENT_RECENT_PROJECTS_PATH) {
@@ -20,6 +21,7 @@ export interface RecentProject {
 	 */
 	addedAt?: string
 	lastThreadId?: string
+	skillsConfig?: ProjectSkillsConfig
 }
 
 export function loadRecentProjects(): Array<RecentProject> {
@@ -157,6 +159,50 @@ export function getRecentProjectLastThread(projectPath: string): string | null {
 	const projects = loadRecentProjects()
 	const existing = projects.find((p) => path.resolve(p.rootPath) === safePath)
 	return existing?.lastThreadId || null
+}
+
+export function getRecentProjectSkillsConfig(
+	projectPath: string,
+): ProjectSkillsConfig | null {
+	const safePath = path.resolve(projectPath)
+	const projects = loadRecentProjects()
+	const existing = projects.find((p) => path.resolve(p.rootPath) === safePath)
+	return existing?.skillsConfig || null
+}
+
+export function saveRecentProjectSkillsConfig(
+	projectPath: string,
+	config: Partial<ProjectSkillsConfig>,
+) {
+	if (!projectPath || projectPath === "/" || !projectPath.trim()) return
+	const safePath = path.resolve(projectPath)
+	const projects = loadRecentProjects()
+	let existing = projects.find((p) => path.resolve(p.rootPath) === safePath)
+
+	if (!existing) {
+		const now = new Date().toISOString()
+		existing = {
+			name: path.basename(safePath),
+			rootPath: safePath,
+			addedAt: now,
+			lastOpened: now,
+		}
+		projects.unshift(existing)
+	}
+
+	const currentConfig = existing.skillsConfig || {
+		prompted: false,
+		enabled: false,
+		knownSkills: [],
+	}
+
+	existing.skillsConfig = {
+		...currentConfig,
+		...config,
+		lastScannedAt: Date.now(),
+	}
+
+	writeRecentProjects(projects)
 }
 
 export function renameRecentProject(projectPath: string, newName: string) {

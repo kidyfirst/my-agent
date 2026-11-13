@@ -54,7 +54,10 @@ export class ModelRouterLanguageModel {
 				baseURL:
 					baseURL || "https://generativelanguage.googleapis.com/v1beta/openai/",
 			})
-			this._resolvedModel = openai(this.modelId)
+			// Gemini's OpenAI-compatible endpoint supports Chat Completions, but
+			// does not expose the OpenAI Responses route. Calling the default model
+			// factory would therefore request `/responses` and return 404.
+			this._resolvedModel = openai.chat(this.modelId)
 		} else {
 			const openai = createOpenAI({ apiKey, baseURL })
 			this._resolvedModel = openai(this.modelId)

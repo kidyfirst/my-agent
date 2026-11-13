@@ -1,8 +1,276 @@
-import { useState, useEffect, useRef, memo } from "react"
+import { useState, useEffect, useRef, useMemo, memo } from "react"
+import { createPortal } from "react-dom"
 import type { Message, MessageContent } from "../types/ipc"
 import { normalizeMessageContent } from "../utils/messageParser"
 import { ImagePreviewModal } from "./ImagePreviewModal"
-import { FileIcon, ChevronDownIcon, CheckIcon, CopyIcon, ImageOffIcon } from "./icons"
+import {
+	FileIcon,
+	ChevronDownIcon,
+	CheckIcon,
+	CopyIcon,
+	ImageOffIcon,
+	ZapIcon,
+} from "./icons"
+
+export interface ParsedSkillMessage {
+	skillName: string
+	skillScope?: "project" | "global"
+	skillDescription?: string
+	skillInstructions?: string
+	userQuestion: string
+}
+
+export function parseSkillMessage(text: string): ParsedSkillMessage | null {
+	if (!text) return null
+
+	// Match: # Activated Skill: <name> (<scope> skill)
+	const activatedMatch = text.match(
+		/^# Activated Skill:\s*([^\n(]+)(?:\s*\((project|global)\s*skill\))?/i,
+	)
+
+	if (activatedMatch) {
+		const skillName = activatedMatch[1].trim()
+		if (!skillName) return null
+		const skillScope =
+			(activatedMatch[2]?.toLowerCase() as "project" | "global") || "global"
+
+		// Extract description
+		const descMatch = text.match(/\nDescription:\s*([^\n]+)/i)
+		const skillDescription = descMatch ? descMatch[1].trim() : undefined
+
+		// Extract instructions
+		const instructionsMatch = text.match(
+			/\n## Skill Instructions\s*\n([\s\S]*?)(?=\n## User Task|$)/i,
+		)
+		const skillInstructions = instructionsMatch
+			? instructionsMatch[1].trim()
+			: undefined
+
+		// Extract user task / question
+		const userTaskMatch = text.match(/\n## User Task\s*\n([\s\S]*)$/i)
+		const userQuestion = userTaskMatch ? userTaskMatch[1].trim() : ""
+
+		return {
+			skillName,
+			skillScope,
+			skillDescription,
+			skillInstructions,
+			userQuestion,
+		}
+	}
+
+	return null
+}
+
+export function UserMessageSkillCard({
+	parsedSkill,
+}: {
+	parsedSkill: ParsedSkillMessage
+}) {
+	const [hovered, setHovered] = useState(false)
+	const [popoverPos, setPopoverPos] = useState<{
+		top: number
+		left: number
+	} | null>(null)
+	const anchorRef = useRef<HTMLDivElement>(null)
+	const isProject = parsedSkill.skillScope === "project"
+
+	const updatePos = () => {
+		if (anchorRef.current && typeof window !== "undefined") {
+			const rect = anchorRef.current.getBoundingClientRect()
+			const maxWidth = Math.min(360, window.innerWidth - 24)
+			let left = rect.left
+			if (left + maxWidth > window.innerWidth - 12) {
+				left = window.innerWidth - 12 - maxWidth
+			}
+			if (left < 12) left = 12
+
+			const maxHeight = 240
+			let top = rect.bottom + 6
+			if (
+				top + maxHeight > window.innerHeight - 12 &&
+				rect.top > maxHeight + 12
+			) {
+				top = rect.top - 6 - maxHeight
+			}
+
+			setPopoverPos({
+				top: Math.max(12, top),
+				left,
+			})
+		}
+	}
+
+	const handleMouseEnter = () => {
+		updatePos()
+		setHovered(true)
+	}
+
+	const handleMouseLeave = () => {
+		setHovered(false)
+	}
+
+	useEffect(() => {
+		if (!hovered) return
+		const handleDismiss = () => setHovered(false)
+		window.addEventListener("scroll", handleDismiss, true)
+		window.addEventListener("resize", handleDismiss)
+		return () => {
+			window.removeEventListener("scroll", handleDismiss, true)
+			window.removeEventListener("resize", handleDismiss)
+		}
+	}, [hovered])
+
+	return (
+		<div
+			ref={anchorRef}
+			style={{
+				position: "relative",
+				display: "inline-block",
+				marginBottom: 6,
+			}}
+			onMouseEnter={handleMouseEnter}
+			onMouseLeave={handleMouseLeave}
+			onClick={(e) => e.stopPropagation()}
+		>
+			{/* Pill Badge */}
+			<div
+				style={{
+					display: "inline-flex",
+					alignItems: "center",
+					gap: 5,
+					padding: "2px 8px",
+					borderRadius: 6,
+					background: "var(--bg-elevated)",
+					border: "1px solid var(--border)",
+					cursor: "pointer",
+					userSelect: "none",
+					transition: "background 0.15s, border-color 0.15s",
+					maxWidth: "100%",
+				}}
+			>
+				<ZapIcon
+					size={12}
+					style={{
+						color: "var(--accent)",
+						flexShrink: 0,
+					}}
+				/>
+				<span
+					style={{
+						fontWeight: 600,
+						fontSize: 12,
+						color: "var(--text)",
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+						whiteSpace: "nowrap",
+					}}
+				>
+					{parsedSkill.skillName}
+				</span>
+			</div>
+
+			{/* Floating Hover Preview Card rendered in document.body via portal */}
+			{hovered &&
+				(typeof document !== "undefined"
+					? createPortal(
+							<div
+								style={{
+									position: "fixed",
+									top: popoverPos?.top ?? 0,
+									left: popoverPos?.left ?? 0,
+									zIndex: 99999,
+									width: "max-content",
+									minWidth: 200,
+									maxWidth: "min(360px, calc(100vw - 24px))",
+									maxHeight: 240,
+									boxSizing: "border-box",
+									overflowY: "auto",
+									overflowX: "hidden",
+									wordBreak: "break-word",
+									overflowWrap: "anywhere",
+									scrollbarWidth: "thin",
+									scrollbarColor: "var(--border) transparent",
+									background: "var(--bg-elevated)",
+									border: "1px solid var(--border)",
+									borderRadius: 8,
+									boxShadow: "var(--shadow-popover)",
+									padding: "10px 12px",
+									display: "flex",
+									flexDirection: "column",
+									gap: 8,
+									pointerEvents: "auto",
+									cursor: "default",
+								}}
+								onMouseEnter={() => setHovered(true)}
+								onMouseLeave={() => setHovered(false)}
+							>
+								<div
+									style={{
+										display: "flex",
+										alignItems: "flex-start",
+										justifyContent: "space-between",
+										gap: 8,
+										minWidth: 0,
+									}}
+								>
+									<span
+										style={{
+											fontSize: 13,
+											fontWeight: 600,
+											color: "var(--text)",
+											wordBreak: "break-word",
+											overflowWrap: "anywhere",
+											lineHeight: 1.35,
+											flex: 1,
+											minWidth: 0,
+										}}
+									>
+										{parsedSkill.skillName}
+									</span>
+									<span
+										style={{
+											fontSize: 10,
+											fontWeight: 500,
+											padding: "1px 5px",
+											borderRadius: 4,
+											border: isProject
+												? "1px solid var(--border-accent)"
+												: "1px solid var(--tool-border-success)",
+											background: isProject
+												? "var(--selected-bg)"
+												: "var(--tool-success-bg)",
+											color: isProject ? "var(--accent)" : "var(--success)",
+											fontFamily: isProject ? "var(--font-mono)" : "inherit",
+											flexShrink: 0,
+											whiteSpace: "nowrap",
+										}}
+									>
+										{isProject ? "project skill" : "global skill"}
+									</span>
+								</div>
+
+								{parsedSkill.skillDescription && (
+									<div
+										style={{
+											fontSize: 11,
+											color: "var(--muted)",
+											lineHeight: 1.45,
+											wordBreak: "break-word",
+											overflowWrap: "anywhere",
+											whiteSpace: "pre-wrap",
+										}}
+									>
+										{parsedSkill.skillDescription}
+									</div>
+								)}
+							</div>,
+							document.body,
+						)
+					: null)}
+		</div>
+	)
+}
 
 interface UserMessageProps {
 	message: Message
@@ -197,7 +465,17 @@ export const UserMessage = memo(function UserMessage({
 				})
 				.trim()
 		: ""
-	const displayText = cleanedText || text
+	// Parse skill metadata if message was generated from an activated skill
+	const parsedSkill = useMemo(() => {
+		return parseSkillMessage(text)
+	}, [text])
+
+	const displayText = useMemo(() => {
+		if (parsedSkill) {
+			return parsedSkill.userQuestion
+		}
+		return cleanedText || text
+	}, [parsedSkill, cleanedText, text])
 
 	// Detect whether the content exceeds the collapsed height so we can show
 	// a "click to expand" affordance and enable the toggle.
@@ -215,7 +493,11 @@ export const UserMessage = memo(function UserMessage({
 	}
 
 	const handleCopy = async () => {
-		const textToCopy = displayText || text
+		const textToCopy = parsedSkill
+			? parsedSkill.userQuestion
+				? `/${parsedSkill.skillName} ${parsedSkill.userQuestion}`
+				: `/${parsedSkill.skillName}`
+			: displayText || text
 		if (!textToCopy) return
 		try {
 			await navigator.clipboard.writeText(textToCopy)
@@ -310,7 +592,13 @@ export const UserMessage = memo(function UserMessage({
 						position: "relative",
 					}}
 				>
-					{displayText}
+					{parsedSkill && <UserMessageSkillCard parsedSkill={parsedSkill} />}
+
+					{displayText ? (
+						<div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+							{displayText}
+						</div>
+					) : null}
 
 					{/* Non-image file chips */}
 					{rawFiles.length > 0 && (

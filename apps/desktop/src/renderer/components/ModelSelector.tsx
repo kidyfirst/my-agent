@@ -209,12 +209,13 @@ export function useAvailableModels() {
 	const [loading, setLoading] = useState(true)
 
 	useEffect(() => {
+		let disposed = false
 		async function load() {
 			try {
 				const result = (await window.api.invoke({
 					type: "getAvailableModels",
 				})) as ModelInfo[]
-				setModels(result ?? [])
+				if (!disposed) setModels(result ?? [])
 			} catch {
 				// ignore
 			} finally {
@@ -222,6 +223,13 @@ export function useAvailableModels() {
 			}
 		}
 		load()
+		const off = window.api.onEvent((event: any) => {
+			if (event?.type === "login_success" || event?.type === "logout") load()
+		})
+		return () => {
+			disposed = true
+			off()
+		}
 	}, [])
 
 	return { models, loading }

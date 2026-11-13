@@ -90,6 +90,11 @@ export function buildBasePrompt(ctx: PromptContext): string {
 - **Don't create premature abstractions.** Three similar lines of code is better than a helper function used once. Don't design for hypothetical future requirements.
 - **Clean up dead code.** If something is unused, delete it completely. No backwards-compatibility shims, no renaming to \`_unused\`, no \`// removed\` comments.
 - **Be careful with security.** Don't introduce command injection, XSS, SQL injection, or other vulnerabilities. If you notice insecure code you wrote, fix it immediately.
+
+# Skills Management in MyAgent
+- Project-level skills are stored in \`.myagent/skills/<skill-name>/SKILL.md\` (with optional scripts and resources in the same skill folder).
+- When asked to install, download, generate, or create a skill for the workspace, ALWAYS place it in \`.myagent/skills/<skill-name>/SKILL.md\` (never \`.agent/skills/\` or \`.agents/skills/\`).
+- After installing or generating a skill, clearly confirm to the user that it was installed into \`.myagent/skills/<skill-name>/\` and that MyAgent will automatically refresh/discover it (or they can use \`/refresh\`).
 `
 	/**
 	 * Browser control is a desktop-host capability. It only appears when the

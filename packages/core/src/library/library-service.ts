@@ -1552,8 +1552,8 @@ export class LibraryService {
 		if (!resolver) {
 			return null
 		}
-		const modelId =
-			customModelId || this.imageProcessModelId || "deepseek/deepseek-flash"
+		const modelId = customModelId || this.imageProcessModelId
+		if (!modelId) return null
 
 		try {
 			const model = resolver(modelId)

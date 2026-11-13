@@ -154,6 +154,8 @@ export {
 	saveRecentProjectLastThread,
 	renameRecentProject,
 	removeRecentProject,
+	getRecentProjectSkillsConfig,
+	saveRecentProjectSkillsConfig,
 	type RecentProject,
 } from "./utils/recent-projects.js"
 export {
@@ -199,3 +201,7 @@ export {
 
 export * from "./library/index.js"
 export { createLibraryTool } from "./tools/library.js"
+export * from "./skills/index.js"
+export * from "./harness/settings.js"
+export { createInvokeSkillTool } from "./tools/invoke-skill.js"
+export { createInstallSkillTool } from "./tools/install-skill.js"

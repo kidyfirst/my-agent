@@ -40,7 +40,9 @@ export interface ThreadActionsOptions {
 		setShowCommandPalette: (v: boolean) => void
 		handleOpenGraphViewer?: () => void
 		handleOpenSettings?: (section?: string) => void
+		setSkillsGuideModal?: (state: any) => void
 	}
+	showToast?: (message: string, type?: "info" | "success" | "error") => void
 	applyPermissionMode: (
 		permission: PermissionMode,
 		threadId?: string,
@@ -86,6 +88,7 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 		isAgentActive,
 		handleToggleRecording,
 		handleStartReplay,
+		showToast,
 	} = opts
 
 	/**
@@ -387,6 +390,32 @@ export function useThreadActions(opts: ThreadActionsOptions) {
 				case "settings":
 					dialogs.handleOpenSettings?.()
 					break
+				case "refresh": {
+					try {
+						const res = (await window.api.invoke({
+							type: "processSlashCommand",
+							commandName: "refresh",
+						})) as any
+						if (res?.type === "skills_refresh") {
+							if (res.hasChanges) {
+								dialogs.setSkillsGuideModal?.({
+									isOpen: true,
+									mode: "refresh",
+									projectPath: projectRootPath || "",
+									added: res.added,
+									removed: res.removed,
+									modified: res.modified,
+									skills: res.skills,
+								})
+							} else {
+								showToast?.("Project skills are up to date.", "info")
+							}
+						}
+					} catch (err) {
+						console.warn("Failed to refresh project skills:", err)
+					}
+					break
+				}
 				case "record":
 					if (handleToggleRecording) {
 						handleToggleRecording()

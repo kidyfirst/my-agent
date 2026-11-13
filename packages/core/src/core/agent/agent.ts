@@ -293,6 +293,10 @@ export class Agent {
 		const sortedTools = sortToolsByName(tools)
 		const result = streamText({
 			model: effectiveModel,
+			// Gemini's OpenAI-compatible endpoint can return transient 503s. The
+			// SDK's default three retries delay the fallback model and duplicate a
+			// failed turn. Let the resolver's fallback switch models immediately.
+			maxRetries: modelIdStr.startsWith("google/") ? 0 : undefined,
 			system: instructions,
 			prompt,
 			tools:

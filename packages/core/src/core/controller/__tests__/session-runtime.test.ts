@@ -134,4 +134,53 @@ describe("Session runtime snapshot (record → replay)", () => {
 		expect(session.permissions.getRules().categories.execute).toBeUndefined()
 		expect(session.getGrants().categories).toEqual(["edit"])
 	})
+
+	it("safely handles string and object inputs to session.model.switch and invokes tracker with valid IDs", async () => {
+		const tracked: string[] = []
+		const controller = new AgentController({
+			agent: {
+				getInstructions: async () => "test agent",
+				getModel: async () => ({ modelId: "mock-model" }),
+				listTools: async () => ({}),
+			} as any,
+			storage: new SQLiteStore() as any,
+			modelUseCountTracker: (id) => tracked.push(id),
+		})
+		await controller.init()
+		const session = await controller.createSession({
+			resourceId: "model-switch-test",
+		})
+
+		// 1. Valid string
+		await session.model.switch("google/gemini-2.0-flash")
+		expect(session.model.get()).toBe("google/gemini-2.0-flash")
+
+		// 2. Object with modelId
+		await session.model.switch({ modelId: "openai/gpt-4o" } as any)
+		expect(session.model.get()).toBe("openai/gpt-4o")
+
+		// 3. Object with id
+		await session.model.switch({ id: "deepseek/deepseek-chat" } as any)
+		expect(session.model.get()).toBe("deepseek/deepseek-chat")
+
+		// 4. Object with name
+		await session.model.switch({ name: "anthropic/claude-3-7-sonnet" } as any)
+		expect(session.model.get()).toBe("anthropic/claude-3-7-sonnet")
+
+		// 5. Invalid objects: empty object or [object Object]
+		await session.model.switch({} as any)
+		await session.model.switch("[object Object]" as any)
+		await session.model.switch(null as any)
+
+		// Model remains the last valid model
+		expect(session.model.get()).toBe("anthropic/claude-3-7-sonnet")
+
+		// Tracker only received valid model IDs, never [object Object]
+		expect(tracked).toEqual([
+			"google/gemini-2.0-flash",
+			"openai/gpt-4o",
+			"deepseek/deepseek-chat",
+			"anthropic/claude-3-7-sonnet",
+		])
+	})
 })

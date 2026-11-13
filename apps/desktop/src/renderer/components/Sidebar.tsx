@@ -617,19 +617,16 @@ export function Sidebar({
 									<span
 										style={{ display: "flex", gap: 4, alignItems: "center" }}
 									>
-										{connected.map((p) => (
-											<span
-												key={p.id}
-												title={p.label}
-												style={{
-													width: 7,
-													height: 7,
-													borderRadius: "50%",
-													background: "var(--success)",
-													flexShrink: 0,
-												}}
-											/>
-										))}
+										<span
+											title={`${connected.length} providers connected`}
+											style={{
+												width: 7,
+												height: 7,
+												borderRadius: "50%",
+												background: "var(--success)",
+												flexShrink: 0,
+											}}
+										/>
 									</span>
 									<span
 										style={{

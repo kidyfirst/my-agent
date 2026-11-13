@@ -72,7 +72,7 @@ export function LibrarySection({
 				description="Vision model used to extract text (OCR) and index images for library search (Default: DeepSeek)"
 			>
 				<ModelPickerInline
-					currentModelId={state.imageProcessModelId || "deepseek/deepseek-flash"}
+					currentModelId={state.imageProcessModelId || ""}
 					models={models}
 					loading={!modelsLoaded}
 					onSelect={(v) => update("imageProcessModelId", v)}

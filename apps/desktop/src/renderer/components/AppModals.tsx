@@ -16,8 +16,10 @@ import {
 } from "./SessionExportModal"
 import { SessionReplayModal } from "./SessionReplayModal"
 import { LogConsoleModal } from "./LogConsoleModal"
+import { ProjectSkillsGuideModal } from "./skills/ProjectSkillsGuideModal"
 import { DEFAULT_EXECUTION_MODE } from "../types/ipc"
 import { CloseIcon } from "./icons"
+import { AsyncButton } from "./AsyncButton"
 
 import type { AuthManager } from "../hooks/useAuthManager"
 import type { DialogManager } from "../hooks/useDialogManager"
@@ -254,9 +256,11 @@ export function AppModals(props: AppModalsProps) {
 								>
 									Cancel
 								</button>
-								<button
+								<AsyncButton
 									onClick={project.handleCloneSubmit}
 									disabled={!cloneReady || project.cloning}
+									loading={project.cloning}
+									progress={project.cloning ? null : undefined}
 									style={{
 										padding: "8px 20px",
 										background: cloneReady
@@ -272,8 +276,8 @@ export function AppModals(props: AppModalsProps) {
 										opacity: project.cloning ? 0.6 : 1,
 									}}
 								>
-									{project.cloning ? "Cloning..." : "Clone repository"}
-								</button>
+									Clone repository
+								</AsyncButton>
 							</div>
 						</div>
 					</div>
@@ -382,7 +386,7 @@ export function AppModals(props: AppModalsProps) {
 							>
 								Cancel
 							</button>
-							<button
+							<AsyncButton
 								onClick={async () => {
 									const tabId = tabs.pendingCloseTab!
 									tabs.setPendingCloseTab(null)
@@ -401,7 +405,7 @@ export function AppModals(props: AppModalsProps) {
 								}}
 							>
 								Save & Close
-							</button>
+							</AsyncButton>
 						</div>
 					</div>
 				</div>
@@ -444,6 +448,7 @@ export function AppModals(props: AppModalsProps) {
 					onLogout={auth.handleLogout}
 					initialSection={dialogs.settingsSection}
 					onSectionChange={dialogs.setSettingsSection}
+					showToast={props.showToast}
 				/>
 			)}
 
@@ -493,6 +498,56 @@ export function AppModals(props: AppModalsProps) {
 					onClose={props.onCloseReplay || (() => {})}
 					onStartReplay={props.onStartReplay || (() => {})}
 					onError={props.onReplayError}
+				/>
+			)}
+
+			{dialogs.skillsGuideModal?.isOpen && (
+				<ProjectSkillsGuideModal
+					isOpen={dialogs.skillsGuideModal.isOpen}
+					mode={dialogs.skillsGuideModal.mode}
+					projectPath={dialogs.skillsGuideModal.projectPath}
+					skills={dialogs.skillsGuideModal.skills}
+					added={dialogs.skillsGuideModal.added}
+					removed={dialogs.skillsGuideModal.removed}
+					modified={dialogs.skillsGuideModal.modified}
+					onClose={() => dialogs.setSkillsGuideModal(null)}
+					onEnable={async () => {
+						const current = dialogs.skillsGuideModal
+						if (!current) return
+						const knownSkills = (current.skills || current.added || []).map(
+							(s: any) => ({
+								name: s.name,
+								path: s.path,
+								hash: s.hash || "",
+							}),
+						)
+						await window.api.invoke({
+							type: "saveProjectSkillsConfig",
+							projectRoot: current.projectPath,
+							config: {
+								prompted: true,
+								enabled: true,
+								knownSkills,
+							},
+						})
+						dialogs.setSkillsGuideModal(null)
+						props.showToast?.("Project skills enabled.", "success")
+					}}
+					onDisable={async () => {
+						const current = dialogs.skillsGuideModal
+						if (!current) return
+						await window.api.invoke({
+							type: "saveProjectSkillsConfig",
+							projectRoot: current.projectPath,
+							config: {
+								prompted: true,
+								enabled: false,
+								knownSkills: [],
+							},
+						})
+						dialogs.setSkillsGuideModal(null)
+						props.showToast?.("Project skills disabled.", "info")
+					}}
 				/>
 			)}
 		</>

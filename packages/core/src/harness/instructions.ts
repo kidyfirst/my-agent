@@ -107,6 +107,9 @@ export function createDynamicInstructions(options: BrowserToolOptions = {}) {
 					title: status.title ?? status.name,
 					error: status.error,
 				})),
+			skillsCatalog:
+				(harnessContext as any)?.getSkillsCatalog?.() ??
+				(harnessContext as any)?.skillExecutor?.formatStage1Catalog?.(),
 		}
 
 		return buildFullPrompt(promptCtx)

@@ -22,6 +22,10 @@ import { createSubagentTool } from "../tools/subagent.js"
 import { createProjectMemoryTool } from "../tools/project-memory.js"
 import { createLibraryTool } from "../tools/library.js"
 import { createRetrieveFoldedMessagesTool } from "../tools/retrieve-folded.js"
+import { createInvokeSkillTool } from "../tools/invoke-skill.js"
+import { createInstallSkillTool } from "../tools/install-skill.js"
+import { SkillExecutor } from "../skills/skill-executor.js"
+import { SkillManager } from "../skills/skill-manager.js"
 import { getLibraryService } from "../library/library-service.js"
 import { DEFAULT_OM_MODEL_ID } from "./state.js"
 
@@ -46,6 +50,8 @@ export const READ_TOOL_NAMES = [
 	"assets_fetch",
 	"search_my_library",
 	"retrieve_folded_messages",
+	"invoke_skill",
+	"install_skill",
 ] as const
 
 /**
@@ -61,6 +67,7 @@ export const WRITE_TOOL_NAMES = [
 	"ast_smart_edit",
 	"subagent",
 	"project_memory",
+	"install_skill",
 ] as const
 
 export const PLAN_TOOL_NAMES = [
@@ -193,6 +200,21 @@ export function createDynamicTools(
 			assets_fetch: () => createAssetsFetchTool(projectRoot),
 			project_memory: () => createProjectMemoryTool(projectRoot),
 			retrieve_folded_messages: () => createRetrieveFoldedMessagesTool(),
+			invoke_skill: () => {
+				const harness = (requestContext.get("harness") ||
+					requestContext.get("controller")) as any
+				const executor =
+					harness?.skillExecutor ??
+					harness?.session?.skillExecutor ??
+					new SkillExecutor()
+				return createInvokeSkillTool(executor)
+			},
+			install_skill: () => {
+				const harness = (requestContext.get("harness") ||
+					requestContext.get("controller")) as any
+				const manager = harness?.skillManager ?? new SkillManager()
+				return createInstallSkillTool(manager)
+			},
 			search_my_library: () => {
 				const service = getLibraryService()
 				const harness = (requestContext.get("harness") ||

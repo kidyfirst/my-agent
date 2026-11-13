@@ -103,6 +103,7 @@ export interface HarnessCallbacks {
 			totalBytes: number
 		} | null>
 	>
+	onSkillsRefreshNeeded?: () => void
 }
 
 export function useHarnessEvents(callbacks: HarnessCallbacks) {
@@ -191,6 +192,21 @@ export function useHarnessEvents(callbacks: HarnessCallbacks) {
 										messageId: lastAssistant || "",
 										files,
 									})
+
+									// Auto-detect project skill changes if any skill file was created or modified
+									const hasSkillFileChange = files.some((f) => {
+										const p = (f.path || "").replace(/\\/g, "/")
+										return (
+											p.includes("/skills/") ||
+											p.startsWith("skills/") ||
+											p.endsWith("/SKILL.md") ||
+											p === "SKILL.md"
+										)
+									})
+
+									if (hasSkillFileChange) {
+										cb.onSkillsRefreshNeeded?.()
+									}
 								}
 							})
 							.catch(() => {})

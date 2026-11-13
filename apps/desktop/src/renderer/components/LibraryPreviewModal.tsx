@@ -12,6 +12,7 @@ import {
 import { OpenInDropdown } from "./OpenInDropdown"
 import type { LibraryItemContent } from "@my-agent/core"
 import { CloseIcon, ExternalLinkIcon } from "./icons"
+import { AsyncButton } from "./AsyncButton"
 
 interface LibraryPreviewModalProps {
 	itemId: string | null
@@ -524,10 +525,10 @@ export function LibraryPreviewModal({
 											</div>
 
 											{content.analysis && (
-												<button
+												<AsyncButton
 													type="button"
 													onClick={handleRunOcr}
-													disabled={isAnalyzingOcr}
+													loading={isAnalyzingOcr}
 													title="Re-analyze image"
 													style={{
 														fontSize: 11,
@@ -545,8 +546,8 @@ export function LibraryPreviewModal({
 														opacity: isAnalyzingOcr ? 0.7 : 1,
 													}}
 												>
-													{isAnalyzingOcr ? "Analyzing..." : "Re-run"}
-												</button>
+													Re-run
+												</AsyncButton>
 											)}
 										</div>
 

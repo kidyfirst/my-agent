@@ -42,12 +42,13 @@ export function ComputerUsePreview({
 	// The mirrored page lives in a headless browser; opening it means opening
 	// the same url on a surface the user can actually type in.
 	const openInBrowser = () => {
-		if (!/^https?:/i.test(frame.url)) return
+		const url = normalizePreviewUrl(frame.url)
+		if (!url) return
 		if (onOpenInPanel) {
-			onOpenInPanel(frame.url)
+			onOpenInPanel(url)
 			return
 		}
-		void window.api.invoke({ type: "openExternal", url: frame.url })
+		void window.api.invoke({ type: "openExternal", url })
 	}
 
 	return (
@@ -61,6 +62,17 @@ export function ComputerUsePreview({
 			onOpen={openInBrowser}
 		/>
 	)
+}
+
+/** Browser snapshots can point at generated local HTML, not only web URLs. */
+function normalizePreviewUrl(value: string): string {
+	const trimmed = (value || "").trim()
+	if (/^(https?|file|about|data):/i.test(trimmed)) return trimmed
+	// Playwright may expose a local document as an absolute filesystem path.
+	if (trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed)) {
+		return `file://${encodeURI(trimmed.replace(/\\/g, "/"))}`
+	}
+	return ""
 }
 
 interface CardProps {
@@ -157,7 +169,6 @@ export function ComputerUsePreviewCard({
 				>
 					<ExternalLinkIcon
 						size={13}
-						viewBox="0 0 16 16"
 						strokeWidth={1.6}
 					/>
 				</button>

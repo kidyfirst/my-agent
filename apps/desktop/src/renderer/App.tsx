@@ -44,7 +44,10 @@ import type { AttachedFile } from "./types/chat"
 import { ensureAudioContext } from "./utils/audio"
 import { useChatReducer } from "./hooks/useChatReducer"
 import { useAuthManager } from "./hooks/useAuthManager"
-import { useDialogManager, type PendingApproval } from "./hooks/useDialogManager"
+import {
+	useDialogManager,
+	type PendingApproval,
+} from "./hooks/useDialogManager"
 import { useTabManager } from "./hooks/useTabManager"
 import { useProjectManager } from "./hooks/useProjectManager"
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
@@ -72,6 +75,7 @@ import {
 } from "./utils/rightSidebarResize"
 import { BUILTIN_COMMAND_NAMES } from "./components/SlashCommandAutocomplete"
 import type { SessionExportData } from "./components/SessionExportModal"
+import { ToastNotification } from "./components/ToastNotification"
 
 export function App() {
 	// Core hooks
@@ -323,30 +327,17 @@ export function App() {
 	// Developer logging — controls whether the sidebar exposes the Logging item.
 	const [loggingEnabled, setLoggingEnabled] = useState(false)
 	const [toast, setToast] = useState<{
+		id: number
 		message: string
 		type: "info" | "error" | "success"
 	} | null>(null)
 
 	const showToast = useCallback(
 		(message: string, type: "info" | "error" | "success" = "info") => {
-			setToast({ message, type })
-			setTimeout(() => {
-				setToast((t) => (t?.message === message ? null : t))
-			}, 3000)
+			setToast({ id: Date.now(), message, type })
 		},
 		[],
 	)
-
-	// The toast keeps the active theme surface and font; only this glyph is tinted, so
-	// it stays legible on both light and dark skins.
-	const toastAccent =
-		toast?.type === "error"
-			? "var(--error)"
-			: toast?.type === "success"
-				? "var(--success)"
-				: "var(--muted)"
-	const toastGlyph =
-		toast?.type === "error" ? "⚠" : toast?.type === "success" ? "✓" : "•"
 	// Two independent paths load the same thread: the caller that initiated the
 	// switch, and the `thread_changed` broadcast the main process emits after
 	// it. Without this guard the transcript loads twice, so the user watches
@@ -520,6 +511,14 @@ export function App() {
 		setThreads,
 		setTokenUsage,
 		setCurrentThreadId,
+		onSkillsDetected: (skills, projectPath) => {
+			dialogs.setSkillsGuideModal?.({
+				isOpen: true,
+				mode: "onboarding",
+				projectPath,
+				skills,
+			})
+		},
 	})
 
 	// Git surfaces (Git tab, PR button, branch chips) only make sense inside a
@@ -799,13 +798,14 @@ export function App() {
 					const targetThread = session.threads?.find(
 						(t) => t.id === targetThreadId,
 					)
-					const tMeta = (targetThread?.metadata || {}) as Record<string, unknown>
+					const tMeta = (targetThread?.metadata || {}) as Record<
+						string,
+						unknown
+					>
 
 					// 1. Model
-					const tModel =
-						(threadModel.modelsByThread[targetThreadId] || tMeta.modelId) as
-							| string
-							| undefined
+					const tModel = (threadModel.modelsByThread[targetThreadId] ||
+						tMeta.modelId) as string | undefined
 					if (tModel) {
 						setModelId(tModel)
 						window.api.invoke({
@@ -1243,12 +1243,40 @@ export function App() {
 		setShowCommandPalette: dialogs.setShowCommandPalette,
 		setUpdateInfo,
 		setDownloadProgress,
+		onSkillsRefreshNeeded: async () => {
+			const projectRoot = project.projectInfo?.rootPath
+			if (!projectRoot) return
+			try {
+				const res = (await window.api.invoke({
+					type: "processSlashCommand",
+					commandName: "refresh",
+				})) as any
+				if (res?.type === "skills_refresh" && res.hasChanges) {
+					dialogs.setSkillsGuideModal?.({
+						isOpen: true,
+						mode: "refresh",
+						projectPath: projectRoot,
+						added: res.added,
+						removed: res.removed,
+						modified: res.modified,
+						skills: res.skills,
+					})
+					showToast(
+						`Detected ${res.added?.length || 0} new skill(s). Project skills refreshed.`,
+						"success",
+					)
+				}
+			} catch (err) {
+				console.warn("Auto skill refresh failed:", err)
+			}
+		},
 	})
 
 	// Chat handlers
 	const handleSend = useCallback(
 		async (content: string, files?: AttachedFile[]) => {
 			ensureAudioContext()
+			const rawUserContent = content || ""
 			let finalContent = content || ""
 			if (typeof finalContent === "string" && finalContent.startsWith("/")) {
 				const spaceIndex = finalContent.indexOf(" ")
@@ -1264,17 +1292,43 @@ export function App() {
 								.trim()
 								.split(/\s+/)
 				try {
-					finalContent = (await window.api.invoke({
+					const res = await window.api.invoke({
 						type: "processSlashCommand",
 						commandName,
 						args,
-					})) as string
+					})
+					if (typeof res === "string" && res.trim()) {
+						finalContent = res
+					} else if (
+						res &&
+						typeof res === "object" &&
+						(res as any).type === "skills_refresh"
+					) {
+						const refreshRes = res as any
+						if (refreshRes.hasChanges) {
+							dialogs.setSkillsGuideModal?.({
+								isOpen: true,
+								mode: "refresh",
+								projectPath: project.projectInfo?.rootPath || "",
+								added: refreshRes.added,
+								removed: refreshRes.removed,
+								modified: refreshRes.modified,
+								skills: refreshRes.skills,
+							})
+						} else {
+							showToast("Project skills are up to date.", "info")
+						}
+						return
+					} else {
+						// Command or skill not recognized: fall back directly to raw user input text
+						if (!BUILTIN_COMMAND_NAMES.has(commandName)) {
+							finalContent = rawUserContent
+						}
+					}
 				} catch {
-					// Not a custom command. Known builtins are handled by the
-					// composer; anything else (including a removed /model) is
-					// dropped instead of being sent to the agent as text.
+					// On any invocation error: keep raw user text instead of blanking out or throwing
 					if (!BUILTIN_COMMAND_NAMES.has(commandName)) {
-						finalContent = ""
+						finalContent = rawUserContent
 					}
 				}
 			}
@@ -1300,8 +1354,10 @@ export function App() {
 			}
 
 			const messageContent: Message["content"] = []
-			if (finalContent) {
-				messageContent.push({ type: "text", text: finalContent })
+			// Use finalContent so skill activations parse into skill cards immediately and reconcile with server
+			const displayContent = finalContent || rawUserContent
+			if (displayContent) {
+				messageContent.push({ type: "text", text: displayContent })
 			}
 			if (imageFiles) {
 				for (const img of imageFiles) {
@@ -1623,6 +1679,7 @@ export function App() {
 		isAgentActive: chat.isAgentActive,
 		handleToggleRecording,
 		handleStartReplay,
+		showToast,
 	})
 	const {
 		handleSwitchThread,
@@ -1991,7 +2048,6 @@ export function App() {
 				isAgentsActive={dialogs.showAgents}
 				isLibraryActive={dialogs.showLibrary}
 				activeAgentCount={project.activeWorktrees.size}
-
 				updateInfo={updateInfo}
 				downloadProgress={downloadProgress}
 				onDownloadUpdate={handleDownloadUpdate}
@@ -2029,6 +2085,7 @@ export function App() {
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
+						position: "relative",
 					}}
 				>
 					{/* Tab bar */}
@@ -2067,6 +2124,15 @@ export function App() {
 						}
 						replayingThreads={replayingThreads}
 					/>
+
+					{/* Conversation Container Toast (Below header with slide/fade animation) */}
+					{toast && (
+						<ToastNotification
+							key={toast.id}
+							toast={toast}
+							onClose={() => setToast(null)}
+						/>
+					)}
 
 					<MainContent
 						auth={auth}
@@ -2198,46 +2264,6 @@ export function App() {
 				currentThreadId={currentThreadId}
 				showToast={showToast}
 			/>
-
-			{/* Floating Toast Notification */}
-			{toast && (
-				<div
-					role="status"
-					aria-live="polite"
-					style={{
-						position: "fixed",
-						top: 24,
-						left: "50%",
-						transform: "translateX(-50%)",
-						zIndex: 99999,
-						maxWidth: "min(560px, calc(100vw - 48px))",
-						padding: "8px 14px",
-						borderRadius: 8,
-						background: "var(--bg-elevated)",
-						border: "1px solid var(--border)",
-						boxShadow: "var(--shadow-popover)",
-						color: "var(--text)",
-						fontFamily: "inherit",
-						fontSize: 12,
-						fontWeight: 500,
-						lineHeight: 1.5,
-						letterSpacing: "0.2px",
-						display: "flex",
-						alignItems: "flex-start",
-						gap: 8,
-						pointerEvents: "none",
-					}}
-				>
-					<span
-						style={{ color: toastAccent, fontWeight: 700, flex: "0 0 auto" }}
-					>
-						{toastGlyph}
-					</span>
-					<span style={{ minWidth: 0, wordBreak: "break-word" }}>
-						{toast.message}
-					</span>
-				</div>
-			)}
 		</div>
 	)
 }

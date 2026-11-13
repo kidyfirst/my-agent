@@ -51,6 +51,7 @@ export interface ChatViewProps {
 		activeForm: string
 	}>
 	onOpenDiff?: (path: string) => void
+	onOpenFile?: (path: string) => void
 	/** Show a page in the sidebar's browser tab (browser-preview card). */
 	onOpenBrowserPanel?: (url: string) => void
 	isReplaySession?: boolean
@@ -282,6 +283,7 @@ export function ChatView({
 	streamingMessageId,
 	todos,
 	onOpenDiff,
+	onOpenFile,
 	onOpenBrowserPanel,
 	isReplaySession,
 	isActivelyReplaying,
@@ -980,6 +982,19 @@ export function ChatView({
 				if (isReplayMessage(item.data as Message)) {
 					baseItems[baseItems.length - 1] = item
 				}
+			} else if (
+				item.type === "assistant" &&
+				prev?.type === "assistant" &&
+				(((prev.data as any).interrupted === true &&
+					(item.data as any).stopReason === "error") ||
+					((item.data as any).interrupted === true &&
+						(prev.data as any).stopReason === "error"))
+			) {
+				// Collapse the persisted interruption notice and the renderer's
+				// immediate request error into one assistant result.
+				if ((item.data as any).stopReason === "error") {
+					baseItems[baseItems.length - 1] = item
+				}
 			} else {
 				baseItems.push(item)
 			}
@@ -1103,6 +1118,7 @@ export function ChatView({
 						key={item.key}
 						message={assistantMsg}
 						onOpenDiff={onOpenDiff}
+						onOpenFile={onOpenFile}
 						isAgentActive={isAgentActive}
 						flushTop={afterHeader}
 					/>
@@ -1308,7 +1324,10 @@ export function ChatView({
 							{cleanedItems.length === 0 && !isAgentActive && <AsciiLogo />}
 
 							{renderedTurns.map((turn) => {
-								const replayTurn = isReplayTurn(turn)
+								// Older recordings may have message ids without the replay-
+								// prefix. When the active thread is explicitly a replay, keep
+								// the visual provenance marker for those messages as well.
+								const replayTurn = isReplaySession || isReplayTurn(turn)
 								const playbackKey = replayTurn
 									? replayTurnPlaybackKey(turn)
 									: null

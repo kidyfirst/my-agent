@@ -212,6 +212,9 @@ importers:
       '@ast-grep/napi':
         specifier: ^0.40.5
         version: 0.40.5
+      '@electron-internal/extract-zip':
+        specifier: 1.0.8
+        version: 1.0.8
       '@langchain/core':
         specifier: ^1.3.1
         version: 1.3.1(@opentelemetry/api@1.9.0)
@@ -233,6 +236,9 @@ importers:
       fastest-levenshtein:
         specifier: ^1.0.16
         version: 1.0.16
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
       js-tiktoken:
         specifier: ^1.0.21
         version: 1.0.21
@@ -1863,6 +1869,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.2:
+    resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
 
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
@@ -4944,6 +4953,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.3):
     optionalDependencies:
       picomatch: 4.0.3
+
+  fflate@0.8.2: {}
 
   figures@6.1.0:
     dependencies:

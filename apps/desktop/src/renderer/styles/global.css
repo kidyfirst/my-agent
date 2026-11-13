@@ -134,6 +134,11 @@ body.light-theme {
 	--logo-accent: #059669;
 }
 
+@keyframes async-button-progress {
+	0% { transform: translateX(-120%); }
+	100% { transform: translateX(260%); }
+}
+
 [data-theme="dark"],
 body.dark-theme {
 	/* Core UI */
@@ -508,5 +513,14 @@ body.dark-theme .shortcut-tooltip {
 	}
 	to {
 		opacity: 1;
+	}
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
 	}
 }

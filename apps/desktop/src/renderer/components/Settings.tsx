@@ -10,6 +10,7 @@ import type {
 import { AccountsSection } from "./settings/AccountsSection"
 import { GeneralSection } from "./settings/GeneralSection"
 import { McpSection } from "./settings/McpSection"
+import { SkillsSection } from "./settings/SkillsSection"
 import { ModelsSection } from "./settings/ModelsSection"
 import { AgentSection } from "./settings/AgentSection"
 import { GitSection } from "./settings/GitSection"
@@ -27,6 +28,7 @@ export function Settings({
 	onLogout,
 	initialSection,
 	onSectionChange,
+	showToast,
 }: SettingsProps) {
 	if (!isOpen) return null
 	const [state, setState] = useState<SettingsState | null>(null)
@@ -267,6 +269,7 @@ export function Settings({
 		{ id: "accounts", label: "Accounts" },
 		{ id: "general", label: "General" },
 		{ id: "mcp", label: "MCP" },
+		{ id: "skills", label: "Skills" },
 		{ id: "models", label: "Models" },
 		{ id: "library", label: "Library" },
 		{ id: "agent", label: "Agent" },
@@ -424,9 +427,10 @@ export function Settings({
 
 					{/* Content */}
 					<div
+						className="settings-content-scroll"
 						style={{
 							flex: 1,
-							padding: "16px 28px 28px",
+							padding: "8px 14px 14px",
 							overflowY: "auto",
 							background: "var(--bg)",
 						}}
@@ -466,6 +470,10 @@ export function Settings({
 										onRemoveServer={handleRemoveServer}
 										onSetApiKey={handleSetMcpApiKey}
 									/>
+								)}
+
+								{activeSection === "skills" && (
+									<SkillsSection showToast={showToast} />
 								)}
 
 								{activeSection === "models" && (

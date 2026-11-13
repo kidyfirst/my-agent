@@ -45,6 +45,49 @@ describe("Message Deduplication and Reconciliation in chatReducer", () => {
 		)
 	})
 
+	it("reconciles optimistic skill slash command with incoming activated skill message", () => {
+		const optimisticMsg: Message = {
+			id: "user-1729510000999",
+			role: "user",
+			content: [
+				{ type: "text", text: "/Study-Mate 制作学习资料，关于本项目下的内容" },
+			],
+			createdAt: "2026-10-21T11:23:00.000Z",
+		}
+
+		let state = chatReducer(initialChatState, {
+			type: "MESSAGE_START",
+			message: optimisticMsg,
+		})
+
+		expect(state.messages).toHaveLength(1)
+
+		// Server emits expanded skill activation prompt
+		const serverSkillMsg: Message = {
+			id: "msg-db-skill-888",
+			role: "user",
+			content: [
+				{
+					type: "text",
+					text: `# Activated Skill: Study-Mate (global skill)\nDescription: 你的AI学习搭档\n\n## Skill Instructions\nYou are Study-Mate.\n\n## User Task\n制作学习资料，关于本项目下的内容`,
+				},
+			],
+			createdAt: "2026-10-21T11:23:01.000Z",
+		}
+
+		state = chatReducer(state, {
+			type: "MESSAGE_START",
+			message: serverSkillMsg,
+		})
+
+		// Must reconcile in place without creating duplicate messages
+		expect(state.messages).toHaveLength(1)
+		expect(state.messages[0].id).toBe("msg-db-skill-888")
+		expect(getMessageText(state.messages[0])).toContain(
+			"# Activated Skill: Study-Mate",
+		)
+	})
+
 	it("reconciles optimistic message with incoming signal message (role: 'signal')", () => {
 		const optimisticMsg: Message = {
 			id: "user-1729510000001",
