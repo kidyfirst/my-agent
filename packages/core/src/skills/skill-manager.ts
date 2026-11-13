@@ -12,6 +12,7 @@ import {
 	type Skill,
 	type SkillHubPluginItem,
 } from "./types.js"
+import { CLAWHUB_SOURCE, SKILLHUB_SOURCE } from "./market-sources.js"
 
 export { DEFAULT_PROJECT_SKILL_DIRS }
 
@@ -229,45 +230,33 @@ export class SkillManager {
 			const sourceBase = options.sourceUrl
 				.replace(/\/+$/, "")
 				.replace(/^https:\/\/skillhub\.cn$/i, "https://api.skillhub.cn")
-			const isClawHub = /clawhub/i.test(sourceBase)
-			const slug = isClawHub
-				? options.slug.replace(/^@/, "")
-				: options.slug.startsWith("@")
-					? options.slug
-					: `@${options.slug}`
-			const downloadUrls = isClawHub
-				? [
-						`${sourceBase}/api/skills/${encodeURIComponent(slug)}/download`,
-						`${sourceBase}/api/v1/skills/${encodeURIComponent(slug)}/download`,
-						`${sourceBase}/api/v1/download?slug=${encodeURIComponent(slug)}`,
-					]
-				: [`${sourceBase}/api/v1/download?slug=${encodeURIComponent(slug)}`]
-			let response: Response | undefined
-			let downloadUrl = downloadUrls[0]
-			for (const candidate of downloadUrls) {
-				console.info(
-					`[SkillManager] downloading skill ${slug} from ${candidate}`,
-				)
-				const candidateResponse = await fetch(candidate)
-				if (candidateResponse.ok) {
-					response = candidateResponse
-					downloadUrl = candidate
-					break
-				}
-			}
-			if (!response || !response.ok)
+			const source = /clawhub/i.test(sourceBase)
+				? CLAWHUB_SOURCE
+				: SKILLHUB_SOURCE
+			const rawSlug = options.slug.replace(/^@/, "")
+			const [owner, ...parts] = rawSlug.split("/")
+			const skillName = parts.join("/") || rawSlug
+			const downloadUrl = source.downloadUrl
+				.replace("{apiUrl}", sourceBase)
+				.replace("{owner}", encodeURIComponent(owner))
+				.replace("{name}", encodeURIComponent(skillName))
+			console.info(
+				`[SkillManager] downloading skill ${rawSlug} from ${downloadUrl}`,
+			)
+			const response = await fetch(downloadUrl)
+			if (!response.ok)
 				return {
 					success: false,
 					auditReport: await this.securityInspector.auditSkill({
 						manifestContent,
 						files,
 					}),
-					reason: `Skill download failed; tried ${downloadUrls.join(", ")}`,
+					reason: `Skill download failed (${response.status})`,
 				}
 			const archive = new Uint8Array(await response.arrayBuffer())
 			const downloaded = await extractArchiveFiles(archive)
 			console.info(
-				`[SkillManager] SkillHub archive ${slug}: ${Object.keys(downloaded).length} files`,
+				`[SkillManager] marketplace archive ${rawSlug}: ${Object.keys(downloaded).length} files`,
 			)
 			if (Object.keys(downloaded).length === 0) {
 				const preview = new TextDecoder()
