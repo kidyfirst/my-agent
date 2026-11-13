@@ -483,6 +483,25 @@ ${plugin.description}
 
 	const handleConfirmInstall = async () => {
 		if (!securityPlugin) return
+		// Different marketplaces can publish the same owner/name. They share one
+		// global directory, so make the overwrite explicit before downloading.
+		const installed = (await window.api.invoke({
+			type: "getInstalledSkills",
+		})) as Skill[]
+		const existing = Array.isArray(installed)
+			? installed.find(
+					(skill) =>
+						skill.name.toLowerCase() === securityPlugin.name.toLowerCase() &&
+						(skill.owner || "").toLowerCase() ===
+							securityPlugin.owner.toLowerCase(),
+					)
+				: undefined
+		if (existing) {
+			const confirmed = window.confirm(
+				`Skill ${securityPlugin.owner}/${securityPlugin.name} is already installed. Overwrite it?`,
+			)
+			if (!confirmed) return
+		}
 		setInstalling(true)
 		try {
 			const manifestContent = `---
