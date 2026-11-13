@@ -287,6 +287,7 @@ export function MainContent(props: MainContentProps) {
 					streamingMessageId={chat.streamingMessageId}
 					todos={props.tasks}
 					onOpenDiff={props.tabs.handleDiffClick}
+					onOpenFile={props.tabs.handleFileClick}
 					onOpenBrowserPanel={props.onOpenBrowserPanel}
 					isReplaySession={props.isReplaySession}
 					isActivelyReplaying={props.isReplaying}

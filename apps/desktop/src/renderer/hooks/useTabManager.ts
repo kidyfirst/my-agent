@@ -62,6 +62,17 @@ export function useTabManager(currentThreadId: string | null) {
 		setActiveTab(filePath)
 	}, [])
 
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const detail = (e as CustomEvent).detail
+			if (detail?.filePath) {
+				handleFileClick(detail.filePath)
+			}
+		}
+		window.addEventListener("open-file-tab", handler)
+		return () => window.removeEventListener("open-file-tab", handler)
+	}, [handleFileClick])
+
 	const forceCloseTab = useCallback((tabId: string) => {
 		if (tabId.startsWith("thread:") || tabId === "chat") {
 			return

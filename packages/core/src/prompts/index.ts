@@ -28,6 +28,8 @@ export interface PromptContext extends BasePromptContext {
 	mcpSetup?: BasePromptContext["mcpSetup"]
 	/** Built-in MCP servers with a key that failed to connect (see base.ts). */
 	mcpFailures?: BasePromptContext["mcpFailures"]
+	/** Stage 1 compact catalog of available skills */
+	skillsCatalog?: string
 }
 
 const modePrompts: Record<string, string | ((ctx: PromptContext) => string)> = {
@@ -96,9 +98,15 @@ export function buildFullPrompt(ctx: PromptContext): string {
 		prSection = `\n# PR Instructions\nWhen creating pull requests, follow these additional instructions from the user:\n${prInstructions.trim()}\n`
 	}
 
+	let skillsSection = ""
+	if (ctx.skillsCatalog?.trim()) {
+		skillsSection = `\n${ctx.skillsCatalog.trim()}\n`
+	}
+
 	return (
 		base +
 		toolsSection +
+		skillsSection +
 		"\n" +
 		modeSpecific +
 		instructionsSection +

@@ -1629,3 +1629,7 @@ flowchart LR
 - **[mastra-code-ui](https://github.com/mastra-ai/mastra-code-ui)**：Mastra AI 团队优秀的桌面 Agent 界面与交互范式探索，为本项目桌面端工作台设计与代码交互界面奠定了坚实基础。
 
 <!-- 本文档由维护者持续更新，如与代码实现不一致，以代码为准。 -->
+
+## License
+
+MIT

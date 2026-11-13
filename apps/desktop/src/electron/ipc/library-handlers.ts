@@ -1,7 +1,11 @@
 import { dialog, shell } from "electron"
 import * as path from "node:path"
 import { pathToFileURL } from "node:url"
-import { getLibraryService, DEFAULT_OM_MODEL_ID } from "@my-agent/core"
+import {
+	getLibraryService,
+	DEFAULT_OM_MODEL_ID,
+	loadSettings,
+} from "@my-agent/core"
 import type { IpcCommandHandler } from "./types.js"
 
 export function getLibraryHandlers(): Record<string, IpcCommandHandler> {
@@ -53,7 +57,15 @@ export function getLibraryHandlers(): Record<string, IpcCommandHandler> {
 					? harness.resolveModel.bind(harness)
 					: undefined
 			const state = harness?.getState?.() as any
-			const modelId = state?.imageProcessModelId || DEFAULT_OM_MODEL_ID
+			const persistedModelId = loadSettings().models?.imageProcessModelId
+			const configuredModelId =
+				(command.modelId as string) ||
+				persistedModelId ||
+				state?.imageProcessModelId ||
+				service.getConfig().imageProcessModelId
+			if (configuredModelId)
+				service.setConfig({ imageProcessModelId: configuredModelId })
+			const modelId = configuredModelId
 
 			for (const item of uploaded) {
 				if (item.type === "image" && resolver) {
@@ -76,7 +88,12 @@ export function getLibraryHandlers(): Record<string, IpcCommandHandler> {
 					? harness.resolveModel.bind(harness)
 					: undefined
 			const state = harness?.getState?.() as any
-			const modelId = state?.imageProcessModelId || DEFAULT_OM_MODEL_ID
+			const persistedModelId = loadSettings().models?.imageProcessModelId
+			const modelId =
+				(command.modelId as string) ||
+				persistedModelId ||
+				state?.imageProcessModelId ||
+				service.getConfig().imageProcessModelId
 
 			const result = await service.analyzeImage(fullPath, resolver, modelId)
 			return {

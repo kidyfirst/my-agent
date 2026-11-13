@@ -1,4 +1,4 @@
-{"id":"case_001","category":"file_read","input":"读取 package.json 文件并返回当前项目的版本号","expected_tools":["read_file"],"expected_answer_criteria":"必须明确指出当前项目版本号为 0.1.7，不能胡乱猜测","max_steps":10}
+{"id":"case_001","category":"file_read","input":"读取 package.json 文件并返回当前项目的版本号","expected_tools":["read_file"],"expected_answer_criteria":"必须读取 package.json 并准确返回文件中实际存在的当前版本号，不能使用固定版本号或胡乱猜测","max_steps":10}
 {"id":"case_002","category":"file_read","input":"查看 tsconfig.json 中配置的 paths 别名有哪些","expected_tools":["read_file"],"expected_answer_criteria":"必须包含 @my-agent/core、@my-agent/a2a、@my-agent/cli 的路径映射","max_steps":10}
 {"id":"case_003","category":"file_write","input":"在临时目录创建一个 note.txt 并写入 hello world","expected_tools":["write_file"],"expected_answer_criteria":"必须调用写入工具完成写入，并向用户确认写入的文件路径与内容","max_steps":10}
 {"id":"case_004","category":"file_edit","input":"修改 README.md，在文件末尾补充一行：## License MIT","expected_tools":["edit_file"],"expected_answer_criteria":"必须调用文件编辑或写入工具完成修改，指出修改的文件与目标内容","max_steps":10}
@@ -7,7 +7,7 @@
 {"id":"case_007","category":"git_ops","input":"查看最近 3 条 Git 提交日志","expected_tools":["run_command"],"expected_answer_criteria":"展示最近 3 次 commit 的 hash 与提交信息摘要","max_steps":10}
 {"id":"case_008","category":"git_ops","input":"检查当前仓库是否有未提交的代码变更","expected_tools":["run_command"],"expected_answer_criteria":"准确反馈是否有 unstaged 或 untracked 的文件","max_steps":10}
 {"id":"case_009","category":"terminal_cmd","input":"运行 pnpm --version 查看当前的 pnpm 版本","expected_tools":["run_command"],"expected_answer_criteria":"必须给出具体的 pnpm 版本号输出（如 10.x.x）","max_steps":10}
-{"id":"case_010","category":"terminal_cmd","input":"统计 apps/desktop 目录下一共有多少个 tsx 文件","expected_tools":["run_command"],"expected_answer_criteria":"给出明确的统计数字（当前代码库实际约为 119 个左右），不能明显偏离事实或无依据编造","max_steps":10}
+{"id":"case_010","category":"terminal_cmd","input":"统计 apps/desktop 目录下一共有多少个 tsx 文件","expected_tools":["run_command"],"expected_answer_criteria":"必须通过终端命令实际统计 apps/desktop 目录下的 .tsx 文件并给出与当前代码库一致的明确数字，不能凭历史数字或无依据猜测","max_steps":10}
 {"id":"case_011","category":"code_analysis","input":"解释 packages/core/src/index.ts 中导出了哪些主要模块","expected_tools":["read_file"],"expected_answer_criteria":"列出 Controller、Session、GraphRunner、Harness 等主要导出项","max_steps":10}
 {"id":"case_012","category":"code_analysis","input":"检查 packages/cli/package.json 依赖了哪些 workspace 包","expected_tools":["read_file"],"expected_answer_criteria":"准确识别出 @my-agent/core 和 @my-agent/a2a","max_steps":10}
 {"id":"case_013","category":"multi_step","input":"先查看 git 状态，再查看 package.json 版本","expected_tools":["run_command","read_file"],"expected_answer_criteria":"依次完成两个步骤并分别汇总说明结果","max_steps":15}

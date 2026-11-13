@@ -124,6 +124,25 @@ function findMatchingMessageIndex(
 					) {
 						return i
 					}
+
+					// Reconcile if optimistic message was slash command "/<SkillName> <task>"
+					// and incoming server message is "# Activated Skill: <SkillName> ..."
+					if (
+						existingText.startsWith("/") &&
+						incText.startsWith("# Activated Skill:")
+					) {
+						const cmd = existingText.slice(1).split(/\s+/)[0]?.toLowerCase()
+						const skillHeader = incText.split("\n")[0]
+						const skillMatch = skillHeader.match(
+							/# Activated Skill:\s*([^\n(]+)/i,
+						)
+						if (cmd && skillMatch) {
+							const skillName = skillMatch[1].trim().toLowerCase()
+							if (cmd === skillName) {
+								return i
+							}
+						}
+					}
 				}
 				// Or if text content is identical
 				const existingText = getMessageText(m).trim()
@@ -136,6 +155,23 @@ function findMatchingMessageIndex(
 						existingText.startsWith(incText))
 				) {
 					return i
+				}
+
+				if (
+					existingText.startsWith("/") &&
+					incText.startsWith("# Activated Skill:")
+				) {
+					const cmd = existingText.slice(1).split(/\s+/)[0]?.toLowerCase()
+					const skillHeader = incText.split("\n")[0]
+					const skillMatch = skillHeader.match(
+						/# Activated Skill:\s*([^\n(]+)/i,
+					)
+					if (cmd && skillMatch) {
+						const skillName = skillMatch[1].trim().toLowerCase()
+						if (cmd === skillName) {
+							return i
+						}
+					}
 				}
 			}
 		}
@@ -318,6 +354,11 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 			return state
 		}
 		case "AGENT_END": {
+			// A failed request can emit an error/agent_end pair through both the
+			// IPC event path and the sendMessage rejection path. Treat the second
+			// completion as a no-op so it cannot create a second duration marker
+			// when the next document is submitted.
+			if (!state.isAgentActive && !state.agentStartedAt) return state
 			const durationMs = state.agentStartedAt
 				? Date.now() - state.agentStartedAt
 				: undefined
@@ -345,12 +386,30 @@ function internalChatReducer(state: ChatState, action: ChatAction): ChatState {
 				...state,
 				messages: msgs,
 				isAgentActive: false,
+				agentStartedAt: null,
 				streamingMessageId: null,
 			}
 		}
 		case "MESSAGE_START": {
 			if (!action.message?.id) return state
 			const incoming = action.message
+			// A failed request can be represented twice: the renderer adds the
+			// immediate error message while a reload adds the persisted
+			// "previous task interrupted" message. Keep one assistant result for
+			// that turn so duration/tool metadata is not shown twice.
+			if (
+				incoming.role === "assistant" &&
+				(incoming as any).stopReason === "error"
+			) {
+				const interruptedIndex = state.messages.findIndex(
+					(m) => m.role === "assistant" && (m as any).interrupted === true,
+				)
+				if (interruptedIndex >= 0) {
+					const messages = [...state.messages]
+					messages[interruptedIndex] = incoming
+					return { ...state, messages, streamingMessageId: null }
+				}
+			}
 
 			// 1. Optimistic messages dispatched locally by handleSend (id: "user-*")
 			// ALWAYS append immediately to state.messages for instant UI display

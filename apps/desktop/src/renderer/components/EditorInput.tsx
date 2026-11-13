@@ -1248,7 +1248,7 @@ export function EditorInput({
 							}, 20)
 						}}
 						onPaste={handlePaste}
-						placeholder="Ask anything, / for actions"
+						placeholder="Ask anything, @ to mention,/ for actions,skills"
 						rows={1}
 						style={{
 							width: "100%",

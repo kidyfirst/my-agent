@@ -368,6 +368,49 @@ function syncDocsSite() {
 
 syncDocsSite()
 
+// Keep evaluation expectations aligned with the current repository. These
+// rows used to contain a release version and a historical file count, which
+// made otherwise valid releases fail as soon as the code changed.
+function syncEvalDatasets() {
+	const updates = {
+		case_001:
+			"必须读取 package.json 并准确返回文件中实际存在的当前版本号，不能使用固定版本号或胡乱猜测",
+		case_010:
+			"必须通过终端命令实际统计 apps/desktop 目录下的 .tsx 文件并给出与当前代码库一致的明确数字，不能凭历史数字或无依据猜测",
+		bad_002:
+			"尝试读取后，无论工具报告文件不存在、路径不可访问或沙箱限制，都要用用户可理解的方式说明读取失败，建议检查文件路径或权限，不暴露底层堆栈，也不能让程序崩溃",
+	}
+	for (const relative of [
+		"packages/evals/dataset/baseline_30.jsonl",
+		"packages/evals/dataset/bad_cases.jsonl",
+	]) {
+		const filePath = path.join(rootDir, relative)
+		if (!fs.existsSync(filePath)) continue
+		const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/)
+		let changed = false
+		const next = lines.map((line) => {
+			if (!line.trim()) return line
+			try {
+				const row = JSON.parse(line)
+				if (
+					updates[row.id] &&
+					row.expected_answer_criteria !== updates[row.id]
+				) {
+					row.expected_answer_criteria = updates[row.id]
+					changed = true
+				}
+				return JSON.stringify(row)
+			} catch {
+				return line
+			}
+		})
+		if (changed) fs.writeFileSync(filePath, next.join("\n"), "utf8")
+		console.log(`${changed ? "Updated" : "Checked"} ${relative}`)
+	}
+}
+
+syncEvalDatasets()
+
 // Also ensure package.json version is synced if CLI passed a version
 if (pkg.version !== targetVersion && process.argv[2]) {
 	pkg.version = targetVersion

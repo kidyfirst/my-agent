@@ -40,6 +40,15 @@ export function useDialogManager() {
 		string | null
 	>(null)
 	const [showLogConsole, setShowLogConsole] = useState(false)
+	const [skillsGuideModal, setSkillsGuideModal] = useState<{
+		isOpen: boolean
+		mode: "onboarding" | "refresh"
+		projectPath: string
+		skills?: any[]
+		added?: any[]
+		removed?: any[]
+		modified?: any[]
+	} | null>(null)
 
 	const [settingsSection, setSettingsSection] = useState<string | undefined>(
 		undefined,
@@ -308,5 +317,7 @@ export function useDialogManager() {
 		handlePlanResponse,
 		handleSwitchModel,
 		handleOpenModelSelector,
+		skillsGuideModal,
+		setSkillsGuideModal,
 	}
 }

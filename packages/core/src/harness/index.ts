@@ -48,6 +48,7 @@ import { AuthStorage } from "../auth/storage.js"
 import { MCPManager } from "../mcp/manager.js"
 import type { McpServerStatus } from "../mcp/types.js"
 import { HookManager } from "../hooks/manager.js"
+import { SkillManager, SkillExecutor } from "../skills/index.js"
 import { getLibraryService } from "../library/library-service.js"
 import {
 	detectProject,
@@ -75,6 +76,7 @@ import {
 import {
 	loadSettings,
 	saveSettings,
+	sanitizeModelUseCounts,
 	acquireThreadLock,
 	releaseThreadLock,
 } from "./settings.js"
@@ -337,6 +339,9 @@ export interface MyAgentHarness<TState = HarnessState> {
 	setPermissionForCategory(options: { category: string; policy: string }): void
 	getPermissionRules(): PermissionRulesResult
 	getSessionGrants(): SessionGrantsResult
+	skillManager?: any
+	skillExecutor?: any
+	getSkillsCatalog?(): string
 	/**
 	 * Names of the tools the connected MCP servers registered (already namespaced
 	 * as `server_tool`). The system prompt lists them so the model knows it can
@@ -639,9 +644,29 @@ export async function createMyAgent(
 			...config?.initialState,
 		},
 		modelUseCountProvider: () => loadSettings().modelUseCounts,
-		modelUseCountTracker: (modelId: string) => {
+		modelUseCountTracker: (rawModelId: unknown) => {
 			try {
+				let modelId: string | undefined
+				if (typeof rawModelId === "string") {
+					modelId = rawModelId.trim()
+				} else if (rawModelId && typeof rawModelId === "object") {
+					const obj = rawModelId as Record<string, unknown>
+					if (typeof obj.modelId === "string") modelId = obj.modelId.trim()
+					else if (typeof obj.id === "string") modelId = obj.id.trim()
+					else if (typeof obj.name === "string") modelId = obj.name.trim()
+				}
+				if (
+					!modelId ||
+					modelId === "[object Object]" ||
+					modelId === "undefined" ||
+					modelId === "null"
+				) {
+					return
+				}
 				const settings = loadSettings()
+				settings.modelUseCounts = sanitizeModelUseCounts(
+					settings.modelUseCounts,
+				)
 				settings.modelUseCounts[modelId] =
 					(settings.modelUseCounts[modelId] ?? 0) + 1
 				saveSettings(settings)
@@ -732,9 +757,17 @@ export async function createMyAgent(
 			return s
 		})
 
+	const skillManager = new SkillManager()
+	const skillExecutor = new SkillExecutor()
+
 	const adapter: MyAgentHarness = {
 		id: "myagent-code",
 		controller,
+		skillManager,
+		skillExecutor,
+		getSkillsCatalog() {
+			return skillExecutor.formatStage1Catalog()
+		},
 		get activeSession() {
 			return activeSession
 		},
@@ -742,6 +775,17 @@ export async function createMyAgent(
 			await controller.init()
 			const session = activeSession ?? (await sessionReady)
 			await session.init?.()
+
+			// Warm up skills catalog
+			try {
+				const [proj, glob] = await Promise.all([
+					project.rootPath
+						? skillManager.scanProjectSkills(project.rootPath)
+						: [],
+					skillManager.scanGlobalSkills(),
+				])
+				skillExecutor.setSkills([...proj, ...glob])
+			} catch {}
 
 			// Restore saved last active thread if present
 			const savedThreadId = getRecentProjectLastThread(project.rootPath)
@@ -793,6 +837,15 @@ export async function createMyAgent(
 			if (!rc.get("controller")) {
 				rc.set("controller", this)
 			}
+			try {
+				const [proj, glob] = await Promise.all([
+					project.rootPath
+						? skillManager.scanProjectSkills(project.rootPath)
+						: [],
+					skillManager.scanGlobalSkills(),
+				])
+				skillExecutor.setSkills([...proj, ...glob])
+			} catch {}
 			return session.sendMessage({ ...options, requestContext: rc })
 		},
 		async abort(options?: { threadId?: string }) {
@@ -888,7 +941,9 @@ export async function createMyAgent(
 		async switchModel(
 			options:
 				| {
-						modelId: string
+						modelId?: string
+						id?: string
+						name?: string
 						scope?: string
 						modeId?: string
 				  }
@@ -896,9 +951,13 @@ export async function createMyAgent(
 		) {
 			const session = activeSession ?? (await sessionReady)
 			const targetModelId =
-				typeof options === "string" ? options : options.modelId
-			await session.model?.switch?.(targetModelId)
-			await session.state?.set?.({ currentModelId: targetModelId })
+				typeof options === "string"
+					? options
+					: options?.modelId || (options as any)?.id || (options as any)?.name
+			if (typeof targetModelId === "string" && targetModelId) {
+				await session.model?.switch?.(targetModelId)
+				await session.state?.set?.({ currentModelId: targetModelId })
+			}
 		},
 		async switchObserverModel(options: { modelId: string }) {
 			const session = activeSession ?? (await sessionReady)

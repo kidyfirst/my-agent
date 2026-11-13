@@ -99,7 +99,7 @@ export function SectionHeader({ title }: { title: string }) {
 				color: "var(--muted)",
 				textTransform: "uppercase",
 				letterSpacing: "0.5px",
-				padding: "16px 0 4px",
+				padding: "8px 0 4px",
 			}}
 		>
 			{title}

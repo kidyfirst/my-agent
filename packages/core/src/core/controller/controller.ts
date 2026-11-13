@@ -818,8 +818,29 @@ export class Session<TState = any> {
 	get model() {
 		return {
 			get: () => this._modelId,
-			switch: async (modelId: string | { modelId: string }) => {
-				const id = typeof modelId === "string" ? modelId : modelId.modelId
+			switch: async (
+				modelId:
+					| string
+					| { modelId?: string; id?: string; name?: string }
+					| unknown,
+			) => {
+				let id: string | undefined
+				if (typeof modelId === "string") {
+					id = modelId.trim()
+				} else if (modelId && typeof modelId === "object") {
+					const obj = modelId as Record<string, unknown>
+					if (typeof obj.modelId === "string") id = obj.modelId.trim()
+					else if (typeof obj.id === "string") id = obj.id.trim()
+					else if (typeof obj.name === "string") id = obj.name.trim()
+				}
+				if (
+					!id ||
+					id === "[object Object]" ||
+					id === "undefined" ||
+					id === "null"
+				) {
+					return this._modelId
+				}
 				this._modelId = id
 				this._state.currentModelId = id
 				this.controller.modelUseCountTracker?.(id)

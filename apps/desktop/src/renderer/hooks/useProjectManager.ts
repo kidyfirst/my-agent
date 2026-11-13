@@ -24,6 +24,7 @@ export function useProjectManager(
 		setThreads: React.Dispatch<React.SetStateAction<ThreadInfo[]>>
 		setTokenUsage: React.Dispatch<React.SetStateAction<TokenUsage>>
 		setCurrentThreadId?: React.Dispatch<React.SetStateAction<string | null>>
+		onSkillsDetected?: (skills: any[], projectRoot: string) => void
 	},
 ) {
 	const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
@@ -213,6 +214,29 @@ export function useProjectManager(
 		return () => clearInterval(interval)
 	}, [enrichedProjects])
 
+	const checkProjectSkillsOnboarding = useCallback(
+		async (projectRoot: string) => {
+			if (!projectRoot) return
+			try {
+				const config = (await window.api.invoke({
+					type: "getProjectSkillsConfig",
+					projectRoot,
+				})) as any
+				if (!config || !config.prompted) {
+					const skills = (await window.api.invoke({
+						type: "getProjectSkills",
+						projectRoot,
+						customDirs: config?.customDirs || [],
+					})) as any[]
+					if (Array.isArray(skills) && skills.length > 0) {
+						tabSetters.onSkillsDetected?.(skills, projectRoot)
+					}
+				}
+			} catch {}
+		},
+		[tabSetters],
+	)
+
 	const handleSwitchProject = useCallback(
 		async (switchPath: string, targetThreadId?: string) => {
 			setUnreadWorktrees((prev) => {
@@ -241,11 +265,12 @@ export function useProjectManager(
 					path: switchPath,
 					targetThreadId,
 				})
+				void checkProjectSkillsOnboarding(switchPath)
 			} finally {
 				setProjectSwitching(false)
 			}
 		},
-		[],
+		[checkProjectSkillsOnboarding],
 	)
 
 	const handleOpenFolder = useCallback(async () => {
@@ -257,11 +282,12 @@ export function useProjectManager(
 				setProjectSwitching(true)
 				await window.api.invoke({ type: "switchProject", path: result.path })
 				await loadEnrichedProjects()
+				void checkProjectSkillsOnboarding(result.path)
 			}
 		} catch {
 			// user cancelled
 		}
-	}, [])
+	}, [checkProjectSkillsOnboarding])
 
 	const handleShowCloneModal = useCallback(async () => {
 		setShowCloneModal(true)

@@ -42,7 +42,7 @@ pnpm --filter @my-agent/evals run export
 	"input": "读取 package.json 文件并返回当前项目的版本号",
 	"expected_tools": ["read_file"],
 	"expected_tool_args": { "path": "package.json" },
-	"expected_answer_criteria": "必须明确指出当前项目版本号为 0.1.7，不能胡乱猜测",
+	"expected_answer_criteria": "必须读取 package.json 并准确返回文件中实际存在的当前版本号，不能使用固定版本号或胡乱猜测",
 	"max_steps": 2
 }
 ```

@@ -7,25 +7,8 @@ import { FilesChangedBar } from "./FilesChangedBar"
 import { ImagePreviewModal } from "./ImagePreviewModal"
 import { MessageFeedback } from "./MessageFeedback"
 import { openLibraryPreview } from "../utils/library"
+import { openFileTab } from "../utils/fileTab"
 import { FileIcon, CheckIcon, CopyIcon } from "./icons"
-
-const LOCAL_DOC_EXTENSIONS = [
-	".docx",
-	".doc",
-	".pptx",
-	".ppt",
-	".xlsx",
-	".xls",
-	".pdf",
-	".png",
-	".jpg",
-	".jpeg",
-	".webp",
-	".md",
-	".txt",
-	".csv",
-	".tsv",
-]
 
 function resolveLibraryItemId(
 	href?: string | null,
@@ -49,66 +32,16 @@ function resolveLibraryItemId(
 				href.slice(myLibIdx + "/my-library/".length).trim(),
 			)
 		}
-
-		// 3. Dev server localhost URL: http://localhost:5173/filename.docx
-		if (
-			lowerHref.startsWith("http://localhost:5173/") ||
-			lowerHref.startsWith("http://127.0.0.1:5173/") ||
-			lowerHref.startsWith("http://localhost:") ||
-			lowerHref.startsWith("http://127.0.0.1:")
-		) {
-			try {
-				const u = new URL(href)
-				const pathname = decodeURIComponent(u.pathname.replace(/^\/+/, ""))
-				if (pathname) return pathname
-			} catch {}
-		}
-
-		// 4. Relative paths or filenames: e.g. "1-2.习近平总书记重要讲话精神.docx" or "./report.pptx"
-		if (
-			!lowerHref.startsWith("http://") &&
-			!lowerHref.startsWith("https://") &&
-			!lowerHref.startsWith("mailto:")
-		) {
-			const clean = decodeURIComponent(
-				href
-					.replace(/^\.\//, "")
-					.replace(/^file:\/\//, "")
-					.trim(),
-			)
-			if (clean && getDocumentFilename(clean)) return clean
-		}
-
-		// 5. Fallback: Check if href ends with known doc extensions
-		for (const ext of LOCAL_DOC_EXTENSIONS) {
-			if (
-				lowerHref.endsWith(ext) ||
-				lowerHref.includes(`${ext}?`) ||
-				lowerHref.includes(`${ext}#`)
-			) {
-				try {
-					const clean = decodeURIComponent(
-						href
-							.replace(/^.*[\\/]/, "")
-							.replace(/\?.*$/, "")
-							.replace(/#.*$/, ""),
-					)
-					if (clean) return clean
-				} catch {}
-			}
-		}
-	}
-
-	if (linkText && typeof linkText === "string") {
-		const doc = getDocumentFilename(linkText)
-		if (doc) return doc
 	}
 
 	return null
 }
 
-const DOC_EXT_REGEX =
-	/\.(docx|doc|pptx|ppt|xlsx|xls|pdf|png|jpg|jpeg|webp|gif|md|txt|csv|tsv)$/i
+const OFFICE_DOC_EXT_REGEX =
+	/\.(docx|doc|pptx|ppt|xlsx|xls|pdf)$/i
+
+const PROJECT_FILE_EXT_REGEX =
+	/\.(md|markdown|txt|json|ts|tsx|js|jsx|css|scss|sass|less|html|htm|vue|svelte|py|go|rs|java|c|cpp|h|hpp|sh|bash|zsh|yaml|yml|toml|sql|env|csv|tsv|xml|graphql|svg)$/i
 
 function getChildrenText(children: React.ReactNode): string {
 	if (typeof children === "string") return children
@@ -120,14 +53,29 @@ function getChildrenText(children: React.ReactNode): string {
 	return ""
 }
 
-function getDocumentFilename(val: unknown): string | null {
+function getOfficeDocFilename(val: unknown): string | null {
 	if (!val) return null
 	if (typeof val === "string") {
 		const trimmed = val.trim()
 		if (
-			DOC_EXT_REGEX.test(trimmed) &&
-			trimmed.length < 150 &&
+			OFFICE_DOC_EXT_REGEX.test(trimmed) &&
+			trimmed.length < 250 &&
 			!trimmed.includes("\n")
+		) {
+			return trimmed
+		}
+	}
+	return null
+}
+
+function getProjectFilename(val: unknown): string | null {
+	if (!val) return null
+	if (typeof val === "string") {
+		const trimmed = val.trim()
+		if (
+			PROJECT_FILE_EXT_REGEX.test(trimmed) &&
+			trimmed.length < 250 &&
+			!/[\s\n]/.test(trimmed)
 		) {
 			return trimmed
 		}
@@ -210,9 +158,83 @@ function LibraryDocumentChip({
 	)
 }
 
-interface AssistantMessageProps {
+function ProjectFileChip({
+	filePath,
+	onOpenFile,
+	children,
+}: {
+	filePath: string
+	onOpenFile?: (path: string) => void
+	children?: React.ReactNode
+}) {
+	// Guard against any nested chips
+	if (
+		React.isValidElement(children) &&
+		((children.props as any)?.["data-file-chip"] === "true" ||
+			(children.props as any)?.["data-library-chip"] === "true" ||
+			(children.props as any)?.role === "button")
+	) {
+		return children
+	}
+
+	const handleOpen = (e: React.SyntheticEvent) => {
+		e.preventDefault()
+		e.stopPropagation()
+		if (onOpenFile) {
+			onOpenFile(filePath)
+		} else {
+			openFileTab(filePath)
+		}
+	}
+
+	return (
+		<span
+			data-file-chip="true"
+			role="button"
+			tabIndex={0}
+			onClick={handleOpen}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					handleOpen(e)
+				}
+			}}
+			title={`Click to open "${filePath}" in editor tab`}
+			style={{
+				display: "inline-flex",
+				alignItems: "center",
+				gap: 5,
+				padding: "1px 8px",
+				margin: "1px 2px",
+				fontSize: "0.95em",
+				fontFamily: "var(--font-mono)",
+				color: "var(--accent)",
+				backgroundColor: "var(--selected-bg)",
+				border: "1px solid var(--border-accent)",
+				borderRadius: 5,
+				cursor: "pointer",
+				verticalAlign: "baseline",
+				lineHeight: 1.4,
+				fontWeight: 600,
+				transition: "all 0.15s ease",
+				userSelect: "none",
+			}}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.filter = "brightness(0.95)"
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.filter = "none"
+			}}
+		>
+			<FileIcon size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
+			<span>{children || filePath}</span>
+		</span>
+	)
+}
+
+export interface AssistantMessageProps {
 	message: Message & { isStreaming?: boolean }
 	onOpenDiff?: (path: string) => void
+	onOpenFile?: (path: string) => void
 	isAgentActive?: boolean
 	/**
 	 * True when this answer sits directly under its turn header (the collapsed
@@ -339,6 +361,7 @@ function CodeBlock({ children, className }: CodeBlockProps) {
 export const AssistantMessage = React.memo(function AssistantMessage({
 	message,
 	onOpenDiff,
+	onOpenFile,
 	isAgentActive,
 	flushTop = false,
 }: AssistantMessageProps) {
@@ -515,16 +538,47 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							},
 							a({ href, children, ...props }) {
 								const childrenText = getChildrenText(children)
-								const libraryItemId =
-									resolveLibraryItemId(href, childrenText) ||
-									getDocumentFilename(childrenText) ||
-									(href ? getDocumentFilename(href) : null)
-
-								if (libraryItemId) {
+								const libId = resolveLibraryItemId(href, childrenText)
+								if (libId) {
 									return (
-										<LibraryDocumentChip itemId={libraryItemId}>
-											{children || libraryItemId}
+										<LibraryDocumentChip itemId={libId}>
+											{children || libId}
 										</LibraryDocumentChip>
+									)
+								}
+
+								const officeDoc =
+									(href ? getOfficeDocFilename(href) : null) ||
+									getOfficeDocFilename(childrenText)
+								if (officeDoc) {
+									return (
+										<LibraryDocumentChip itemId={officeDoc}>
+											{children || officeDoc}
+										</LibraryDocumentChip>
+									)
+								}
+
+								const cleanHref = href
+									? decodeURIComponent(
+											href.replace(/^\.\//, "").replace(/^file:\/\//, "").trim(),
+									  )
+									: ""
+								const projectPath =
+									(cleanHref && getProjectFilename(cleanHref)) ||
+									getProjectFilename(childrenText)
+
+								if (
+									projectPath &&
+									!cleanHref.startsWith("http://") &&
+									!cleanHref.startsWith("https://")
+								) {
+									return (
+										<ProjectFileChip
+											filePath={projectPath}
+											onOpenFile={onOpenFile}
+										>
+											{children || projectPath}
+										</ProjectFileChip>
 									)
 								}
 
@@ -533,16 +587,6 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 									<a
 										href={href}
 										onClick={(e) => {
-											const possibleDoc =
-												resolveLibraryItemId(href || "", childrenText) ||
-												getDocumentFilename(childrenText) ||
-												getDocumentFilename(href)
-											if (possibleDoc) {
-												e.preventDefault()
-												e.stopPropagation()
-												openLibraryPreview(possibleDoc)
-												return
-											}
 											if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
 												e.preventDefault()
 												void (window as any).api?.invoke?.({ type: "openExternal", url: href })
@@ -559,11 +603,21 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							p({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
 											<p {...props}>
-												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</p>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<p {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
 											</p>
 										)
 									}
@@ -573,26 +627,70 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							li({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
 											<li {...props}>
-												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</li>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<li {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
 											</li>
 										)
 									}
 								}
 								return <li {...props}>{children}</li>
 							},
+							td({ node, children, ...props }) {
+								if (isPureTextNode(node)) {
+									const text = getChildrenText(children).trim()
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
+										return (
+											<td {...props}>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</td>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<td {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
+											</td>
+										)
+									}
+								}
+								return <td {...props}>{children}</td>
+							},
 							code({ className, children, ...props }) {
 								const text = getChildrenText(children).trim()
-								const docFile = getDocumentFilename(text)
-								if (docFile && !className) {
-									return (
-										<LibraryDocumentChip itemId={docFile}>
-											{text}
-										</LibraryDocumentChip>
-									)
+								if (!className) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
+										return (
+											<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+												{text}
+											</ProjectFileChip>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<LibraryDocumentChip itemId={officeDoc}>
+												{text}
+											</LibraryDocumentChip>
+										)
+									}
 								}
 								return (
 									<code className={className} {...props}>
@@ -603,11 +701,19 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							strong({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
-											<LibraryDocumentChip itemId={docFile}>
-												{docFile}
+											<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+												{projectFile}
+											</ProjectFileChip>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<LibraryDocumentChip itemId={officeDoc}>
+												{officeDoc}
 											</LibraryDocumentChip>
 										)
 									}
@@ -617,11 +723,21 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							h1({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
 											<h1 {...props}>
-												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</h1>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<h1 {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
 											</h1>
 										)
 									}
@@ -631,11 +747,21 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							h2({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
 											<h2 {...props}>
-												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</h2>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<h2 {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
 											</h2>
 										)
 									}
@@ -645,11 +771,21 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							h3({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
 											<h3 {...props}>
-												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</h3>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<h3 {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
 											</h3>
 										)
 									}
@@ -659,11 +795,21 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 							h4({ node, children, ...props }) {
 								if (isPureTextNode(node)) {
 									const text = getChildrenText(children).trim()
-									const docFile = getDocumentFilename(text)
-									if (docFile) {
+									const projectFile = getProjectFilename(text)
+									if (projectFile) {
 										return (
 											<h4 {...props}>
-												<LibraryDocumentChip itemId={docFile}>{docFile}</LibraryDocumentChip>
+												<ProjectFileChip filePath={projectFile} onOpenFile={onOpenFile}>
+													{projectFile}
+												</ProjectFileChip>
+											</h4>
+										)
+									}
+									const officeDoc = getOfficeDocFilename(text)
+									if (officeDoc) {
+										return (
+											<h4 {...props}>
+												<LibraryDocumentChip itemId={officeDoc}>{officeDoc}</LibraryDocumentChip>
 											</h4>
 										)
 									}

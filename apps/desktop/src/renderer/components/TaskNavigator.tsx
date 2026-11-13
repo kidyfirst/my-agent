@@ -84,6 +84,26 @@ export function TaskNavigator({
 		return () => ro.disconnect()
 	}, [updateFades])
 
+	// Expanding the card changes its width, padding and available height. The
+	// browser can report the previous overflow state for one frame, which makes
+	// the collapsed rail use `flex-start` and leaves the whole tick group too
+	// high. Re-measure after the transition has committed, then recenter.
+	useEffect(() => {
+		let firstFrame = 0
+		let secondFrame = 0
+		firstFrame = requestAnimationFrame(() => {
+			updateFades()
+			secondFrame = requestAnimationFrame(() => {
+				updateFades()
+				if (!isHovered) centerActiveTask()
+			})
+		})
+		return () => {
+			cancelAnimationFrame(firstFrame)
+			if (secondFrame) cancelAnimationFrame(secondFrame)
+		}
+	}, [isHovered, updateFades])
+
 	const effectiveActiveId = activeTaskId || tasks?.[tasks.length - 1]?.id
 
 	// Auto-scroll the task list to keep active task in view
@@ -93,14 +113,38 @@ export function TaskNavigator({
 				`[data-task-active="true"]`,
 			)
 			if (activeEl) {
-				activeEl.scrollIntoView({
-					block: isHovered ? "nearest" : "center",
-					behavior: "smooth",
-				})
+				if (isHovered) {
+					activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" })
+				} else {
+					centerActiveTask()
+				}
+				if (!isHovered) {
+					// The collapsed rail has a different height/padding. Re-apply the
+					// centering after its layout has settled so hover cannot change the
+					// resting position permanently.
+					requestAnimationFrame(() => {
+						const current = listRef.current?.querySelector<HTMLElement>(
+							`[data-task-active="true"]`,
+						)
+						centerActiveTask()
+					})
+				}
 			}
 			updateFades()
 		}
 	}, [effectiveActiveId, isHovered, updateFades])
+
+	function centerActiveTask() {
+		const list = listRef.current
+		const active = list?.querySelector<HTMLElement>(
+			`[data-task-active="true"]`,
+		)
+		if (!list || !active) return
+		// scrollIntoView is unreliable while the card is transitioning between
+		// expanded and collapsed flex layouts. Calculate the target explicitly.
+		const target = active.offsetTop - (list.clientHeight - active.offsetHeight) / 2
+		list.scrollTop = Math.max(0, Math.min(target, list.scrollHeight - list.clientHeight))
+	}
 
 	const handleMouseEnter = () => {
 		if (hoverTimeoutRef.current) {

@@ -59,4 +59,5 @@ export interface SettingsProps {
 	onLogout?: (providerId: string) => void
 	initialSection?: string
 	onSectionChange?: (section: string) => void
+	showToast?: (message: string, type?: "info" | "success" | "error") => void
 }

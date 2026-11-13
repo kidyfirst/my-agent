@@ -5,6 +5,70 @@ import type { IpcCommandHandler, HandlerContext } from "./types.js"
 import { detectEditor, execQuiet } from "@my-agent/core"
 import { parseExternalUrl } from "../external-links.js"
 
+function resolveProjectPath(
+	projectRoot: string,
+	rawPath: string,
+): { filePath: string; resolvedRelativePath: string } {
+	let filePath = path.resolve(projectRoot, rawPath)
+	if (!filePath.startsWith(projectRoot)) {
+		throw new Error("Access denied: path outside project root")
+	}
+	if (!fs.existsSync(filePath)) {
+		const baseName = path.basename(rawPath)
+		try {
+			const output = execQuiet(
+				"git ls-files --cached --others --exclude-standard",
+				{
+					cwd: projectRoot,
+					maxBuffer: 10 * 1024 * 1024,
+				},
+			)
+			const files = output.split("\n").filter(Boolean)
+			const match = files.find(
+				(f) =>
+					f === rawPath ||
+					f.endsWith("/" + rawPath) ||
+					f.endsWith("/" + baseName) ||
+					f === baseName,
+			)
+			if (match) {
+				return {
+					filePath: path.resolve(projectRoot, match),
+					resolvedRelativePath: match,
+				}
+			}
+		} catch {
+			try {
+				const output = execQuiet(
+					'find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*"',
+					{
+						cwd: projectRoot,
+						maxBuffer: 10 * 1024 * 1024,
+					},
+				)
+				const files = output
+					.split("\n")
+					.filter(Boolean)
+					.map((f) => f.replace(/^\.\//, ""))
+				const match = files.find(
+					(f) =>
+						f === rawPath ||
+						f.endsWith("/" + rawPath) ||
+						f.endsWith("/" + baseName) ||
+						f === baseName,
+				)
+				if (match) {
+					return {
+						filePath: path.resolve(projectRoot, match),
+						resolvedRelativePath: match,
+					}
+				}
+			} catch {}
+		}
+	}
+	return { filePath, resolvedRelativePath: rawPath }
+}
+
 export function getFileHandlers(): Record<string, IpcCommandHandler> {
 	return {
 		listDirectory: async (command, ctx) => {
@@ -62,9 +126,13 @@ export function getFileHandlers(): Record<string, IpcCommandHandler> {
 		},
 		readFileContents: async (command, ctx) => {
 			const projectRoot = ctx.getActiveSession().projectRoot
-			const filePath = path.resolve(projectRoot, (command.path as string) || "")
-			if (!filePath.startsWith(projectRoot)) {
-				throw new Error("Access denied: path outside project root")
+			const rawPath = (command.path as string) || ""
+			const { filePath, resolvedRelativePath } = resolveProjectPath(
+				projectRoot,
+				rawPath,
+			)
+			if (!fs.existsSync(filePath)) {
+				throw new Error(`File not found: ${rawPath}`)
 			}
 			const stat = fs.statSync(filePath)
 			if (stat.isDirectory()) {
@@ -77,7 +145,7 @@ export function getFileHandlers(): Record<string, IpcCommandHandler> {
 			const ext = path.extname(filePath).slice(1)
 			return {
 				content,
-				path: command.path as string,
+				path: resolvedRelativePath,
 				fileName: path.basename(filePath),
 				extension: ext,
 				size: stat.size,
@@ -86,7 +154,8 @@ export function getFileHandlers(): Record<string, IpcCommandHandler> {
 		},
 		writeFileContents: async (command, ctx) => {
 			const projectRoot = ctx.getActiveSession().projectRoot
-			const filePath = path.resolve(projectRoot, (command.path as string) || "")
+			const rawPath = (command.path as string) || ""
+			const { filePath } = resolveProjectPath(projectRoot, rawPath)
 			if (!filePath.startsWith(projectRoot)) {
 				throw new Error("Access denied: path outside project root")
 			}

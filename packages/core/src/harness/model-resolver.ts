@@ -12,70 +12,10 @@ import { AuthStorage } from "../auth/storage.js"
 import { loadSettings, getCustomProviderId } from "./settings.js"
 import { DEFAULT_OM_MODEL_ID } from "./state.js"
 import { withThinkingOptions } from "./thinking.js"
-import { PROVIDER_DEFAULT_MODELS } from "../constants/models.js"
 
 export interface ResolveModelOptions {
 	thinkingLevel?: string
 	remapForCodexOAuth?: boolean
-}
-
-function wrapWithFallback(primaryModel: any, getFallbackModel: () => any) {
-	let fallbackInstance: any = null
-	const getFallback = () => {
-		if (!fallbackInstance) fallbackInstance = getFallbackModel()
-		return fallbackInstance
-	}
-	const isTransientError = (err: any) => {
-		const str = String(err?.message || err)
-		return (
-			str.includes("503") ||
-			str.includes("Service Unavailable") ||
-			str.includes("unavailable") ||
-			str.includes("overloaded") ||
-			str.includes("aborted due to timeout") ||
-			str.includes("timeout") ||
-			str.includes("ECONNRESET")
-		)
-	}
-
-	return new Proxy(primaryModel, {
-		get(target, prop, receiver) {
-			if (prop === "doStream") {
-				return async (...args: any[]) => {
-					try {
-						return await target.doStream(...args)
-					} catch (err: any) {
-						if (isTransientError(err)) {
-							console.warn(
-								`[model-fallback] Primary model error (${err?.message || err}), switching to fallback model...`,
-							)
-							const fb = getFallback()
-							return await fb.doStream(...args)
-						}
-						throw err
-					}
-				}
-			}
-			if (prop === "doGenerate") {
-				return async (...args: any[]) => {
-					try {
-						return await target.doGenerate(...args)
-					} catch (err: any) {
-						if (isTransientError(err)) {
-							console.warn(
-								`[model-fallback] Primary model error (${err?.message || err}), switching to fallback model...`,
-							)
-							const fb = getFallback()
-							return await fb.doGenerate(...args)
-						}
-						throw err
-					}
-				}
-			}
-			const val = Reflect.get(target, prop, receiver)
-			return typeof val === "function" ? val.bind(target) : val
-		},
-	})
 }
 
 export type ModelResolver = ReturnType<typeof createModelResolver>
@@ -178,17 +118,9 @@ export function createModelResolver(authStorage: AuthStorage) {
 					id: modelId as any,
 					apiKey,
 				})
-				const fallbackGoogleModel = PROVIDER_DEFAULT_MODELS.google
-				if (modelId !== fallbackGoogleModel) {
-					return wrapWithFallback(
-						primaryModel,
-						() =>
-							new ModelRouterLanguageModel({
-								id: fallbackGoogleModel as any,
-								apiKey,
-							}),
-					)
-				}
+				// Do not silently replace a model selected in Settings. In particular,
+				// Library re-run must report an invalid/unsupported Google model rather
+				// than issuing a second request to the provider default.
 				return primaryModel
 			}
 			return new ModelRouterLanguageModel(modelId as any)

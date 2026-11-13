@@ -2,12 +2,19 @@ import fs from "node:fs"
 import path from "node:path"
 import { getAppDataDir } from "../utils/project.js"
 import { DEFAULT_OM_MODEL_ID } from "./state.js"
+import { DEFAULT_SKILLHUB_API_BASE } from "../skills/market-sources.js"
 
 export interface CustomProviderConfig {
 	name: string
 	url: string
 	apiKey?: string
 	models: string[]
+}
+
+export interface SkillHubSourceConfig {
+	url: string
+	name?: string
+	createdAt?: number
 }
 
 export interface SettingsData {
@@ -34,6 +41,8 @@ export interface SettingsData {
 	modelUseCounts: Record<string, number>
 	updateDismissedVersion: string | null
 	lsp?: Record<string, any>
+	skillHubSources?: SkillHubSourceConfig[]
+	activeSkillHubSourceUrl?: string
 	/**
 	 * Credentials for MCP servers that ship with the app. Kept here rather than
 	 * in mcp.json so a built-in server never needs a hand-written config file:
@@ -67,7 +76,34 @@ const DEFAULT_SETTINGS: SettingsData = {
 	modelUseCounts: {},
 	updateDismissedVersion: null,
 	lsp: {},
+	skillHubSources: [],
+	activeSkillHubSourceUrl: DEFAULT_SKILLHUB_API_BASE,
 	mcp: { apiKeys: {} },
+}
+
+export function sanitizeModelUseCounts(
+	counts: Record<string, unknown> | null | undefined,
+): Record<string, number> {
+	if (!counts || typeof counts !== "object" || Array.isArray(counts)) {
+		return {}
+	}
+	const result: Record<string, number> = {}
+	for (const [key, val] of Object.entries(counts)) {
+		const trimmedKey = typeof key === "string" ? key.trim() : ""
+		if (
+			!trimmedKey ||
+			trimmedKey === "[object Object]" ||
+			trimmedKey === "undefined" ||
+			trimmedKey === "null"
+		) {
+			continue
+		}
+		const num = typeof val === "number" ? val : Number(val)
+		if (Number.isFinite(num) && num > 0) {
+			result[trimmedKey] = Math.floor(num)
+		}
+	}
+	return result
 }
 
 export function getSettingsPath(): string {
@@ -93,11 +129,18 @@ export function loadSettings(
 			customProviders: Array.isArray(raw.customProviders)
 				? raw.customProviders
 				: [],
-			modelUseCounts:
-				raw.modelUseCounts && typeof raw.modelUseCounts === "object"
-					? raw.modelUseCounts
-					: {},
+			modelUseCounts: sanitizeModelUseCounts(raw.modelUseCounts),
 			lsp: raw.lsp && typeof raw.lsp === "object" ? raw.lsp : {},
+			skillHubSources: Array.isArray(raw.skillHubSources)
+				? raw.skillHubSources.filter(
+						(s: any) => s && typeof s.url === "string" && s.url.trim(),
+					)
+				: [],
+			activeSkillHubSourceUrl:
+				typeof raw.activeSkillHubSourceUrl === "string" &&
+				raw.activeSkillHubSourceUrl.trim()
+					? raw.activeSkillHubSourceUrl.trim()
+					: DEFAULT_SKILLHUB_API_BASE,
 			mcp: {
 				...DEFAULT_SETTINGS.mcp,
 				...(raw.mcp && typeof raw.mcp === "object" ? raw.mcp : {}),
@@ -117,6 +160,7 @@ export function saveSettings(
 	filePath: string = getSettingsPath(),
 ): void {
 	try {
+		settings.modelUseCounts = sanitizeModelUseCounts(settings.modelUseCounts)
 		const dir = path.dirname(filePath)
 		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 		fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf-8")
