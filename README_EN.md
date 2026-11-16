@@ -37,23 +37,23 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#downloads-for-all-platforms)
 [![ChangeLog](https://img.shields.io/badge/ChangeLog-notes-blueviolet)](https://kidyfirst.github.io/my-agent/changelog.html)
 
-**Latest stable version: `v0.1.8`**  
+**Latest stable version: `v0.1.9`**  
 🌐 **[Official download site (GitHub Pages)](https://kidyfirst.github.io/my-agent/)** ｜ 📋 **[Release notes (ChangeLog)](https://kidyfirst.github.io/my-agent/changelog.html)** ｜ 📦 **[GitHub Releases](https://github.com/kidyfirst/my-agent/releases)**
 
 </div>
 
 ### Downloads for all platforms
 
-| Platform | Architecture / device | Package | Direct download (v0.1.8) | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer | [my-agent-0.1.8-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-arm64.dmg) | Recommended for most Macs |
-| 🍏 **macOS** | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build | [my-agent-0.1.8-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-arm64.zip) | Unzip and run |
-| 🍏 **macOS** | **Intel x86_64** | `.dmg` installer | [my-agent-0.1.8-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-x64.dmg) | For Intel-based Macs |
-| 🍏 **macOS** | **Intel x86_64** | `.zip` portable build | [my-agent-0.1.8-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-mac-x64.zip) | Unzip and run |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit) | `.exe` installer | [my-agent-0.1.8-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-win-x64.exe) | NSIS guided setup |
-| 🪟 **Windows** | **Windows 10 / 11** (64-bit) | `.zip` portable build | [my-agent-0.1.8-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-win-x64.zip) | Unzip and run |
-| 🐧 **Linux** | **Linux x86_64** (generic) | `.AppImage` portable image | [my-agent-0.1.8-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-linux-x86_64.AppImage) | `chmod +x`, then run it |
-| 🐧 **Linux** | **Debian / Ubuntu / Deepin** | `.deb` package | [my-agent-0.1.8-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.8/my-agent-0.1.8-linux-amd64.deb) | Install with `sudo dpkg -i` |
+| Platform       | Architecture / device                 | Package                    | Direct download (v0.1.9)                                                                                                                    | Notes                       |
+| :------------- | :------------------------------------ | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------- |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.dmg` installer           | [my-agent-0.1.9-mac-arm64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-mac-arm64.dmg)                 | Recommended for most Macs   |
+| 🍏 **macOS**   | **Apple Silicon** (M1 / M2 / M3 / M4) | `.zip` portable build      | [my-agent-0.1.9-mac-arm64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-mac-arm64.zip)                 | Unzip and run               |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.dmg` installer           | [my-agent-0.1.9-mac-x64.dmg](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-mac-x64.dmg)                     | For Intel-based Macs        |
+| 🍏 **macOS**   | **Intel x86_64**                      | `.zip` portable build      | [my-agent-0.1.9-mac-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-mac-x64.zip)                     | Unzip and run               |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.exe` installer           | [my-agent-0.1.9-win-x64.exe](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-win-x64.exe)                     | NSIS guided setup           |
+| 🪟 **Windows** | **Windows 10 / 11** (64-bit)          | `.zip` portable build      | [my-agent-0.1.9-win-x64.zip](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-win-x64.zip)                     | Unzip and run               |
+| 🐧 **Linux**   | **Linux x86_64** (generic)            | `.AppImage` portable image | [my-agent-0.1.9-linux-x86_64.AppImage](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-linux-x86_64.AppImage) | `chmod +x`, then run it     |
+| 🐧 **Linux**   | **Debian / Ubuntu / Deepin**          | `.deb` package             | [my-agent-0.1.9-linux-amd64.deb](https://github.com/kidyfirst/my-agent/releases/download/v0.1.9/my-agent-0.1.9-linux-amd64.deb)             | Install with `sudo dpkg -i` |
 
 > [!IMPORTANT]
 > **macOS says the app “is damaged” or “cannot be opened”:**  
@@ -70,6 +70,7 @@ This project is a desktop-grade intelligent coding assistant built on **Electron
 > - Full history and per-version details: 👉 **[online ChangeLog](https://kidyfirst.github.io/my-agent/changelog.html)** or **[all releases on GitHub](https://github.com/kidyfirst/my-agent/releases)**.
 
 ---
+
 <!-- LATEST_RELEASE_END -->
 
 <!-- TIP_JAR_START — the QR is apps/desktop/src/renderer/assets/alipay-qr.png itself; do not add a second copy -->
@@ -1572,3 +1573,7 @@ During architectural evolution, context memory governance, and product UX design
 - **[mastra-code-ui](https://github.com/mastra-ai/mastra-code-ui)**: Mastra AI's pioneering open-source desktop agent UI paradigm and coding workbench, which laid a strong foundation for our desktop client layout and code interaction workflows.
 
 <!-- This document is continuously maintained; in case of discrepancy with the code, the code takes precedence. -->
+
+## License
+
+MIT

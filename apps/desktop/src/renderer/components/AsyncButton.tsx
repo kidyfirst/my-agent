@@ -30,7 +30,7 @@ export function AsyncButton({ onClick, children, loading = false, loadingLabel, 
 				}
 			}}
 		>
-			{busy && progress !== undefined && <span aria-hidden="true" style={{ position: "absolute", inset: "auto 0 0", height: 3, overflow: "hidden", borderRadius: "inherit" }}><span style={{ display: "block", width: progress === null ? "42%" : `${Math.max(0, Math.min(100, progress))}%`, height: "100%", background: "rgba(255,255,255,.85)", animation: progress === null ? "async-button-progress 1.1s ease-in-out infinite" : undefined }} /></span>}
+			{busy && progress !== undefined && <span aria-hidden="true" style={{ position: "absolute", inset: "auto 0 0", height: 3, overflow: "hidden", borderRadius: "inherit" }}><span style={{ display: "block", width: progress === null ? "42%" : `${Math.max(0, Math.min(100, progress))}%`, height: "100%", background: "var(--async-progress)", animation: progress === null ? "async-button-progress 1.1s ease-in-out infinite" : undefined }} /></span>}
 			{busy && <SpinnerIcon size={13} aria-label="Loading" />}
 			{busy ? (loadingLabel || children) : children}
 		</button>

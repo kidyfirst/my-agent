@@ -160,7 +160,7 @@ describe("skills-handlers and slash commands integration", () => {
 		expect(initial.sources.some((s) => s.name === "clawhub.ai")).toBe(true)
 		expect(initial.activeSourceUrl).toBeDefined()
 
-		// 2. Set active source
+		// 2. Selection is session-only; it must not change the persisted default.
 		const setOk = await handlers.setActiveSkillHubSource(
 			{ url: "https://clawhub.ai" },
 			mockCtx,
@@ -171,7 +171,7 @@ describe("skills-handlers and slash commands integration", () => {
 			sources: Array<{ name: string; url: string }>
 			activeSourceUrl: string
 		}
-		expect(afterSet.activeSourceUrl).toBe("https://clawhub.ai")
+		expect(afterSet.activeSourceUrl).toBe(initial.sources[0].url)
 
 		// 3. Reset active source back to default
 		await handlers.setActiveSkillHubSource(

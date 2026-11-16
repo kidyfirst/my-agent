@@ -208,7 +208,6 @@ Instructions for design.`
 		const installResult = await manager.installSkill({
 			name: "huashu-design",
 			owner: "alchaincyf",
-			repositoryUrl: "https://github.com/alchaincyf/huashu-design",
 			headSha: "804f2193ef39e9cbe68c0e23d0701141f440a344",
 			manifestContent: skillContent,
 			files: { "SKILL.md": skillContent },

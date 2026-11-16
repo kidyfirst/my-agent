@@ -116,6 +116,7 @@ body.light-theme {
 	/* Primary blue call to action (composer send, update prompt). */
 	--action: #1a73e8;
 	--action-hover: #1557b0;
+	--async-progress: rgba(255, 255, 255, 0.85);
 	/* Third-party issue tracker accent (Linear). */
 	--issue: #5e6ad2;
 	/* Third-party language marks — identical in both themes. */
@@ -256,6 +257,7 @@ body.dark-theme {
 	/* Primary blue call to action (composer send, update prompt). */
 	--action: #3b82f6;
 	--action-hover: #2563eb;
+	--async-progress: rgba(255, 255, 255, 0.85);
 	/* Third-party issue tracker accent (Linear). */
 	--issue: #a5b4fc;
 	/* Third-party language marks — identical in both themes. */
